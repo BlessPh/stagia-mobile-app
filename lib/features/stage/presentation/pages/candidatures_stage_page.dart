@@ -69,11 +69,12 @@ class _CandidaturesStagePageState extends State<CandidaturesStagePage> {
                 child: CircularProgressIndicator(color: Color(0xFFFF7417)),
               );
             }
-            if (snapshot.hasError)
+            if (snapshot.hasError) {
               return ErreurChargementApi(
                 erreur: snapshot.error,
                 onReessayer: _actualiser,
               );
+            }
             final items = _liste(snapshot.data?['items']);
             final visibles = _filtrer(items);
             return RefreshIndicator(

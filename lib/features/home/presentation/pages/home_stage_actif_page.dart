@@ -1,12 +1,18 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 import 'home_shared_widgets.dart';
 
 class HomeStageActifPage extends StatelessWidget {
-  const HomeStageActifPage({required this.donnees, super.key});
+  const HomeStageActifPage({
+    required this.donnees,
+    this.chargement = false,
+    super.key,
+  });
 
   final Map<String, dynamic> donnees;
+  final bool chargement;
 
   @override
   Widget build(BuildContext context) {
@@ -17,64 +23,67 @@ class HomeStageActifPage extends StatelessWidget {
         stats['payment_paid'] == true ||
         stats['payment_status']?.toString().toUpperCase() == 'PAYE';
 
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: EdgeInsets.fromLTRB(marge, 16, marge, 28),
-      children: [
-        stage.isEmpty
-            ? const _CarteVide('Aucun stage actuel.')
-            : _CarteStage(stage),
-        const SizedBox(height: 18),
-        Row(
-          children: [
-            Expanded(
-              child: _Indicateur(
-                'assets/icons/candidature.png',
-                '${stats['applications'] ?? 0}',
-                'Candidatures',
+    return Skeletonizer(
+      enabled: chargement,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.fromLTRB(marge, 16, marge, 28),
+        children: [
+          stage.isEmpty
+              ? const _CarteVide('Aucun stage actuel.')
+              : _CarteStage(stage),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: _Indicateur(
+                  'assets/icons/candidature.png',
+                  '${stats['applications'] ?? 0}',
+                  'Candidatures',
+                ),
               ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _Indicateur(
-                'assets/icons/stage_en_cours.png',
-                '${stats['active_stages'] ?? stats['stages'] ?? 0}',
-                'Stage en cours',
+              const SizedBox(width: 10),
+              Expanded(
+                child: _Indicateur(
+                  'assets/icons/stage_en_cours.png',
+                  '${stats['active_stages'] ?? stats['stages'] ?? 0}',
+                  'Stage en cours',
+                ),
               ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _Indicateur(
-                paiementEffectue
-                    ? 'assets/icons/paiement_effectue.png'
-                    : 'assets/icons/paiement.png',
-                paiementEffectue ? 'Payé' : 'Non payé',
-                'Paiements',
+              const SizedBox(width: 10),
+              Expanded(
+                child: _Indicateur(
+                  paiementEffectue
+                      ? 'assets/icons/paiement_effectue.png'
+                      : 'assets/icons/paiement.png',
+                  paiementEffectue ? 'Payé' : 'Non payé',
+                  'Paiements',
+                ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
-        _Statut(
-          'Présence quotidienne',
-          '${stage['taux_presence'] ?? 0}%',
-          'assets/icons/presence.png',
-        ),
-        const SizedBox(height: 12),
-        _Statut(
-          'Note',
-          stage['note_finale'] == null
-              ? 'Pas disponible'
-              : '${stage['note_finale']}',
-          'assets/icons/note.png',
-        ),
-        const SizedBox(height: 12),
-        _Statut(
-          'Documents envoyés',
-          '${stats['documents'] ?? 0}',
-          'assets/icons/documents.png',
-        ),
-      ],
+            ],
+          ),
+          const SizedBox(height: 20),
+          _Statut(
+            'Présence quotidienne',
+            '${stage['taux_presence'] ?? 0}%',
+            'assets/icons/presence.png',
+          ),
+          const SizedBox(height: 12),
+          _Statut(
+            'Note',
+            stage['note_finale'] == null
+                ? 'Pas disponible'
+                : '${stage['note_finale']}',
+            'assets/icons/note.png',
+          ),
+          const SizedBox(height: 12),
+          _Statut(
+            'Documents envoyés',
+            '${stats['documents'] ?? 0}',
+            'assets/icons/documents.png',
+          ),
+        ],
+      ),
     );
   }
 }

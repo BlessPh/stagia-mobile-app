@@ -1,15 +1,22 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 import '../../../../core/services/photo_profil_service.dart';
 import '../../../notifications/presentation/pages/notifications_page.dart';
 import '../../../messagerie/presentation/messages_page.dart';
 
 class EnTeteAccueil extends StatelessWidget implements PreferredSizeWidget {
-  const EnTeteAccueil({required this.etudiant, this.superviseur, super.key});
+  const EnTeteAccueil({
+    required this.etudiant,
+    this.superviseur,
+    this.chargement = false,
+    super.key,
+  });
 
   final Map<String, dynamic> etudiant;
   final Map<String, String>? superviseur;
+  final bool chargement;
 
   @override
   Size get preferredSize => const Size.fromHeight(76);
@@ -23,6 +30,29 @@ class EnTeteAccueil extends StatelessWidget implements PreferredSizeWidget {
       prenom,
       nom,
     ].where((element) => element.isNotEmpty).join(' ');
+
+    if (chargement) {
+      return AppBar(
+        automaticallyImplyLeading: false,
+        toolbarHeight: preferredSize.height,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        surfaceTintColor: Colors.transparent,
+        title: Skeletonizer.zone(
+          enabled: true,
+          effect: _effetChargement(context),
+          child: const Row(
+            children: [
+              Bone.circle(size: 52),
+              SizedBox(width: 12),
+              Expanded(child: Bone.text(width: 145, fontSize: 18)),
+              Bone.iconButton(size: 40),
+              SizedBox(width: 4),
+              Bone.iconButton(size: 40),
+            ],
+          ),
+        ),
+      );
+    }
 
     return AppBar(
       automaticallyImplyLeading: false,
@@ -103,6 +133,84 @@ class EnTeteAccueil extends StatelessWidget implements PreferredSizeWidget {
   }
 }
 
+class ChargementAccueil extends StatelessWidget {
+  const ChargementAccueil({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final marge = MediaQuery.sizeOf(context).width < 360 ? 14.0 : 18.0;
+    return Skeletonizer.zone(
+      enabled: true,
+      effect: _effetChargement(context),
+      child: ListView(
+        physics: const NeverScrollableScrollPhysics(),
+        padding: EdgeInsets.fromLTRB(marge, 16, marge, 28),
+        children: const [
+          Bone(height: 170, width: double.infinity, uniRadius: 22),
+          SizedBox(height: 22),
+          Bone.text(width: 210, fontSize: 20),
+          SizedBox(height: 14),
+          _LigneIndicateursChargement(),
+          SizedBox(height: 20),
+          Bone(height: 92, width: double.infinity, uniRadius: 20),
+          SizedBox(height: 12),
+          Bone(height: 92, width: double.infinity, uniRadius: 20),
+          SizedBox(height: 12),
+          Bone(height: 92, width: double.infinity, uniRadius: 20),
+        ],
+      ),
+    );
+  }
+}
+
+class ChargementPremiereConnexion extends StatelessWidget {
+  const ChargementPremiereConnexion({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final marge = MediaQuery.sizeOf(context).width < 360 ? 14.0 : 18.0;
+    return Skeletonizer.zone(
+      enabled: true,
+      effect: _effetChargement(context),
+      child: ListView(
+        physics: const NeverScrollableScrollPhysics(),
+        padding: EdgeInsets.fromLTRB(marge, 16, marge, 28),
+        children: const [
+          Bone(height: 170, width: double.infinity, uniRadius: 22),
+          SizedBox(height: 22),
+          Bone.text(width: 220, fontSize: 20),
+          SizedBox(height: 14),
+          Bone(height: 330, width: double.infinity, uniRadius: 22),
+        ],
+      ),
+    );
+  }
+}
+
+ShimmerEffect _effetChargement(BuildContext context) {
+  final sombre = Theme.of(context).brightness == Brightness.dark;
+  return ShimmerEffect(
+    baseColor: sombre ? const Color(0xFF303030) : const Color(0xFFD7DCE2),
+    highlightColor: sombre ? const Color(0xFF5A5A5A) : const Color(0xFFF7F8FA),
+    duration: const Duration(milliseconds: 900),
+  );
+}
+
+class _LigneIndicateursChargement extends StatelessWidget {
+  const _LigneIndicateursChargement();
+
+  @override
+  Widget build(BuildContext context) => const Row(
+    children: [
+      Expanded(child: Bone(height: 134, uniRadius: 20)),
+      SizedBox(width: 10),
+      Expanded(child: Bone(height: 134, uniRadius: 20)),
+      SizedBox(width: 10),
+      Expanded(child: Bone(height: 134, uniRadius: 20)),
+    ],
+  );
+}
+
 class ErreurAccueil extends StatelessWidget {
   const ErreurAccueil({required this.onReessayer, super.key});
 
@@ -119,7 +227,13 @@ class ErreurAccueil extends StatelessWidget {
           size: 40,
         ),
         const SizedBox(height: 12),
-        const Text('Impossible de charger les données.'),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 28),
+          child: Text(
+            'Connexion impossible. Vérifiez votre connexion Internet puis réessayez.',
+            textAlign: TextAlign.center,
+          ),
+        ),
         TextButton(onPressed: onReessayer, child: const Text('Réessayer')),
       ],
     ),

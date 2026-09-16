@@ -93,7 +93,7 @@ class _EtatAcademique extends State<ModifierInformationsAcademiquesPage> {
                       _ChampAcademique(
                         largeur: largeur,
                         controleur: _controleurs[2],
-                        libelle: 'Département ou filière',
+                        libelle: 'Département',
                         obligatoire: true,
                       ),
                       _ChampAcademique(
@@ -104,7 +104,7 @@ class _EtatAcademique extends State<ModifierInformationsAcademiquesPage> {
                       _ChampAcademique(
                         largeur: largeur,
                         controleur: _controleurs[4],
-                        libelle: 'Promotion et niveau',
+                        libelle: 'Promotion',
                         obligatoire: true,
                       ),
                       _ChampAcademique(
@@ -134,8 +134,14 @@ class _EtatAcademique extends State<ModifierInformationsAcademiquesPage> {
               child: FilledButton(
                 onPressed: _enregistrer,
                 style: FilledButton.styleFrom(
-                  backgroundColor: Color(Colors.black.value),
-                  foregroundColor: Color(Colors.white.value),
+                  backgroundColor:
+                      Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white
+                      : Colors.black,
+                  foregroundColor:
+                      Theme.of(context).brightness == Brightness.dark
+                      ? Colors.black
+                      : Colors.white,
                 ),
                 child: const Text('Enregistrer les modifications'),
               ),

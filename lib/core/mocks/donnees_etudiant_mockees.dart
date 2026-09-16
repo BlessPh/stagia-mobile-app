@@ -54,11 +54,11 @@ abstract final class DonneesEtudiantMockees {
     'student': {
       'stagia_code': 'STG-ETU-00000001',
       'nom': 'Bolia',
-      'postnom': 'Bolia',
+      'postnom': 'Kiza',
       'prenom': 'Matthew',
       'sexe': 'Masculin',
       'telephone': '+243 812 345 678',
-      'province': 'Kinshasa',
+      'lieu_naissance': 'Kinshasa',
       'university_name': 'Université de Kinshasa',
       'faculty_name': 'Faculté des sciences',
       'department_name': 'Informatique',
@@ -156,9 +156,7 @@ abstract final class DonneesEtudiantMockees {
     'items': <Map<String, dynamic>>[],
   };
 
-  static const admission = <String, dynamic>{
-    'items': <Map<String, dynamic>>[],
-  };
+  static const admission = <String, dynamic>{'items': <Map<String, dynamic>>[]};
 
   static const documents = <String, dynamic>{
     'items': <Map<String, dynamic>>[],
@@ -179,5 +177,4 @@ abstract final class DonneesEtudiantMockees {
     'items': <Map<String, dynamic>>[],
     'stats': {'total': 0, 'average': 0},
   };
-
 }

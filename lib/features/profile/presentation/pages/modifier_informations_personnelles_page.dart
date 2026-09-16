@@ -18,8 +18,8 @@ class _ModifierInformationsPersonnellesPageState
   late final TextEditingController _postnom;
   late final TextEditingController _prenom;
   late final TextEditingController _naissance;
+  late final TextEditingController _lieuNaissance;
   late final TextEditingController _adresse;
-  late final TextEditingController _province;
   late final TextEditingController _telephone;
   late final TextEditingController _email;
   late String _sexe;
@@ -39,8 +39,8 @@ class _ModifierInformationsPersonnellesPageState
           : parties.sublist(1, parties.length - 1).join(' '),
     );
     _naissance = TextEditingController(text: p.dateNaissance);
+    _lieuNaissance = TextEditingController(text: p.lieuNaissance);
     _adresse = TextEditingController(text: p.adresse);
-    _province = TextEditingController(text: p.province);
     _telephone = TextEditingController(text: p.telephone);
     _email = TextEditingController(text: p.email);
     _sexe = p.sexe;
@@ -53,8 +53,8 @@ class _ModifierInformationsPersonnellesPageState
       _postnom,
       _prenom,
       _naissance,
+      _lieuNaissance,
       _adresse,
-      _province,
       _telephone,
       _email,
     ]) {
@@ -90,8 +90,8 @@ class _ModifierInformationsPersonnellesPageState
         nomComplet: nomComplet,
         sexe: _sexe,
         dateNaissance: _naissance.text.trim(),
+        lieuNaissance: _lieuNaissance.text.trim(),
         adresse: _adresse.text.trim(),
-        province: _province.text.trim(),
         telephone: _telephone.text.trim(),
         email: widget.profil.email,
       ),
@@ -165,11 +165,19 @@ class _ModifierInformationsPersonnellesPageState
                         indication: 'JJ-MM-AAAA',
                         lectureSeule: true,
                         onTap: _choisirDate,
+                        suffixIcon: IconButton(
+                          tooltip: 'Ouvrir le calendrier',
+                          onPressed: _choisirDate,
+                          icon: const Icon(
+                            Icons.calendar_month_outlined,
+                            color: Colors.grey,
+                          ),
+                        ),
                       ),
                       _Champ(
                         largeur: largeur,
-                        controleur: _province,
-                        libelle: 'Province et ville',
+                        controleur: _lieuNaissance,
+                        libelle: 'Lieu de naissance',
                         obligatoire: true,
                       ),
                       _Champ(
@@ -213,6 +221,7 @@ class _Champ extends StatelessWidget {
     this.lectureSeule = false,
     this.obligatoire = false,
     this.onTap,
+    this.suffixIcon,
   }) : aide = null;
   final double largeur;
   final TextEditingController controleur;
@@ -224,6 +233,7 @@ class _Champ extends StatelessWidget {
   final bool lectureSeule;
   final bool obligatoire;
   final VoidCallback? onTap;
+  final Widget? suffixIcon;
 
   @override
   Widget build(BuildContext context) => SizedBox(
@@ -244,6 +254,7 @@ class _Champ extends StatelessWidget {
           indication: indication,
           aide: aide,
           lectureSeule: lectureSeule,
+          suffixIcon: suffixIcon,
         ),
         validator: obligatoire
             ? (valeur) =>
@@ -279,9 +290,11 @@ InputDecoration _decoration(
   String? indication,
   String? aide,
   bool lectureSeule = false,
+  Widget? suffixIcon,
 }) => InputDecoration(
   hintText: indication,
   helperText: aide,
+  suffixIcon: suffixIcon,
   filled: true,
   fillColor: lectureSeule
       ? (Theme.of(context).brightness == Brightness.dark
@@ -345,8 +358,12 @@ class _BarreEnregistrement extends StatelessWidget {
           child: FilledButton(
             onPressed: onEnregistrer,
             style: FilledButton.styleFrom(
-              backgroundColor: Color(Colors.black.value),
-              foregroundColor: Color(Colors.white.value),
+              backgroundColor: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white
+                  : Colors.black,
+              foregroundColor: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.black
+                  : Colors.white,
             ),
             child: const Text('Enregistrer les modifications'),
           ),

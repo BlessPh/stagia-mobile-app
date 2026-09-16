@@ -498,8 +498,12 @@ class _JournalPageState extends State<JournalPage>
     floatingActionButton: widget.estActif && _indexOnglet == 0
         ? FloatingActionButton(
             onPressed: _ajouterActivite,
-            backgroundColor: Colors.black,
-            foregroundColor: Colors.white,
+            backgroundColor: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white
+                : Colors.black,
+            foregroundColor: Theme.of(context).brightness == Brightness.dark
+                ? Colors.black
+                : Colors.white,
             elevation: 6,
             shape: const CircleBorder(side: BorderSide(color: Colors.black)),
             tooltip: 'Ajouter une activité',

@@ -1,20 +1,21 @@
 import 'package:flutter/material.dart';
 import '../../../../core/mocks/depot_mock_etudiant.dart';
+import 'home_shared_widgets.dart';
 
 class HomePremiereConnexionPage extends StatelessWidget {
   const HomePremiereConnexionPage({
-    required this.campagnes,
     required this.candidatures,
-    required this.onVoirCampagnes,
+    this.chargement = false,
     super.key,
   });
 
-  final List<Map<String, dynamic>> campagnes;
   final List<Map<String, dynamic>> candidatures;
-  final VoidCallback? onVoirCampagnes;
+  final bool chargement;
 
   @override
   Widget build(BuildContext context) {
+    if (chargement) return const ChargementPremiereConnexion();
+
     final marge = MediaQuery.sizeOf(context).width < 360 ? 14.0 : 18.0;
     final modeSombre = Theme.of(context).brightness == Brightness.dark;
     return ListView(
@@ -29,32 +30,6 @@ class HomePremiereConnexionPage extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         _ParcoursDebutant(candidatures: candidatures),
-        if (campagnes.isNotEmpty) ...[
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Campagnes disponibles',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
-                ),
-              ),
-              TextButton(
-                onPressed: onVoirCampagnes,
-                child: const Text('Voir tout'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          for (final campagne in campagnes.take(2))
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _CarteCampagne(
-                campagne: campagne,
-                onVoirCampagnes: onVoirCampagnes,
-              ),
-            ),
-        ],
       ],
     );
   }
@@ -327,55 +302,6 @@ class _EtapeParcours extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _CarteCampagne extends StatelessWidget {
-  const _CarteCampagne({required this.campagne, required this.onVoirCampagnes});
-
-  final Map<String, dynamic> campagne;
-  final VoidCallback? onVoirCampagnes;
-
-  @override
-  Widget build(BuildContext context) {
-    final titre =
-        campagne['title']?.toString() ??
-        campagne['campaign_title']?.toString() ??
-        'Campagne de stage';
-    final code = campagne['code']?.toString() ?? '';
-    final places =
-        campagne['available_places'] ?? campagne['places_disponibles'];
-    return Card(
-      color: Theme.of(context).colorScheme.surfaceContainerLow,
-      surfaceTintColor: Colors.transparent,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(titre, style: const TextStyle(fontWeight: FontWeight.w900)),
-            if (code.isNotEmpty)
-              Text(code, style: const TextStyle(color: Color(0xFF718096))),
-            if (places != null) ...[
-              const SizedBox(height: 7),
-              Text('$places places disponibles'),
-            ],
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: onVoirCampagnes,
-                style: OutlinedButton.styleFrom(
-                  backgroundColor: Colors.black,
-                  foregroundColor: Colors.white,
-                ),
-                child: const Text('Voir les campagnes'),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

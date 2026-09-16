@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../../../core/mocks/depot_mock_etudiant.dart';
 import '../../../../core/network/client_api_http.dart';
+import '../../../../core/network/configuration_api.dart';
 import '../../../../core/network/source_etudiant_distante.dart';
 import '../../../../core/services/session_authentification_service.dart';
 import '../../../../core/widgets/contenu_adaptatif.dart';
-import '../../../stage/data/datasources/source_stage_distante.dart';
 import 'home_premiere_connexion_page.dart';
 import 'home_shared_widgets.dart';
 import 'home_stage_actif_page.dart';
@@ -25,7 +25,6 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final _source = SourceEtudiantDistante(ClientApiHttp());
-  final _sourceStages = SourceStageDistante(ClientApiHttp());
   late Future<List<Map<String, dynamic>>> _chargement;
   Map<String, dynamic> _identiteSession = const {};
 
@@ -52,19 +51,21 @@ class _HomePageState extends State<HomePage> {
     if (mounted) setState(() => _chargement = _charger());
   }
 
-  Future<List<Map<String, dynamic>>> _charger() => Future.wait([
-    _source.tableauDeBord(),
-    _chargerCampagnes(),
-    _source.candidatures(),
-    _chargerProfil(),
-  ]);
-
-  Future<Map<String, dynamic>> _chargerCampagnes() async {
-    try {
-      return await _sourceStages.campagnes();
-    } catch (_) {
-      return const <String, dynamic>{'campaigns': <dynamic>[]};
+  Future<List<Map<String, dynamic>>> _charger() async {
+    final debut = DateTime.now();
+    final donnees = await Future.wait([
+      _source.tableauDeBord(),
+      _source.candidatures(),
+      _chargerProfil(),
+    ]);
+    final tempsEcoule = DateTime.now().difference(debut);
+    final dureeMinimale = ConfigurationApi.utiliserDonneesMockees
+        ? const Duration(seconds: 3) // la durée de skeleton en mock
+        : const Duration(seconds: 3);
+    if (tempsEcoule < dureeMinimale) {
+      await Future<void>.delayed(dureeMinimale - tempsEcoule);
     }
+    return donnees;
   }
 
   Future<Map<String, dynamic>> _chargerProfil() async {
@@ -88,15 +89,13 @@ class _HomePageState extends State<HomePage> {
     future: _chargement,
     builder: (context, snapshot) {
       final donnees = snapshot.data?.first ?? const <String, dynamic>{};
-      final options = snapshot.data != null && snapshot.data!.length > 1
+      final candidatures = snapshot.data != null && snapshot.data!.length > 1
           ? snapshot.data![1]
           : const <String, dynamic>{};
-      final candidatures = snapshot.data != null && snapshot.data!.length > 2
+      final profil = snapshot.data != null && snapshot.data!.length > 2
           ? snapshot.data![2]
           : const <String, dynamic>{};
-      final profil = snapshot.data != null && snapshot.data!.length > 3
-          ? snapshot.data![3]
-          : const <String, dynamic>{};
+      final enChargement = snapshot.connectionState == ConnectionState.waiting;
 
       final etudiant = <String, dynamic>{};
       void ajouterIdentite(Map<String, dynamic> source) {
@@ -121,21 +120,18 @@ class _HomePageState extends State<HomePage> {
         appBar: EnTeteAccueil(
           etudiant: etudiant,
           superviseur: _superviseurActuel(donnees),
+          chargement: enChargement,
         ),
         body: ContenuAdaptatif(
-          enfant: snapshot.connectionState == ConnectionState.waiting
-              ? const Center(
-                  child: CircularProgressIndicator(color: Color(0xFFFF7417)),
-                )
-              : snapshot.hasError
+          enfant: snapshot.hasError
               ? ErreurAccueil(onReessayer: _actualiser)
               : RefreshIndicator(
                   color: const Color(0xFFFF7417),
                   onRefresh: _actualiser,
                   child: _interfaceAccueil(
                     donnees: donnees,
-                    campagnes: listeApi(options['campaigns']),
                     candidatures: listeApi(candidatures['items']),
+                    chargement: enChargement,
                   ),
                 ),
         ),
@@ -200,18 +196,17 @@ class _HomePageState extends State<HomePage> {
 
   Widget _interfaceAccueil({
     required Map<String, dynamic> donnees,
-    required List<Map<String, dynamic>> campagnes,
     required List<Map<String, dynamic>> candidatures,
+    required bool chargement,
   }) {
     final stats = mapApi(donnees['stats']);
     if (entierApi(stats['stages']) == 0) {
       return HomePremiereConnexionPage(
-        campagnes: campagnes,
         candidatures: candidatures,
-        onVoirCampagnes: widget.onOuvrirStages,
+        chargement: chargement,
       );
     }
 
-    return HomeStageActifPage(donnees: donnees);
+    return HomeStageActifPage(donnees: donnees, chargement: chargement);
   }
 }

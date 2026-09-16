@@ -3,8 +3,8 @@ class EtudiantProfil {
     required this.nomComplet,
     required this.sexe,
     required this.dateNaissance,
+    required this.lieuNaissance,
     required this.adresse,
-    required this.province,
     required this.telephone,
     required this.email,
     required this.etablissement,
@@ -20,8 +20,8 @@ class EtudiantProfil {
     nomComplet: '',
     sexe: '',
     dateNaissance: '',
+    lieuNaissance: '',
     adresse: '',
-    province: '',
     telephone: '',
     email: '',
     etablissement: '',
@@ -45,8 +45,11 @@ class EtudiantProfil {
       nomComplet: noms,
       sexe: student['sexe']?.toString() ?? '',
       dateNaissance: student['date_naissance']?.toString() ?? '',
+      lieuNaissance:
+          student['lieu_naissance']?.toString() ??
+          student['ville_naissance']?.toString() ??
+          '',
       adresse: student['adresse']?.toString() ?? '',
-      province: student['province']?.toString() ?? '',
       telephone: student['telephone']?.toString() ?? '',
       email: user['email']?.toString() ?? student['email']?.toString() ?? '',
       etablissement: student['university_name']?.toString() ?? '',
@@ -67,8 +70,8 @@ class EtudiantProfil {
   final String nomComplet;
   final String sexe;
   final String dateNaissance;
+  final String lieuNaissance;
   final String adresse;
-  final String province;
   final String telephone;
   final String email;
   final String etablissement;
@@ -93,8 +96,8 @@ class EtudiantProfil {
     String? nomComplet,
     String? sexe,
     String? dateNaissance,
+    String? lieuNaissance,
     String? adresse,
-    String? province,
     String? telephone,
     String? email,
     String? etablissement,
@@ -108,8 +111,8 @@ class EtudiantProfil {
     nomComplet: nomComplet ?? this.nomComplet,
     sexe: sexe ?? this.sexe,
     dateNaissance: dateNaissance ?? this.dateNaissance,
+    lieuNaissance: lieuNaissance ?? this.lieuNaissance,
     adresse: adresse ?? this.adresse,
-    province: province ?? this.province,
     telephone: telephone ?? this.telephone,
     email: email ?? this.email,
     etablissement: etablissement ?? this.etablissement,
