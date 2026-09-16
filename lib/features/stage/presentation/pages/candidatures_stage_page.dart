@@ -5,7 +5,6 @@ import '../../../../core/network/source_etudiant_distante.dart';
 import '../../../../core/widgets/contenu_adaptatif.dart';
 import '../../../../core/widgets/erreur_chargement_api.dart';
 import '../widgets/onglets_stage.dart';
-import '../font_awesome_flutter_icons.dart';
 
 enum FiltreCandidature { toutes, enCours, eligible, terminee }
 
