@@ -42,8 +42,8 @@ class EnTeteAccueil extends StatelessWidget implements PreferredSizeWidget {
           effect: _effetChargement(context),
           child: const Row(
             children: [
-              Bone.circle(size: 52),
-              SizedBox(width: 12),
+              Bone.circle(size: 40), // la taille de l'avatar
+              SizedBox(width: 10),
               Expanded(child: Bone.text(width: 145, fontSize: 18)),
               Bone.iconButton(size: 40),
               SizedBox(width: 4),
@@ -67,7 +67,7 @@ class EnTeteAccueil extends StatelessWidget implements PreferredSizeWidget {
               final photo = PhotoProfilService.instance.cheminPhoto;
               final photoValide = photo != null && File(photo).existsSync();
               return CircleAvatar(
-                radius: 26,
+                radius: 22,
                 backgroundColor: modeSombre
                     ? Colors.black
                     : const Color(0xFFE5E7EB),
@@ -76,13 +76,13 @@ class EnTeteAccueil extends StatelessWidget implements PreferredSizeWidget {
                     ? const FaIcon(
                         FontAwesomeIcons.user,
                         color: Color(0xFF9CA3AF),
-                        size: 24,
+                        size: 21,
                       )
                     : null,
               );
             },
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               nomComplet.isEmpty ? 'Étudiant' : nomComplet,
