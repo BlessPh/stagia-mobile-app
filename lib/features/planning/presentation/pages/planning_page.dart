@@ -3,7 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../data/datasources/source_planning_mock.dart';
 import '../../domain/entities/tache_planning.dart';
 import '../widgets/ajouter_tache_modal.dart';
-import '../widgets/tache_detail_modal.dart';
 import 'detail_tache_page.dart';
 
 class PlanningPage extends StatefulWidget {

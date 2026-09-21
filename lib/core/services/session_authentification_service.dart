@@ -17,31 +17,30 @@ abstract final class SessionAuthentificationService {
       data['token_type']?.toString() ?? 'Bearer',
     );
 
-    final etudiant = data['student'] is Map ? data['student'] : data['user'];
-    if (etudiant is Map) {
-      final email = etudiant['email'] ?? data['email'];
-      final matricule =
-          etudiant['matricule'] ?? etudiant['stagia_code'] ?? data['matricule'];
-      await preferences.setString(_cleEmail, email?.toString() ?? '');
-      await preferences.setString(_cleMatricule, matricule?.toString() ?? '');
-      await preferences.setString(
-        _cleStagiaCode,
-        etudiant['stagia_code']?.toString() ?? '',
-      );
-      await preferences.setString(
-        _cleNom,
-        etudiant['nom']?.toString() ?? etudiant['postnom']?.toString() ?? '',
-      );
-      await preferences.setString(
-        _clePrenom,
-        etudiant['prenom']?.toString() ?? '',
-      );
-    }
+    final user = data['user'] is Map ? Map<String, dynamic>.from(data['user'] as Map) : null;
+    final student = data['student'] is Map ? Map<String, dynamic>.from(data['student'] as Map) : null;
+
+    final email = user?['email'] ?? student?['email'] ?? data['email'];
+    final stagiaCode = student?['stagia_code'] ?? user?['stagia_code'] ?? data['stagia_code'];
+    final matricule = student?['matricule'] ?? stagiaCode ?? user?['matricule'] ?? user?['identifiant'];
+    final nom = student?['nom'] ?? user?['nom'] ?? '';
+    final prenom = student?['prenom'] ?? user?['prenom'] ?? '';
+
+    await preferences.setString(_cleEmail, email?.toString() ?? '');
+    await preferences.setString(_cleMatricule, matricule?.toString() ?? '');
+    await preferences.setString(_cleStagiaCode, stagiaCode?.toString() ?? '');
+    await preferences.setString(_cleNom, nom.toString());
+    await preferences.setString(_clePrenom, prenom.toString());
   }
 
   static Future<String?> jeton() async {
     final preferences = await SharedPreferences.getInstance();
     return preferences.getString(_cleJeton);
+  }
+
+  static Future<bool> estConnecte() async {
+    final t = await jeton();
+    return t != null && t.isNotEmpty;
   }
 
   static Future<String?> email() async {
@@ -52,6 +51,11 @@ abstract final class SessionAuthentificationService {
   static Future<String?> matricule() async {
     final preferences = await SharedPreferences.getInstance();
     return preferences.getString(_cleMatricule);
+  }
+
+  static Future<String?> stagiaCode() async {
+    final preferences = await SharedPreferences.getInstance();
+    return preferences.getString(_cleStagiaCode);
   }
 
   static Future<Map<String, String>> identite() async {

@@ -1,41 +1,62 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/network/client_api_http.dart';
 import '../../../../core/network/source_etudiant_distante.dart';
-import '../../../../core/widgets/contenu_adaptatif.dart';
-import '../../../../core/widgets/erreur_chargement_api.dart';
-import '../../../../core/mocks/depot_mock_etudiant.dart';
-import '../widgets/section_rapport.dart';
+import '../../../messagerie/presentation/pages/messagerie_page.dart';
+import '../../../notifications/presentation/pages/notifications_page.dart';
+import 'calendrier_presence_page.dart';
+import 'detail_journal_page.dart';
+import 'fiche_evaluation_page.dart';
+import 'mes_journaux_page.dart';
+import 'mes_taches_page.dart';
+import 'saisir_journal_page.dart';
+import '../widgets/barre_recherche_journal.dart';
+import '../widgets/calendrier_mois_entier.dart';
+import '../widgets/carte_echeance_tache.dart';
+import '../widgets/en_tete_journal.dart';
+import '../widgets/onglets_journal.dart';
 
 class JournalPage extends StatefulWidget {
   const JournalPage({super.key});
+
   @override
   State<JournalPage> createState() => _JournalPageState();
 }
 
-class _JournalPageState extends State<JournalPage>
-    with SingleTickerProviderStateMixin {
+class _JournalPageState extends State<JournalPage> {
   final _source = SourceEtudiantDistante(ClientApiHttp());
-  late final TabController _onglets;
-  late Future<List<Map<String, dynamic>>> _chargement;
   int _indexOnglet = 0;
+  final TextEditingController _rechercheController = TextEditingController();
+
+  // État onglet Tâches
+  DateTime _dateSelectionneeTaches = DateTime(2026, 1, 15);
+
+  // État onglet Journal
+  String _filtreJournal = 'Aujourd\'hui (5)';
+
+  // État pointage de présence
+  bool _arriveeEnregistree = true;
+  String _heureArrivee = '07:54 AM';
+
+  late Future<List<Map<String, dynamic>>> _chargement;
 
   @override
   void initState() {
     super.initState();
-    _onglets = TabController(length: 4, vsync: this);
-    _onglets.addListener(() {
-      if (!_onglets.indexIsChanging && mounted) {
-        setState(() => _indexOnglet = _onglets.index);
-      }
-    });
     _chargement = _charger();
   }
 
+  @override
+  void dispose() {
+    _rechercheController.dispose();
+    super.dispose();
+  }
+
   Future<List<Map<String, dynamic>>> _charger() => Future.wait([
-    _source.journal(),
-    _source.presences(),
-    _source.evaluations(),
-  ]);
+        _source.journal(),
+        _source.presences(),
+        _source.evaluations(),
+      ]);
 
   Future<void> _actualiser() async {
     final futur = _charger();
@@ -43,779 +64,1084 @@ class _JournalPageState extends State<JournalPage>
     await futur;
   }
 
-  Future<void> _supprimerBrouillon(Map<String, dynamic> activite) async {
-    DepotMockEtudiant.supprimerActivite(activite['uuid'].toString());
-    await _actualiser();
-  }
-
-  Future<void> _soumettreBrouillon(Map<String, dynamic> activite) async {
-    DepotMockEtudiant.soumettreActivite(activite['uuid'].toString());
-    await _actualiser();
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Activité soumise pour vérification.')),
-    );
-  }
-
-  Future<void> _ouvrirDetailBrouillon(Map<String, dynamic> activite) async {
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
-      builder: (sheetContext) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: .78,
-        minChildSize: .45,
-        maxChildSize: .94,
-        builder: (_, controleur) => ListView(
-          controller: controleur,
-          padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
-          children: [
-            const Text(
-              'Détail du brouillon',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 18),
-            _LigneDetail('Intitulé', activite['learning']),
-            _LigneDetail('Date', activite['date']),
-            _LigneDetail('Service ou unité', activite['unit']?['name']),
-            _LigneDetail('Durée', '${activite['duration'] ?? '-'} heure(s)'),
-            _LigneDetail(
-              'Catégorie',
-              _items(activite['activities']).isEmpty
-                  ? '-'
-                  : _items(activite['activities']).first['category'],
-            ),
-            _LigneDetail('Travail réalisé', activite['summary']),
-            _LigneDetail('Objectifs', activite['objectives']),
-            _LigneDetail('Compétences', activite['skills']),
-            _LigneDetail('Résultats', activite['results']),
-            _LigneDetail('Difficultés', activite['difficulties']),
-            const SizedBox(height: 18),
-            FilledButton(
-              onPressed: () {
-                Navigator.pop(sheetContext);
-                _ajouterActivite(activite);
-              },
-              child: const Text('Modifier le brouillon'),
-            ),
-            const SizedBox(height: 10),
-            OutlinedButton(
-              onPressed: () {
-                Navigator.pop(sheetContext);
-                _soumettreBrouillon(activite);
-              },
-              child: const Text('Soumettre le brouillon'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    _onglets.dispose();
-    super.dispose();
-  }
-
-  Future<void> _ajouterActivite([Map<String, dynamic>? activite]) async {
-    final activites = _items(activite?['activities']);
-    final titre = TextEditingController(
-      text: activite?['learning']?.toString(),
-    );
-    final description = TextEditingController(
-      text: activite?['summary']?.toString(),
-    );
-    final difficulte = TextEditingController(
-      text: activite?['difficulties']?.toString(),
-    );
-    final date = TextEditingController(
-      text:
-          activite?['date']?.toString() ??
-          DateTime.now().toIso8601String().split('T').first,
-    );
-    final categorie = TextEditingController(
-      text: activites.isEmpty ? '' : activites.first['category']?.toString(),
-    );
-    final duree = TextEditingController(
-      text: activite?['duration']?.toString(),
-    );
-    final service = TextEditingController(
-      text: activite?['unit']?['name']?.toString(),
-    );
-    final objectifs = TextEditingController(
-      text: activite?['objectives']?.toString(),
-    );
-    final competences = TextEditingController(
-      text: activite?['skills']?.toString(),
-    );
-    final resultats = TextEditingController(
-      text: activite?['results']?.toString(),
-    );
-    final cle = GlobalKey<FormState>();
-    final ajoutee = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          18,
-          20,
-          18,
-          MediaQuery.viewInsetsOf(context).bottom + 20,
-        ),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 720),
-            child: Theme(
-              data: Theme.of(context).copyWith(
-                inputDecorationTheme: InputDecorationTheme(
-                  filled: true,
-                  fillColor: Theme.of(context).colorScheme.surface,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 14,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(9),
-                    borderSide: BorderSide(
-                      color: Theme.of(context).colorScheme.outline,
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(9),
-                    borderSide: BorderSide(
-                      color: Theme.of(context).colorScheme.onSurface,
-                      width: 1.5,
-                    ),
-                  ),
-                ),
-              ),
-              child: Form(
-                key: cle,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        activite == null
-                            ? 'Nouvelle activité'
-                            : 'Modifier le brouillon',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: date,
-                        readOnly: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Date de l’activité',
-                          suffixIcon: Icon(Icons.calendar_month_outlined),
-                        ),
-                        onTap: () async {
-                          final choix = await showDatePicker(
-                            context: context,
-                            firstDate: DateTime(2020),
-                            lastDate: DateTime.now(),
-                            initialDate:
-                                DateTime.tryParse(date.text) ?? DateTime.now(),
-                          );
-                          if (choix != null)
-                            date.text = choix
-                                .toIso8601String()
-                                .split('T')
-                                .first;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: titre,
-                        decoration: const InputDecoration(
-                          labelText: 'Titre de l’activité',
-                        ),
-                        validator: (v) => (v?.trim().isEmpty ?? true)
-                            ? 'Champ obligatoire'
-                            : null,
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: categorie,
-                        decoration: const InputDecoration(
-                          labelText: 'Catégorie de l’activité',
-                        ),
-                        validator: (v) => (v?.trim().isEmpty ?? true)
-                            ? 'Champ obligatoire'
-                            : null,
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: duree,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'Durée en heures',
-                        ),
-                        validator: (v) => (v?.trim().isEmpty ?? true)
-                            ? 'Champ obligatoire'
-                            : null,
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: service,
-                        decoration: const InputDecoration(
-                          labelText: 'Service ou unité',
-                        ),
-                        validator: (v) => (v?.trim().isEmpty ?? true)
-                            ? 'Champ obligatoire'
-                            : null,
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: description,
-                        minLines: 3,
-                        maxLines: 5,
-                        decoration: const InputDecoration(
-                          labelText: 'Travail réalisé',
-                        ),
-                        validator: (v) => (v?.trim().isEmpty ?? true)
-                            ? 'Champ obligatoire'
-                            : null,
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: objectifs,
-                        decoration: const InputDecoration(
-                          labelText: 'Objectifs concernés',
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: competences,
-                        decoration: const InputDecoration(
-                          labelText: 'Compétences travaillées',
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: resultats,
-                        decoration: const InputDecoration(
-                          labelText: 'Résultats obtenus',
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: difficulte,
-                        minLines: 2,
-                        maxLines: 3,
-                        decoration: const InputDecoration(
-                          labelText: 'Difficultés (facultatif)',
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      FilledButton(
-                        onPressed: () {
-                          if (!(cle.currentState?.validate() ?? false)) return;
-                          final donnees = (
-                            titre: titre.text.trim(),
-                            description: description.text.trim(),
-                            difficulte: difficulte.text.trim(),
-                            date: date.text.trim(),
-                            categorie: categorie.text.trim(),
-                            duree: duree.text.trim(),
-                            service: service.text.trim(),
-                            objectifs: objectifs.text.trim(),
-                            competences: competences.text.trim(),
-                            resultats: resultats.text.trim(),
-                          );
-                          if (activite == null) {
-                            DepotMockEtudiant.ajouterActivite(
-                              titre: donnees.titre,
-                              description: donnees.description,
-                              difficulte: donnees.difficulte,
-                              date: donnees.date,
-                              categorie: donnees.categorie,
-                              duree: donnees.duree,
-                              service: donnees.service,
-                              objectifs: donnees.objectifs,
-                              competences: donnees.competences,
-                              resultats: donnees.resultats,
-                            );
-                          } else {
-                            DepotMockEtudiant.modifierActivite(
-                              activite['uuid'].toString(),
-                              titre: donnees.titre,
-                              description: donnees.description,
-                              difficulte: donnees.difficulte,
-                              date: donnees.date,
-                              categorie: donnees.categorie,
-                              duree: donnees.duree,
-                              service: donnees.service,
-                              objectifs: donnees.objectifs,
-                              competences: donnees.competences,
-                              resultats: donnees.resultats,
-                            );
-                          }
-                          Navigator.pop(context, true);
-                        },
-                        child: Text(
-                          activite == null
-                              ? 'Enregistrer le brouillon'
-                              : 'Enregistrer les modifications',
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-    if (ajoutee == true && mounted) {
-      try {
-        await _actualiser();
-      } catch (_) {
-        // Le FutureBuilder présente déjà l'erreur de chargement sans provoquer
-        // d'exception non gérée pendant le retour du formulaire.
-      }
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Activité enregistrée dans le journal.')),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      automaticallyImplyLeading: false,
-      bottom: TabBar(
-        controller: _onglets,
-        indicatorColor: const Color(0xFFFF7417),
-        labelColor: Theme.of(context).colorScheme.onSurface,
-        tabs: const [
-          Tab(text: 'Journal'),
-          Tab(text: 'Rapport'),
-          Tab(text: 'Présences'),
-          Tab(text: 'Évaluations'),
-        ],
-      ),
-    ),
-    body: ContenuAdaptatif(
-      enfant: FutureBuilder<List<Map<String, dynamic>>>(
-        future: _chargement,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(color: Color(0xFFFF7417)),
-            );
-          }
-          if (snapshot.hasError) {
-            return ErreurChargementApi(
-              erreur: snapshot.error,
-              onReessayer: _actualiser,
-            );
-          }
-          final data = snapshot.data!;
-          return TabBarView(
-            controller: _onglets,
-            children: [
-              _ListeApi(
-                items: _items(data[0]['items']),
-                vide: 'Aucune entrée dans le journal.',
-                constructeur: (item) => _journal(
-                  context,
-                  item,
-                  onOuvrir: () => _ouvrirDetailBrouillon(item),
-                  onSupprimer: () => _supprimerBrouillon(item),
-                ),
-              ),
-              const SectionRapport(),
-              _ListeApi(
-                items: _items(data[1]['items']),
-                vide: 'Aucune présence enregistrée.',
-                constructeur: (item) => _presence(context, item),
-              ),
-              _ListeApi(
-                items: _items(data[2]['items']),
-                vide: 'Aucune évaluation disponible.',
-                constructeur: (item) => _evaluation(context, item),
-              ),
-            ],
-          );
-        },
-      ),
-    ),
-    floatingActionButton: _indexOnglet == 0
-        ? FloatingActionButton(
-            onPressed: _ajouterActivite,
-            backgroundColor: Colors.black,
-            foregroundColor: Colors.white,
-            elevation: 6,
-            shape: const CircleBorder(side: BorderSide(color: Colors.black)),
-            tooltip: 'Ajouter une activité',
-            child: const Icon(Icons.add_rounded),
-          )
-        : null,
-    floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-  );
-}
-
-class _ListeApi extends StatelessWidget {
-  const _ListeApi({
-    required this.items,
-    required this.vide,
-    required this.constructeur,
-  });
-  final List<Map<String, dynamic>> items;
-  final String vide;
-  final Widget Function(Map<String, dynamic>) constructeur;
   @override
   Widget build(BuildContext context) {
-    final marge = MediaQuery.sizeOf(context).width < 360 ? 14.0 : 18.0;
-    if (items.isEmpty) {
-      return Center(
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 360),
-          margin: EdgeInsets.all(marge),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.inbox_outlined,
-                size: 42,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                vide,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
-            ],
-          ),
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: EnTeteJournal(
+        nombreTachesAujourdhui: 5,
+        onOuvrirChat: () => Navigator.of(context, rootNavigator: true).push(
+          MaterialPageRoute<void>(builder: (_) => const MessageriePage()),
         ),
-      );
-    }
-    return ListView.separated(
-      padding: EdgeInsets.fromLTRB(marge, 16, marge, 28),
-      itemCount: items.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 12),
-      itemBuilder: (_, index) => constructeur(items[index]),
-    );
-  }
-}
-
-class _LigneDetail extends StatelessWidget {
-  const _LigneDetail(this.libelle, this.valeur);
-
-  final String libelle;
-  final Object? valeur;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    width: double.infinity,
-    padding: const EdgeInsets.symmetric(vertical: 11),
-    decoration: BoxDecoration(
-      border: Border(
-        bottom: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+        onOuvrirNotifications: () => Navigator.of(context, rootNavigator: true).push(
+          MaterialPageRoute<void>(builder: (_) => const NotificationsPage()),
+        ),
+        onOuvrirTaches: () {
+          setState(() => _indexOnglet = 0);
+        },
       ),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          libelle,
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          '${valeur == null || '$valeur'.trim().isEmpty ? '-' : valeur}',
-          textAlign: TextAlign.left,
-          style: const TextStyle(height: 1.35, fontWeight: FontWeight.w700),
-        ),
-      ],
-    ),
-  );
-}
-
-Widget _journal(
-  BuildContext context,
-  Map<String, dynamic> item, {
-  required VoidCallback onOuvrir,
-  required VoidCallback onSupprimer,
-}) {
-  final activites = _items(item['activities']);
-  final brouillon = item['status']?.toString().toUpperCase() == 'BROUILLON';
-  if (brouillon) {
-    return Dismissible(
-      key: ValueKey(item['uuid']),
-      direction: DismissDirection.endToStart,
-      confirmDismiss: (_) => showDialog<bool>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('Supprimer ce brouillon ?'),
-          content: const Text(
-            'Cette action supprimera définitivement cette activité locale.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Annuler'),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Barre de recherche stylée moderne
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: BarreRechercheJournal(
+                controller: _rechercheController,
+                onChanged: (_) => setState(() {}),
+              ),
             ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Supprimer'),
+
+            // TabBar à 4 onglets : Mes tâches, Présences, Evaluations, Journal
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: OngletsJournal(
+                indexActif: _indexOnglet,
+                onChangementOnglet: (index) {
+                  setState(() => _indexOnglet = index);
+                },
+              ),
+            ),
+            const Divider(height: 1, color: Color(0xFFE2E8F0)),
+
+            // Contenu de l'onglet actif
+            Expanded(
+              child: FutureBuilder<List<Map<String, dynamic>>>(
+                future: _chargement,
+                builder: (context, snapshot) {
+                  return RefreshIndicator(
+                    color: const Color(0xFF1D61F2),
+                    onRefresh: _actualiser,
+                    child: switch (_indexOnglet) {
+                      0 => _buildOngletMesTaches(),
+                      1 => _buildOngletPresences(),
+                      2 => _buildOngletEvaluations(),
+                      3 => _buildOngletJournal(),
+                      _ => const SizedBox.shrink(),
+                    },
+                  );
+                },
+              ),
             ),
           ],
         ),
       ),
-      onDismissed: (_) => onSupprimer(),
-      background: Align(
-        alignment: Alignment.centerRight,
-        child: Container(
-          width: 48,
-          height: 48,
-          margin: const EdgeInsets.only(right: 12),
-          decoration: const BoxDecoration(
-            color: Color(0xFFD92D20),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(
-            Icons.delete_outline,
-            color: Colors.white,
-            size: 25,
-          ),
+    );
+  }
+
+  // ==========================================
+  // ONGLET 1 : MES TÂCHES (Image 1)
+  // ==========================================
+  Widget _buildOngletMesTaches() {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
+      children: [
+        // Sélecteur de calendrier mois entier Janvier 2026
+        CalendrierMoisEntier(
+          dateSelectionnee: _dateSelectionneeTaches,
+          pointsCouleursParDate: const {
+            14: Color(0xFFF97316), // point orange sous le 14
+            15: Color(0xFF1D61F2),
+            18: Color(0xFF16A34A),
+          },
+          onDateSelectionnee: (date) {
+            setState(() => _dateSelectionneeTaches = date);
+          },
         ),
-      ),
-      child: SizedBox(
-        width: double.infinity,
-        child: Card(
-          margin: EdgeInsets.zero,
-          color: Theme.of(context).colorScheme.surfaceContainerLow,
-          surfaceTintColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: InkWell(
-            onTap: onOuvrir,
-            borderRadius: BorderRadius.circular(18),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          item['learning']?.toString() ??
-                              'Brouillon sans intitulé',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFE3D1),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Text(
-                          'BROUILLON',
-                          style: TextStyle(
-                            color: Color(0xFFE85D00),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                    ],
+
+        const SizedBox(height: 22),
+
+        // Titre Échéances du 15 Janvier + Lien vers Mes tâches
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Échéances du ${_dateSelectionneeTaches.day} Janvier',
+              style: GoogleFonts.inter(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF0F172A),
+              ),
+            ),
+            GestureDetector(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const MesTachesPage(),
                   ),
-                  const SizedBox(height: 12),
-                  Align(
-                    alignment: Alignment.centerRight,
+                );
+              },
+              child: Text(
+                'Voir toutes',
+                style: GoogleFonts.inter(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF1D61F2),
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 14),
+
+        // Liste des cartes d'échéances
+        CarteEcheanceTache(
+          horaireTexte: 'Toute la',
+          sousHoraireTexte: 'journée',
+          tagLibelle: 'EVALUATION',
+          tagCouleurFond: const Color(0xFFE0F2FE),
+          tagCouleurTexte: const Color(0xFF0284C7),
+          titre: 'Remise du rapport de stage de mi-...',
+          onTap: () {},
+        ),
+        const SizedBox(height: 12),
+        CarteEcheanceTache(
+          horaireTexte: '18:00',
+          sousHoraireTexte: 'Échéance',
+          tagLibelle: 'LOGBOOK',
+          tagCouleurFond: const Color(0xFFF3E8FF),
+          tagCouleurTexte: const Color(0xFF7E22CE),
+          titre: 'Saisie du journal clinique quotidien',
+          onTap: () {
+            setState(() => _indexOnglet = 3);
+          },
+        ),
+        const SizedBox(height: 12),
+        CarteEcheanceTache(
+          horaireTexte: '10:00',
+          sousHoraireTexte: '12:30',
+          tagLibelle: 'CHIRURGIE',
+          tagCouleurFond: const Color(0xFFDCFCE7),
+          tagCouleurTexte: const Color(0xFF16A34A),
+          titre: 'Aide opératoire en cure de hernie',
+          onTap: () {},
+        ),
+      ],
+    );
+  }
+
+  // ==========================================
+  // ONGLET 2 : PRÉSENCES (Image 2)
+  // ==========================================
+  Widget _buildOngletPresences() {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
+      children: [
+        // Carte Service Actuel
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x05000000),
+                blurRadius: 10,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Ligne Service + Badge Garde active
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Service Actuel',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: const Color(0xFF94A3B8),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDCFCE7),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
                     child: Text(
-                      '${_dateCourte(item['date'])} · ${_heureCourte(item['created_at'])}',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
+                      'Garde active',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF16A34A),
                       ),
                     ),
                   ),
                 ],
               ),
+
+              const SizedBox(height: 6),
+
+              // Titre du service
+              Text(
+                'Urgences Générales (HKG)',
+                style: GoogleFonts.inter(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF0F172A),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Ligne Arrivée enregistrée + Statut À l'heure
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Arrivée enregistrée',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF94A3B8),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _heureArrivee,
+                        style: GoogleFonts.inter(
+                          fontSize: 16.5,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF0F172A),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        'Statut',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF94A3B8),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'À l\'heure',
+                        style: GoogleFonts.inter(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF16A34A),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 18),
+
+              // Bouton orange Enregistrer mon départ / Arrivée
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: FilledButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _arriveeEnregistree = !_arriveeEnregistree;
+                      if (_arriveeEnregistree) {
+                        _heureArrivee = '07:54 AM';
+                      }
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          _arriveeEnregistree
+                              ? 'Arrivée validée à 07:54 AM'
+                              : 'Départ enregistré avec succès !',
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.logout_rounded, size: 18),
+                  label: Text(
+                    _arriveeEnregistree ? 'Enregistrer mon départ' : 'Enregistrer mon arrivée',
+                    style: GoogleFonts.inter(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFF97316),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    elevation: 0,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 22),
+
+        // Titre Statistiques du mois
+        Text(
+          'Statistiques du mois (Janvier)',
+          style: GoogleFonts.inter(
+            fontSize: 17,
+            fontWeight: FontWeight.w800,
+            color: const Color(0xFF0F172A),
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        // Grille 2x2 des indicateurs de présence
+        Row(
+          children: [
+            Expanded(
+              child: _buildCarteStatistiquePresence(
+                titre: 'Taux global',
+                valeurWidget: Text(
+                  '96%',
+                  style: GoogleFonts.inter(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                    color: const Color(0xFF1D61F2),
+                  ),
+                ),
+              ),
             ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildCarteStatistiquePresence(
+                titre: 'Présent / Retard',
+                valeurWidget: Row(
+                  children: [
+                    Text(
+                      '12',
+                      style: GoogleFonts.inter(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        color: const Color(0xFF16A34A),
+                      ),
+                    ),
+                    Text(
+                      ' / ',
+                      style: GoogleFonts.inter(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF94A3B8),
+                      ),
+                    ),
+                    Text(
+                      '1',
+                      style: GoogleFonts.inter(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        color: const Color(0xFFF97316),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 12),
+
+        Row(
+          children: [
+            Expanded(
+              child: _buildCarteStatistiquePresence(
+                titre: 'Absences',
+                valeurWidget: Text(
+                  '0',
+                  style: GoogleFonts.inter(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                    color: const Color(0xFFDC2626),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildCarteStatistiquePresence(
+                titre: 'Gardes effectuées',
+                valeurWidget: Text(
+                  '4',
+                  style: GoogleFonts.inter(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                    color: const Color(0xFF7E22CE),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 24),
+
+        // Bouton orange pleine largeur : Voir les details
+        SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: FilledButton(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const CalendrierPresencePage(),
+                ),
+              );
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFF97316),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              elevation: 0,
+            ),
+            child: Text(
+              'Voir les details',
+              style: GoogleFonts.inter(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCarteStatistiquePresence({
+    required String titre,
+    required Widget valeurWidget,
+  }) {
+    return Container(
+      height: 94,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x05000000),
+            blurRadius: 10,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            titre,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: const Color(0xFF94A3B8),
+            ),
+          ),
+          const SizedBox(height: 4),
+          valeurWidget,
+        ],
+      ),
+    );
+  }
+
+  // ==========================================
+  // ONGLET 3 : EVALUATIONS (Image 3)
+  // ==========================================
+  Widget _buildOngletEvaluations() {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
+      children: [
+        // Carte Moyenne Générale
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x05000000),
+                blurRadius: 10,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(18),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Moyenne Générale',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: const Color(0xFF94A3B8),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '16.8 / 20',
+                    style: GoogleFonts.inter(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w900,
+                      color: const Color(0xFF1D61F2),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Excellent travail d\'équipe',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF16A34A),
+                    ),
+                  ),
+                ],
+              ),
+              // Badge Grade A
+              Container(
+                width: 60,
+                height: 60,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFE0F2FE),
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  'A',
+                  style: GoogleFonts.inter(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: const Color(0xFF0284C7),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 22),
+
+        // Titre Fiches d'évaluations (3)
+        Text(
+          'Fiches d\'évaluations (3)',
+          style: GoogleFonts.inter(
+            fontSize: 17,
+            fontWeight: FontWeight.w800,
+            color: const Color(0xFF0F172A),
+          ),
+        ),
+
+        const SizedBox(height: 14),
+
+        // Carte 1 : FIN DE ROTATION
+        _buildCarteEvaluation(
+          tagLibelle: 'FIN DE ROTATION',
+          tagCouleurFond: const Color(0xFFE0F2FE),
+          tagCouleurTexte: const Color(0xFF0284C7),
+          note: '17.5 / 20',
+          titre: 'Stage Clinique - Urgences de Jour',
+          evaluateur: 'Dr. Marie Dupont',
+          appreciation:
+              '"Très bon sens clinique. Aptitude remarquable à gérer le stress en période de forte affluence..."',
+          dateTexte: '10 Janvier 2026',
+        ),
+
+        const SizedBox(height: 14),
+
+        // Carte 2 : MI-PARCOURS
+        _buildCarteEvaluation(
+          tagLibelle: 'MI-PARCOURS',
+          tagCouleurFond: const Color(0xFFF3E8FF),
+          tagCouleurTexte: const Color(0xFF7E22CE),
+          note: '16.0 / 20',
+          titre: 'Gestes Techniques & Sutures',
+          evaluateur: 'Dr. Jean-Pierre Mwamba',
+          appreciation:
+              '"Maîtrise les bases aseptiques. Rapidité d’exécution à perfectionner."',
+          dateTexte: '05 Janvier 2026',
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCarteEvaluation({
+    required String tagLibelle,
+    required Color tagCouleurFond,
+    required Color tagCouleurTexte,
+    required String note,
+    required String titre,
+    required String evaluateur,
+    required String appreciation,
+    required String dateTexte,
+  }) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x05000000),
+            blurRadius: 10,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Ligne Tag + Note
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: tagCouleurFond,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  tagLibelle,
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: tagCouleurTexte,
+                  ),
+                ),
+              ),
+              Text(
+                note,
+                style: GoogleFonts.inter(
+                  fontSize: 15.5,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF16A34A),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+
+          // Titre
+          Text(
+            titre,
+            style: GoogleFonts.inter(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF0F172A),
+            ),
+          ),
+
+          const SizedBox(height: 6),
+
+          // Évaluateur
+          Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: 'Évaluateur :  ',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFF94A3B8),
+                  ),
+                ),
+                TextSpan(
+                  text: evaluateur,
+                  style: GoogleFonts.inter(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF0F172A),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 10),
+
+          // Citation appréciation
+          Text(
+            appreciation,
+            style: GoogleFonts.inter(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
+              color: const Color(0xFF64748B),
+              fontStyle: FontStyle.italic,
+              height: 1.35,
+            ),
+          ),
+
+          const SizedBox(height: 12),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          const SizedBox(height: 10),
+
+          // Footer : Évalué le + Voir les détails
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Évalué le : $dateTexte',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: const Color(0xFF94A3B8),
+                ),
+              ),
+              GestureDetector(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => FicheEvaluationPage(
+                        scoreGlobal: double.tryParse(note.split('/').first.trim()) ?? 17.5,
+                        nomEvaluateur: evaluateur,
+                        initialesEvaluateur: evaluateur
+                            .split(' ')
+                            .where((e) => e.isNotEmpty && !e.startsWith('Dr.'))
+                            .map((e) => e[0])
+                            .take(2)
+                            .join(),
+                      ),
+                    ),
+                  );
+                },
+                child: Text(
+                  'Voir les détails',
+                  style: GoogleFonts.inter(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF1D61F2),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================
+  // ONGLET 4 : JOURNAL (Image 4)
+  // ==========================================
+  Widget _buildOngletJournal() {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
+      children: [
+        // Carte bleue vive : Progression du jour
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: const Color(0xFF1D61F2),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x1A1D61F2),
+                blurRadius: 14,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Progression du jour',
+                    style: GoogleFonts.inter(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                  Text(
+                    '60% effectué',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white70,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: const LinearProgressIndicator(
+                  value: 0.6,
+                  minHeight: 7,
+                  backgroundColor: Color(0x33FFFFFF),
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                '3 sur 5 tâches cliniques obligatoires validées',
+                style: GoogleFonts.inter(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white.withValues(alpha: 0.85),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // Filtres (Aujourd'hui (5), À venir, Terminées) + Lien vers Mes journaux
+        Row(
+          children: [
+            _buildFiltreJournalChip('Aujourd\'hui (5)'),
+            const SizedBox(width: 8),
+            _buildFiltreJournalChip('À venir'),
+            const SizedBox(width: 8),
+            _buildFiltreJournalChip('Terminées'),
+            const Spacer(),
+            IconButton(
+              tooltip: 'Historique des journaux',
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const MesJournauxPage(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.list_alt_rounded, color: Color(0xFF1D61F2), size: 22),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 16),
+
+        // Carte 1 : HAUTE PRIORITÉ - En cours
+        _buildCarteActiviteJournal(
+          tagPriorite: 'HAUTE PRIORITÉ',
+          tagPrioriteBg: const Color(0xFFFFF7ED),
+          tagPrioriteTexte: const Color(0xFFEA580C),
+          statutLibelle: 'En cours',
+          statutBg: const Color(0xFFE0F2FE),
+          statutTexte: const Color(0xFF0284C7),
+          titre: 'Rapport d\'admission - Traumatisme thoracique',
+          description: 'Patient transféré suite à un accident de la route...',
+          echeanceTexte: 'Échéance : Aujourd\'hui, 14:00',
+          actionTexte: 'Ouvrir',
+          actionCouleur: const Color(0xFF1D61F2),
+        ),
+
+        const SizedBox(height: 14),
+
+        // Carte 2 : PROCÉDURE - À corriger
+        _buildCarteActiviteJournal(
+          tagPriorite: 'PROCÉDURE',
+          tagPrioriteBg: const Color(0xFFF3E8FF),
+          tagPrioriteTexte: const Color(0xFF7E22CE),
+          statutLibelle: 'À corriger',
+          statutBg: const Color(0xFFFEF3C7),
+          statutTexte: const Color(0xFFD97706),
+          titre: 'Suture et parage de plaie complexe',
+          description: 'Suture effectuée sous la supervision du Dr. Marie Dupo...',
+          echeanceTexte: 'Échéance : Aujourd\'hui, 18:00',
+          actionTexte: 'Corriger',
+          actionCouleur: const Color(0xFF1D61F2),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFiltreJournalChip(String titre) {
+    final actif = _filtreJournal == titre;
+    return GestureDetector(
+      onTap: () => setState(() => _filtreJournal = titre),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8.5),
+        decoration: BoxDecoration(
+          color: actif ? const Color(0xFF1D61F2) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: actif ? const Color(0xFF1D61F2) : const Color(0xFFE2E8F0),
+          ),
+        ),
+        child: Text(
+          titre,
+          style: GoogleFonts.inter(
+            fontSize: 13,
+            fontWeight: actif ? FontWeight.w700 : FontWeight.w500,
+            color: actif ? Colors.white : const Color(0xFF64748B),
           ),
         ),
       ),
     );
   }
-  return Card(
-    color: Theme.of(context).colorScheme.surfaceContainerLow,
-    surfaceTintColor: Colors.transparent,
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-    child: Padding(
+
+  Widget _buildCarteActiviteJournal({
+    required String tagPriorite,
+    required Color tagPrioriteBg,
+    required Color tagPrioriteTexte,
+    required String statutLibelle,
+    required Color statutBg,
+    required Color statutTexte,
+    required String titre,
+    required String description,
+    required String echeanceTexte,
+    required String actionTexte,
+    required Color actionCouleur,
+  }) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x05000000),
+            blurRadius: 10,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Ligne Badge Priorité + Badge Statut
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: tagPrioriteBg,
+                  borderRadius: BorderRadius.circular(6),
+                ),
                 child: Text(
-                  item['campaign']?['title']?.toString() ?? 'Journal',
-                  style: const TextStyle(fontWeight: FontWeight.w900),
+                  tagPriorite,
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: tagPrioriteTexte,
+                  ),
                 ),
               ),
-              Chip(label: Text(item['status']?.toString() ?? '')),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statutBg,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  statutLibelle,
+                  style: GoogleFonts.inter(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: statutTexte,
+                  ),
+                ),
+              ),
             ],
           ),
+
+          const SizedBox(height: 12),
+
+          // Titre
           Text(
-            '${item['hospital']?['name'] ?? ''} · ${item['unit']?['name'] ?? ''}',
-            style: const TextStyle(color: Color(0xFF718096)),
+            titre,
+            style: GoogleFonts.inter(
+              fontSize: 15.5,
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF0F172A),
+            ),
           ),
-          if (item['difficulties'] != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: Text('Difficultés : ${item['difficulties']}'),
+
+          const SizedBox(height: 4),
+
+          // Description
+          Text(
+            description,
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: const Color(0xFF64748B),
             ),
-          if ('${item['objectives'] ?? ''}'.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text('Objectifs : ${item['objectives']}'),
-            ),
-          if ('${item['skills'] ?? ''}'.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text('Compétences : ${item['skills']}'),
-            ),
-          if ('${item['results'] ?? ''}'.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text('Résultats : ${item['results']}'),
-            ),
-          for (final activite in activites)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.task_alt, color: Color(0xFFFF7417)),
-              title: Text(activite['category']?.toString() ?? 'Activité'),
-              subtitle: Text(
-                '${activite['involvement_level'] ?? ''} · Quantité : ${activite['quantity'] ?? 0}',
+          ),
+
+          const SizedBox(height: 12),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          const SizedBox(height: 10),
+
+          // Footer : Échéance + Action
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                echeanceTexte,
+                style: GoogleFonts.inter(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                  color: const Color(0xFF94A3B8),
+                ),
               ),
-            ),
+              GestureDetector(
+                onTap: () {
+                  if (actionTexte == 'Ouvrir') {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const DetailJournalPage(),
+                      ),
+                    );
+                  } else {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const SaisirJournalPage(),
+                      ),
+                    );
+                  }
+                },
+                child: Text(
+                  actionTexte,
+                  style: GoogleFonts.inter(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: actionCouleur,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
-    ),
-  );
-}
-
-Widget _presence(BuildContext context, Map<String, dynamic> item) => Card(
-  color: Theme.of(context).colorScheme.surfaceContainerLow,
-  surfaceTintColor: Colors.transparent,
-  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-  child: ListTile(
-    leading: const CircleAvatar(
-      backgroundColor: Color(0xFFFFE3D1),
-      child: Icon(Icons.fact_check_outlined, color: Color(0xFFE85D00)),
-    ),
-    title: Text(
-      '${item['date'] ?? '-'} · ${item['status'] ?? ''}',
-      style: const TextStyle(fontWeight: FontWeight.w900),
-    ),
-    subtitle: Text(
-      'Arrivée ${item['arrival_time'] ?? '-'} · Départ ${item['departure_time'] ?? '-'}\n${item['hospital']?['name'] ?? ''}',
-    ),
-    isThreeLine: true,
-  ),
-);
-
-Widget _evaluation(BuildContext context, Map<String, dynamic> item) => Card(
-  color: Theme.of(context).colorScheme.surfaceContainerLow,
-  surfaceTintColor: Colors.transparent,
-  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-  child: Padding(
-    padding: const EdgeInsets.all(16),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                item['type']?.toString() ?? 'Évaluation',
-                style: const TextStyle(fontWeight: FontWeight.w900),
-              ),
-            ),
-            Text(
-              '${item['note'] ?? '-'} / 100',
-              style: const TextStyle(
-                color: Color(0xFFFF7417),
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Text(item['appreciation']?.toString() ?? 'Aucune appréciation.'),
-        const SizedBox(height: 8),
-        Text(
-          '${item['hospital']?['name'] ?? ''} · ${item['unit']?['name'] ?? ''}',
-          style: const TextStyle(color: Color(0xFF718096)),
-        ),
-      ],
-    ),
-  ),
-);
-
-List<Map<String, dynamic>> _items(Object? valeur) => valeur is List
-    ? valeur.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
-    : <Map<String, dynamic>>[];
-
-String _dateCourte(Object? valeur) {
-  final date = DateTime.tryParse(valeur?.toString() ?? '');
-  if (date == null) return '-';
-  final jour = date.day.toString().padLeft(2, '0');
-  final mois = date.month.toString().padLeft(2, '0');
-  final annee = (date.year % 100).toString().padLeft(2, '0');
-  return '$jour/$mois/$annee';
-}
-
-String _heureCourte(Object? valeur) {
-  final date = DateTime.tryParse(valeur?.toString() ?? '') ?? DateTime.now();
-  final heure = date.hour.toString().padLeft(2, '0');
-  final minute = date.minute.toString().padLeft(2, '0');
-  return '$heure:$minute';
+    );
+  }
 }

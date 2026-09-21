@@ -14,9 +14,7 @@ void main() {
     await tester.pump(const Duration(seconds: 8));
     await tester.pumpAndSettle();
 
-    expect(find.text('Accueil'), findsAtLeastNWidgets(1));
-    expect(find.text('Stages'), findsOneWidget);
-    expect(find.text('Journal'), findsOneWidget);
-    expect(find.text('Profil'), findsOneWidget);
+    expect(find.text('Connexion'), findsOneWidget);
+    expect(find.text('Se connecter'), findsOneWidget);
   });
 }

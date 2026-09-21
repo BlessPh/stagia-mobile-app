@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../app/navigation/main_shell.dart';
 import '../../../../core/network/client_api_http.dart';
-import '../../../../core/network/configuration_api.dart';
 import '../../../../core/network/reponse_api.dart';
 import '../../../../core/services/session_authentification_service.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -41,39 +40,6 @@ class _ConnexionPageState extends State<ConnexionPage> {
       _erreurMotDePasse = null;
     });
     if (!(_cleFormulaire.currentState?.validate() ?? false)) return;
-
-    if (!ConfigurationApi.utiliserAuthentificationApi) {
-      if (_connexionEnCours) return;
-      FocusScope.of(context).unfocus();
-      setState(() => _connexionEnCours = true);
-      await Future<void>.delayed(const Duration(seconds: 3));
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          behavior: SnackBarBehavior.floating,
-          margin: EdgeInsets.all(16),
-          duration: Duration(seconds: 2),
-          backgroundColor: Color(0xFF16803C),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(16)),
-          ),
-          content: Row(
-            children: [
-              Icon(Icons.check_circle_outline_rounded, color: Colors.white),
-              SizedBox(width: 10),
-              Text('Connexion réussie.'),
-            ],
-          ),
-        ),
-      );
-      await Future<void>.delayed(const Duration(milliseconds: 500));
-      if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute<void>(builder: (_) => const MainShell()),
-      );
-      if (mounted) setState(() => _connexionEnCours = false);
-      return;
-    }
 
     FocusScope.of(context).unfocus();
     setState(() => _connexionEnCours = true);
@@ -372,57 +338,62 @@ class _ConnexionPageState extends State<ConnexionPage> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                InkWell(
-                                  onTap: () {
-                                    setState(
-                                      () => _resterConnecte = !_resterConnecte,
-                                    );
-                                  },
-                                  borderRadius: BorderRadius.circular(6),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 4,
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        SizedBox(
-                                          width: 18,
-                                          height: 18,
-                                          child: Checkbox(
-                                            value: _resterConnecte,
-                                            onChanged: (val) {
-                                              setState(
-                                                () => _resterConnecte =
-                                                    val ?? false,
-                                              );
-                                            },
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
+                                Flexible(
+                                  child: InkWell(
+                                    onTap: () {
+                                      setState(
+                                        () => _resterConnecte = !_resterConnecte,
+                                      );
+                                    },
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 4,
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          SizedBox(
+                                            width: 18,
+                                            height: 18,
+                                            child: Checkbox(
+                                              value: _resterConnecte,
+                                              onChanged: (val) {
+                                                setState(
+                                                  () => _resterConnecte =
+                                                      val ?? false,
+                                                );
+                                              },
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                              side: const BorderSide(
+                                                color: Color(0xFF94A3B8),
+                                                width: 1.3,
+                                              ),
+                                              activeColor: const Color(0xFF0F172A),
+                                              checkColor: Colors.white,
+                                              materialTapTargetSize:
+                                                  MaterialTapTargetSize.shrinkWrap,
+                                              visualDensity:
+                                                  VisualDensity.compact,
                                             ),
-                                            side: const BorderSide(
-                                              color: Color(0xFF94A3B8),
-                                              width: 1.3,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Flexible(
+                                            child: Text(
+                                              'Rester connecté',
+                                              overflow: TextOverflow.ellipsis,
+                                              style: GoogleFonts.inter(
+                                                fontSize: 13.5,
+                                                fontWeight: FontWeight.w400,
+                                                color: const Color(0xFF64748B),
+                                              ),
                                             ),
-                                            activeColor: const Color(0xFF0F172A),
-                                            checkColor: Colors.white,
-                                            materialTapTargetSize:
-                                                MaterialTapTargetSize.shrinkWrap,
-                                            visualDensity:
-                                                VisualDensity.compact,
                                           ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          'Rester connecté',
-                                          style: GoogleFonts.inter(
-                                            fontSize: 13.5,
-                                            fontWeight: FontWeight.w400,
-                                            color: const Color(0xFF64748B),
-                                          ),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ),

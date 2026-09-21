@@ -10,6 +10,7 @@ import '../../../../core/network/source_etudiant_distante.dart';
 import '../../../../core/services/photo_profil_service.dart';
 import '../../../../core/services/session_authentification_service.dart';
 import '../../../../core/widgets/contenu_adaptatif.dart';
+import '../../../authentication/data/datasources/source_authentification_distante.dart';
 import '../../../journal/presentation/pages/journal_page.dart';
 import '../../../stage/presentation/pages/candidatures_stage_page.dart';
 import '../../data/models/etudiant_profil.dart';
@@ -206,6 +207,11 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
     );
     if (confirmer == true && mounted) {
+      try {
+        await SourceAuthentificationDistante(ClientApiHttp()).deconnecter();
+      } catch (_) {
+        // Tolérance : la déconnexion locale s'effectue même si le serveur est indisponible
+      }
       await SessionAuthentificationService.supprimer();
       if (!mounted) return;
       Navigator.of(

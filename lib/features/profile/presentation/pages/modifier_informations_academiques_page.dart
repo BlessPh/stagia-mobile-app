@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../../../core/widgets/contenu_adaptatif.dart';
 import '../../data/models/etudiant_profil.dart';
 
@@ -134,8 +133,8 @@ class _EtatAcademique extends State<ModifierInformationsAcademiquesPage> {
               child: FilledButton(
                 onPressed: _enregistrer,
                 style: FilledButton.styleFrom(
-                  backgroundColor: Color(Colors.black.value),
-                  foregroundColor: Color(Colors.white.value),
+                  backgroundColor: Colors.black,
+                  foregroundColor: Colors.white,
                 ),
                 child: const Text('Enregistrer les modifications'),
               ),
@@ -153,16 +152,12 @@ class _ChampAcademique extends StatelessWidget {
     required this.controleur,
     required this.libelle,
     this.indication,
-    this.aide,
-    this.lectureSeule = false,
     this.obligatoire = false,
   });
   final double largeur;
   final TextEditingController controleur;
   final String libelle;
   final String? indication;
-  final String? aide;
-  final bool lectureSeule;
   final bool obligatoire;
 
   @override
@@ -176,23 +171,10 @@ class _ChampAcademique extends StatelessWidget {
         TextFormField(
           controller: controleur,
           cursorColor: Theme.of(context).colorScheme.onSurface,
-          readOnly: lectureSeule,
           decoration: InputDecoration(
             hintText: indication,
-            helperText: aide,
-            suffixIcon: lectureSeule
-                ? const FaIcon(
-                    FontAwesomeIcons.lock,
-                    size: 17,
-                    color: Color(0xFF7A7A7A),
-                  )
-                : null,
             filled: true,
-            fillColor: lectureSeule
-                ? (Theme.of(context).brightness == Brightness.dark
-                      ? const Color(0xFF292929)
-                      : const Color(0xFFF1F3F5))
-                : Theme.of(context).colorScheme.surface,
+            fillColor: Theme.of(context).colorScheme.surface,
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 14,
               vertical: 14,

@@ -146,6 +146,7 @@ class _HomePageState extends State<HomePage> {
         campagnes: campagnes,
         candidatures: candidatures,
         onVoirCampagnes: widget.onOuvrirStages,
+        stats: stats,
       );
     }
 

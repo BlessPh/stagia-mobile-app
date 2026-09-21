@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme/app_theme.dart';
+import '../../features/journal/presentation/pages/saisir_journal_page.dart';
 
 class BarreNavigationPrincipale extends StatelessWidget {
   const BarreNavigationPrincipale({
@@ -269,7 +270,11 @@ class _MenuAjoutRapideModal extends StatelessWidget {
             couleurIcone: AppTheme.orangePrincipal,
             onTap: () {
               Navigator.pop(context);
-              onOptionChoisie(2);
+              Navigator.of(context, rootNavigator: true).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const SaisirJournalPage(),
+                ),
+              );
             },
           ),
           const SizedBox(height: 10),

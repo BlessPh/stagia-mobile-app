@@ -1,0 +1,1178 @@
+openapi: 3.0.3
+info:
+  title: STAGIA - API mobile étudiant
+  version: 1.0.0
+  description: |
+    Contrat OpenAPI de la partie étudiant, établi à partir du code PHP actuel.
+
+    Toutes les réponses JSON utilisent l'enveloppe `{ success, message, data }`.
+    Sauf la connexion, les routes exigent `Authorization: Bearer <token>`.
+    Le token créé par la connexion expire après 30 jours.
+
+    État connu : `profile.php`, `refresh.php` et `logout.php` sont présents mais cassés
+    à cause de fichiers inclus absents. Le refresh utilise en plus un modèle de session
+    incompatible avec celui de la connexion. `documents.php` construit une URL vers
+    `certificate-file.php`, qui n'existe pas encore. Ces limites sont signalées sur les opérations.
+
+    Les dates/heures proviennent de MySQL : `YYYY-MM-DD` et `YYYY-MM-DD HH:mm:ss`,
+    sans information de fuseau horaire.
+servers:
+  - url: http://localhost/stagia/api/v1
+    description: Développement local WAMP
+  - url: /api/v1
+    description: URL relative à l'hôte courant
+tags:
+  - { name: Authentification }
+  - { name: Compte }
+  - { name: Profil et parcours }
+  - { name: Tableau de bord }
+  - { name: Candidatures et réservations }
+  - { name: Paiements }
+  - { name: Stages }
+  - { name: Présences }
+  - { name: Journal de stage }
+  - { name: Évaluations }
+  - { name: Documents }
+security:
+  - bearerAuth: []
+paths:
+  /auth/login.php:
+    post:
+      tags: [Authentification]
+      summary: Connecter un utilisateur
+      description: Connexion par identifiant utilisateur, e-mail ou code STAGIA.
+      operationId: login
+      security: []
+      x-implementation-status: implemented
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+            example: { identifiant: STG-ETU-00000030, password: mot-de-passe, device_name: Stagia Mobile }
+          application/x-www-form-urlencoded:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200': { description: Connexion réussie., content: { application/json: { schema: { $ref: '#/components/schemas/LoginResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /student/stage-options.php:
+    get:
+      tags: [Candidatures et réservations]
+      summary: Lister les campagnes D4 et les hôpitaux disponibles
+      description: Exclut les campagnes déjà engagées ou terminées par l'étudiant.
+      operationId: listStageOptions
+      x-implementation-status: implemented
+      responses:
+        '200': { description: 'Campagnes éligibles, capacités et frais.', content: { application/json: { schema: { $ref: '#/components/schemas/StageOptionsResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/StudentNotFound' }
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /student/reserve.php:
+    post:
+      tags: [Candidatures et réservations]
+      summary: Créer une candidature et réserver une place
+      description: Réservation temporaire de 30 minutes. Idempotent si la même réservation active existe déjà.
+      operationId: reserveStagePlace
+      x-implementation-status: implemented
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReserveRequest' }
+            example: { campaign_id: 17, academic_enrollment_id: 33, participation_id: 11, motivation: Je souhaite développer mes compétences cliniques. }
+          application/x-www-form-urlencoded:
+            schema: { $ref: '#/components/schemas/ReserveRequest' }
+      responses:
+        '200': { description: Réservation active existante renvoyée., content: { application/json: { schema: { $ref: '#/components/schemas/ReserveResponse' } } } }
+        '201': { description: Nouvelle réservation créée., content: { application/json: { schema: { $ref: '#/components/schemas/ReserveResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/StudentNotFound' }
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /student/applications.php:
+    get:
+      tags: [Candidatures et réservations]
+      summary: Lister les candidatures
+      operationId: listApplications
+      x-implementation-status: implemented
+      responses:
+        '200': { description: Candidatures et état global., content: { application/json: { schema: { $ref: '#/components/schemas/ApplicationsResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/StudentNotFound' }
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /student/reservations.php:
+    get:
+      tags: [Candidatures et réservations]
+      summary: Lister les réservations
+      operationId: listReservations
+      x-implementation-status: implemented
+      responses:
+        '200': { description: 'Réservations, expiration, frais et état global.', content: { application/json: { schema: { $ref: '#/components/schemas/ReservationsResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/StudentNotFound' }
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /student/admission.php:
+    get:
+      tags: [Candidatures et réservations]
+      summary: Suivre admission et affectation
+      operationId: getAdmissionTracking
+      x-implementation-status: implemented
+      parameters: [{ $ref: '#/components/parameters/OptionalReservationUuid' }]
+      responses:
+        '200': { description: 'Chaîne réservation, admission, affectation et clôture.', content: { application/json: { schema: { $ref: '#/components/schemas/AdmissionResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/StudentNotFound' }
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /student/payment-checkout.php:
+    post:
+      tags: [Paiements]
+      summary: Préparer confirmation ou facture
+      description: Confirme une réservation gratuite; sinon crée/retourne la facture. N'appelle aucun opérateur de paiement.
+      operationId: checkoutReservation
+      x-implementation-status: implemented
+      requestBody: { $ref: '#/components/requestBodies/ReservationUuidBody' }
+      responses:
+        '200': { description: Réservation confirmée ou facture prête., content: { application/json: { schema: { $ref: '#/components/schemas/CheckoutResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/StudentNotFound' }
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /student/payment-sync.php:
+    post:
+      tags: [Paiements]
+      summary: Synchroniser paiement, réservation et admission
+      description: Agrège les paiements validés déjà en base; peut confirmer la réservation et créer l'admission `ATTENDU`.
+      operationId: syncReservationPayment
+      x-implementation-status: implemented
+      requestBody: { $ref: '#/components/requestBodies/ReservationUuidBody' }
+      responses:
+        '200': { description: 'État gratuit, payé, partiel ou en attente.', content: { application/json: { schema: { $ref: '#/components/schemas/PaymentSyncResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/StudentNotFound' }
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+        '409': { description: Expiration ou synchronisation impossible., content: { application/json: { schema: { oneOf: [{ $ref: '#/components/schemas/ErrorResponse' }, { $ref: '#/components/schemas/ExpiredReservationResponse' }] } } } }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /student/payments.php:
+    get:
+      tags: [Paiements]
+      summary: Lister les factures et paiements
+      operationId: listPayments
+      x-implementation-status: implemented
+      responses:
+        '200': { description: 'Factures, paiements associés et agrégats.', content: { application/json: { schema: { $ref: '#/components/schemas/PaymentsResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/StudentNotFound' }
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /student/stages.php:
+    get:
+      tags: [Stages]
+      summary: Lister les stages affectés
+      operationId: listStages
+      x-implementation-status: implemented
+      responses:
+        '200': { description: 'Stages planifiés, actifs, terminés et validés.', content: { application/json: { schema: { $ref: '#/components/schemas/StagesResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/StudentNotFound' }
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /auth/refresh.php:
+    post:
+      tags: [Authentification]
+      summary: Renouveler les tokens (non opérationnel)
+      description: Le fichier _bootstrap.php est absent; login.php ne fournit pas de refresh token et utilise une autre table.
+      operationId: refreshToken
+      security: []
+      deprecated: true
+      x-implementation-status: broken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties: { refresh_token: { type: string, minLength: 1 } }
+      responses:
+        '200': { description: Contrat prévu après correction., content: { application/json: { schema: { $ref: '#/components/schemas/RefreshResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /auth/logout.php:
+    post:
+      tags: [Authentification]
+      summary: Révoquer la session (non opérationnel)
+      description: Dépend du fichier absent `_bootstrap.php` et du modèle `api_mobile_sessions`.
+      operationId: logout
+      deprecated: true
+      x-implementation-status: broken
+      responses:
+        '200': { $ref: '#/components/responses/EmptyOk' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /me.php:
+    get:
+      tags: [Compte]
+      summary: Obtenir l'utilisateur connecté
+      operationId: getMe
+      x-implementation-status: implemented
+      responses:
+        '200': { description: Utilisateur et profil étudiant éventuel., content: { application/json: { schema: { $ref: '#/components/schemas/MeResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /student/dashboard.php:
+    get:
+      tags: [Tableau de bord]
+      summary: Charger le tableau de bord étudiant
+      operationId: getStudentDashboard
+      x-implementation-status: implemented
+      responses:
+        '200': { description: 'Identité, compteurs et stage courant ou précédent.', content: { application/json: { schema: { $ref: '#/components/schemas/DashboardResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/StudentNotFound' }
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /student/profile.php:
+    get:
+      tags: [Profil et parcours]
+      summary: Obtenir le profil actif (non opérationnel)
+      description: L'inclusion `api/includes/auth.php` cible actuellement un fichier absent.
+      operationId: getStudentProfile
+      deprecated: true
+      x-implementation-status: broken
+      responses:
+        '200': { description: Profil et rattachement actif., content: { application/json: { schema: { $ref: '#/components/schemas/ProfileResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/StudentNotFound' }
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /student/enrollments.php:
+    get:
+      tags: [Profil et parcours]
+      summary: Lister les rattachements universitaires
+      operationId: listStudentEnrollments
+      x-implementation-status: implemented
+      responses:
+        '200': { description: Rattachements de l'étudiant., content: { application/json: { schema: { $ref: '#/components/schemas/EnrollmentsResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/StudentNotFound' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /student/academic-path.php:
+    get:
+      tags: [Profil et parcours]
+      summary: Obtenir le parcours d'un rattachement
+      operationId: getAcademicPath
+      x-implementation-status: implemented
+      parameters: [{ $ref: '#/components/parameters/EnrollmentId' }]
+      responses:
+        '200': { description: Rattachement et historique académique., content: { application/json: { schema: { $ref: '#/components/schemas/AcademicPathResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/StudentNotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /student/attendance.php:
+    get:
+      tags: [Présences]
+      summary: Lister les présences
+      operationId: listAttendance
+      x-implementation-status: implemented
+      parameters: [{ $ref: '#/components/parameters/OptionalAssignmentUuid' }]
+      responses:
+        '200': { description: Présences et statistiques., content: { application/json: { schema: { $ref: '#/components/schemas/AttendanceResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/StudentNotFound' }
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /student/logbook.php:
+    get:
+      tags: [Journal de stage]
+      summary: Lister les entrées du journal
+      operationId: listLogbookEntries
+      x-implementation-status: implemented
+      parameters: [{ $ref: '#/components/parameters/OptionalAssignmentUuid' }]
+      responses:
+        '200': { description: 'Journaux, activités, droits et statistiques.', content: { application/json: { schema: { $ref: '#/components/schemas/LogbookResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/StudentNotFound' }
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /student/logbook-save.php:
+    post:
+      tags: [Journal de stage]
+      summary: Créer ou modifier un brouillon
+      description: Stage `ACTIVE`, date dans la période; remplace toutes les activités. Modifiable en `BROUILLON`, `REJETE` ou `REJETEE`.
+      operationId: saveLogbookEntry
+      x-implementation-status: implemented
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LogbookSaveRequest' }
+            example:
+              assignment_uuid: 6c049f97-408e-4fc2-bd59-11848000a714
+              date: '2026-09-18'
+              summary: Consultation et suivi des patients.
+              learning: Prise des constantes.
+              difficulties: Aucune.
+              activities: [{ activity: Prise des constantes, category: SOINS, involvement_level: REALISE, quantity: 4, observation: Sous supervision. }]
+          application/x-www-form-urlencoded:
+            schema: { $ref: '#/components/schemas/LogbookSaveRequest' }
+      responses:
+        '200': { description: Brouillon enregistré., content: { application/json: { schema: { $ref: '#/components/schemas/LogbookSaveResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/StudentNotFound' }
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /student/logbook-submit.php:
+    post:
+      tags: [Journal de stage]
+      summary: Soumettre un journal pour validation
+      description: Idempotent si déjà soumis/validé. Au moins une activité est obligatoire.
+      operationId: submitLogbookEntry
+      x-implementation-status: implemented
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: '#/components/schemas/UuidRequest' } }
+          application/x-www-form-urlencoded: { schema: { $ref: '#/components/schemas/UuidRequest' } }
+      responses:
+        '200': { description: 'Journal soumis, déjà soumis ou déjà validé.', content: { application/json: { schema: { $ref: '#/components/schemas/LogbookSubmitResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/StudentNotFound' }
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /student/evaluations.php:
+    get:
+      tags: [Évaluations]
+      summary: Lister les évaluations validées
+      description: Le code ne retient que le statut SQL exact `VALIDEE`.
+      operationId: listEvaluations
+      x-implementation-status: implemented
+      parameters: [{ $ref: '#/components/parameters/OptionalAssignmentUuid' }]
+      responses:
+        '200': { description: 'Évaluations, moyenne et dernière évaluation finale.', content: { application/json: { schema: { $ref: '#/components/schemas/EvaluationsResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/StudentNotFound' }
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /student/documents.php:
+    get:
+      tags: [Documents]
+      summary: Lister attestations et certificats
+      description: Le champ pdf_endpoint cible un fichier absent; verification_url pointe vers la page Web publique.
+      operationId: listOfficialDocuments
+      x-implementation-status: implemented-with-missing-download
+      responses:
+        '200': { description: Documents officiels et liens., content: { application/json: { schema: { $ref: '#/components/schemas/DocumentsResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/StudentNotFound' }
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+        '500': { $ref: '#/components/responses/ServerError' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque-64-hex
+      description: Token opaque de 64 caractères hexadécimaux produit par `/auth/login.php`.
+  parameters:
+    EnrollmentId:
+      name: enrollment_id
+      in: query
+      required: true
+      description: Identifiant d'un rattachement appartenant à l'étudiant.
+      schema: { type: integer, format: int64, minimum: 1 }
+    OptionalAssignmentUuid:
+      name: assignment_uuid
+      in: query
+      required: false
+      description: Filtre par UUID du stage; sans valeur, toutes les données sont renvoyées.
+      schema: { type: string, format: uuid }
+    OptionalReservationUuid:
+      name: reservation_uuid
+      in: query
+      required: false
+      description: Filtre par UUID de réservation.
+      schema: { type: string, format: uuid }
+  requestBodies:
+    ReservationUuidBody:
+      required: true
+      content:
+        application/json: { schema: { $ref: '#/components/schemas/ReservationUuidRequest' } }
+        application/x-www-form-urlencoded: { schema: { $ref: '#/components/schemas/ReservationUuidRequest' } }
+  responses:
+    EmptyOk: { description: Opération réussie., content: { application/json: { schema: { $ref: '#/components/schemas/EmptySuccessResponse' } } } }
+    Unauthorized: { description: Token absent/invalide/expiré ou identifiants invalides., content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' }, example: { success: false, message: Authentification requise., data: [] } } } }
+    Forbidden: { description: Compte ou rôle non autorisé., content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    StudentNotFound: { description: Profil étudiant introuvable., content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    NotFound: { description: Ressource introuvable., content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    MethodNotAllowed: { description: Méthode HTTP non autorisée., content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    ValidationError: { description: Payload ou paramètre invalide., content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    Conflict: { description: 'Conflit métier de capacité, état, expiration ou propriété.', content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+    ServerError: { description: Erreur serveur ou incompatibilité de schéma SQL., content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  schemas:
+    EmptyData: { type: array, maxItems: 0, items: {}, example: [] }
+    ErrorResponse:
+      type: object
+      required: [success, message, data]
+      properties: { success: { type: boolean, enum: [false] }, message: { type: string }, data: { $ref: '#/components/schemas/EmptyData' } }
+    EmptySuccessResponse:
+      type: object
+      required: [success, message, data]
+      properties: { success: { type: boolean, enum: [true] }, message: { type: string }, data: { $ref: '#/components/schemas/EmptyData' } }
+    NullableString: { type: string, nullable: true }
+    NullableDate: { type: string, format: date, nullable: true }
+    NullableDateTime: { type: string, pattern: '^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$', nullable: true }
+    NullableNumber: { type: number, format: float, nullable: true }
+    Uuid: { type: string, format: uuid }
+    NullableUuid: { type: string, format: uuid, nullable: true }
+    CodeName:
+      type: object
+      required: [code, name]
+      properties: { code: { $ref: '#/components/schemas/NullableString' }, name: { $ref: '#/components/schemas/NullableString' } }
+    CampaignSummary:
+      type: object
+      required: [code, title]
+      properties: { code: { $ref: '#/components/schemas/NullableString' }, title: { $ref: '#/components/schemas/NullableString' }, start_date: { $ref: '#/components/schemas/NullableDate' }, end_date: { $ref: '#/components/schemas/NullableDate' } }
+    AssignmentSummary:
+      type: object
+      required: [uuid, status, start_date, end_date]
+      properties:
+        uuid: { $ref: '#/components/schemas/NullableUuid' }
+        status: { type: string, nullable: true }
+        start_date: { $ref: '#/components/schemas/NullableDate' }
+        end_date: { $ref: '#/components/schemas/NullableDate' }
+    LoginRequest:
+      type: object
+      required: [identifiant, password]
+      properties:
+        identifiant: { type: string, minLength: 1, description: 'Identifiant, e-mail ou code STAGIA.' }
+        password: { type: string, format: password, minLength: 1 }
+        device_name: { type: string, default: mobile, maxLength: 100 }
+    LoginResponse:
+      type: object
+      required: [success, message, data]
+      properties:
+        success: { type: boolean, enum: [true] }
+        message: { type: string, example: Connexion réussie. }
+        data:
+          type: object
+          required: [token, token_type, expires_in, user, student]
+          properties:
+            token: { type: string, pattern: '^[a-f0-9]{64}$' }
+            token_type: { type: string, enum: [Bearer] }
+            expires_in: { type: integer, enum: [2592000], description: 'Secondes, soit 30 jours.' }
+            user:
+              type: object
+              required: [id, nom, prenom, email, role_code, role_nom]
+              properties:
+                id: { type: integer }
+                nom: { $ref: '#/components/schemas/NullableString' }
+                prenom: { $ref: '#/components/schemas/NullableString' }
+                email: { type: string, format: email, nullable: true }
+                role_code: { type: string }
+                role_nom: { type: string }
+            student:
+              type: object
+              nullable: true
+              required: [id, stagia_code]
+              properties: { id: { type: integer, format: int64 }, stagia_code: { $ref: '#/components/schemas/NullableString' } }
+    RefreshResponse:
+      type: object
+      description: Contrat prévu; l'appel `apiResponse` du code actuel doit également être corrigé.
+      properties:
+        success: { type: boolean, enum: [true] }
+        message: { type: string }
+        data:
+          type: object
+          properties:
+            access_token: { type: string }
+            refresh_token: { type: string }
+            token_type: { type: string, enum: [Bearer] }
+            expires_in: { type: integer, enum: [3600] }
+    MeResponse:
+      type: object
+      required: [success, message, data]
+      properties:
+        success: { type: boolean, enum: [true] }
+        message: { type: string }
+        data:
+          type: object
+          required: [user]
+          properties:
+            user:
+              type: object
+              required: [identifiant, nom, prenom, email, actif, role]
+              properties:
+                identifiant: { type: string }
+                nom: { $ref: '#/components/schemas/NullableString' }
+                prenom: { $ref: '#/components/schemas/NullableString' }
+                email: { type: string, format: email, nullable: true }
+                actif: { type: boolean }
+                role:
+                  type: object
+                  required: [code, nom]
+                  properties: { code: { type: string }, nom: { type: string } }
+            student:
+              type: object
+              description: Présent uniquement pour un STAGIAIRE ayant un code STAGIA.
+              properties:
+                stagia_code: { type: string }
+                nom: { type: string }
+                postnom: { $ref: '#/components/schemas/NullableString' }
+                prenom: { $ref: '#/components/schemas/NullableString' }
+                statut: { type: string, enum: [ACTIF, SUSPENDU, ARCHIVE] }
+    DashboardStage:
+      type: object
+      properties:
+        uuid: { $ref: '#/components/schemas/Uuid' }
+        statut: { type: string, enum: [PLANIFIEE, ACTIVE, TERMINEE] }
+        date_debut: { type: string, format: date }
+        date_fin: { $ref: '#/components/schemas/NullableDate' }
+        campaign_code: { $ref: '#/components/schemas/NullableString' }
+        campaign_title: { type: string }
+        hospital_code: { $ref: '#/components/schemas/NullableString' }
+        hospital_name: { type: string }
+        unit_code: { $ref: '#/components/schemas/NullableString' }
+        unit_name: { $ref: '#/components/schemas/NullableString' }
+        completion_status: { $ref: '#/components/schemas/NullableString' }
+        taux_presence: { $ref: '#/components/schemas/NullableNumber' }
+        note_finale: { $ref: '#/components/schemas/NullableNumber' }
+        certificate_uuid: { $ref: '#/components/schemas/NullableUuid' }
+        certificate_reference: { $ref: '#/components/schemas/NullableString' }
+    DashboardResponse:
+      type: object
+      required: [success, message, data]
+      properties:
+        success: { type: boolean, enum: [true] }
+        message: { type: string }
+        data:
+          type: object
+          required: [student, stats, current_stage]
+          properties:
+            student:
+              type: object
+              required: [stagia_code, nom, postnom, prenom, email, identifiant]
+              properties:
+                stagia_code: { $ref: '#/components/schemas/NullableString' }
+                nom: { type: string }
+                postnom: { $ref: '#/components/schemas/NullableString' }
+                prenom: { $ref: '#/components/schemas/NullableString' }
+                email: { type: string, format: email, nullable: true }
+                identifiant: { type: string }
+            stats:
+              type: object
+              required: [applications, active_reservations, stages, planned_stages, active_stages, completed_stages, validated_stages, documents]
+              properties:
+                applications: { type: integer, minimum: 0 }
+                active_reservations: { type: integer, minimum: 0 }
+                stages: { type: integer, minimum: 0 }
+                planned_stages: { type: integer, minimum: 0 }
+                active_stages: { type: integer, minimum: 0 }
+                completed_stages: { type: integer, minimum: 0 }
+                validated_stages: { type: integer, minimum: 0 }
+                documents: { type: integer, minimum: 0 }
+            current_stage:
+              allOf: [{ $ref: '#/components/schemas/DashboardStage' }]
+              nullable: true
+    ProfileResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        message: { type: string }
+        data:
+          type: object
+          properties:
+            student:
+              type: object
+              nullable: true
+              properties:
+                stagia_code: { $ref: '#/components/schemas/NullableString' }
+                nom: { type: string }
+                postnom: { $ref: '#/components/schemas/NullableString' }
+                prenom: { $ref: '#/components/schemas/NullableString' }
+                statut: { type: string }
+                identifiant: { type: string }
+                email: { type: string, format: email, nullable: true }
+                university_code: { $ref: '#/components/schemas/NullableString' }
+                university_name: { $ref: '#/components/schemas/NullableString' }
+                academic_year: { $ref: '#/components/schemas/NullableString' }
+                promotion: { $ref: '#/components/schemas/NullableString' }
+                filiere: { $ref: '#/components/schemas/NullableString' }
+                academic_status: { $ref: '#/components/schemas/NullableString' }
+    Enrollment:
+      type: object
+      required: [enrollment_id, etablissement_id, matricule, email_institutionnel, date_inscription, statut]
+      properties:
+        enrollment_id: { type: integer, format: int64 }
+        etablissement_id: { type: integer }
+        matricule: { type: string }
+        email_institutionnel: { type: string, format: email, nullable: true }
+        date_inscription: { $ref: '#/components/schemas/NullableDate' }
+        statut: { type: string, enum: [ACTIF, SUSPENDU, TERMINE, ARCHIVE] }
+    EnrollmentsResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        message: { type: string }
+        data:
+          type: object
+          properties: { enrollments: { type: array, items: { $ref: '#/components/schemas/Enrollment' } } }
+    AcademicEnrollment:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        statut: { type: string, enum: [EN_COURS, REUSSI, ECHEC, ABANDON, TERMINE] }
+        date_debut: { $ref: '#/components/schemas/NullableDate' }
+        date_fin: { $ref: '#/components/schemas/NullableDate' }
+        annee_id: { type: integer }
+        annee: { type: string }
+        promotion_id: { type: integer }
+        promotion: { type: string }
+        filiere_id: { type: integer }
+        filiere: { type: string }
+        departement_id: { type: integer, nullable: true }
+        departement: { $ref: '#/components/schemas/NullableString' }
+        faculte_id: { type: integer, nullable: true }
+        faculte: { $ref: '#/components/schemas/NullableString' }
+    AcademicPathResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        message: { type: string }
+        data:
+          type: object
+          properties:
+            enrollment:
+              type: object
+              properties: { id: { type: integer, format: int64 }, etablissement_id: { type: integer }, matricule: { type: string }, statut: { type: string } }
+            academic_path: { type: array, items: { $ref: '#/components/schemas/AcademicEnrollment' } }
+    StageHospitalOption:
+      type: object
+      required: [participation_id, hospital, capacity, used_places, available_places, available, fees_required, amount, currency, conditions]
+      properties:
+        participation_id: { type: integer, format: int64 }
+        hospital:
+          allOf:
+            - { $ref: '#/components/schemas/CodeName' }
+            - type: object
+              properties: { city: { $ref: '#/components/schemas/NullableString' }, province: { $ref: '#/components/schemas/NullableString' } }
+        capacity: { type: integer, minimum: 0 }
+        used_places: { type: integer, minimum: 0 }
+        available_places: { type: integer, minimum: 0 }
+        available: { type: boolean }
+        fees_required: { type: boolean }
+        amount: { $ref: '#/components/schemas/NullableNumber' }
+        currency: { $ref: '#/components/schemas/NullableString' }
+        conditions: { $ref: '#/components/schemas/NullableString' }
+    StageCampaignOption:
+      type: object
+      properties:
+        campaign_id: { type: integer, format: int64 }
+        academic_enrollment_id: { type: integer, format: int64 }
+        code: { $ref: '#/components/schemas/NullableString' }
+        title: { type: string }
+        start_date: { type: string, format: date }
+        end_date: { type: string, format: date }
+        promotion:
+          type: object
+          properties: { code: { $ref: '#/components/schemas/NullableString' }, name: { type: string }, level: { $ref: '#/components/schemas/NullableString' } }
+        program: { $ref: '#/components/schemas/NullableString' }
+        hospitals: { type: array, items: { $ref: '#/components/schemas/StageHospitalOption' } }
+        hospitals_count: { type: integer, minimum: 0 }
+        available_hospitals: { type: integer, minimum: 0 }
+    StageOptionsResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        message: { type: string }
+        data:
+          type: object
+          properties:
+            campaigns: { type: array, items: { $ref: '#/components/schemas/StageCampaignOption' } }
+            stats:
+              type: object
+              properties: { campaigns: { type: integer }, hospitals: { type: integer }, available_hospitals: { type: integer }, available_places: { type: integer } }
+    ReserveRequest:
+      type: object
+      required: [campaign_id, academic_enrollment_id, participation_id]
+      properties:
+        campaign_id: { type: integer, format: int64, minimum: 1 }
+        academic_enrollment_id: { type: integer, format: int64, minimum: 1 }
+        participation_id: { type: integer, format: int64, minimum: 1 }
+        motivation: { type: string, maxLength: 1000, nullable: true }
+    ReserveResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        message: { type: string }
+        data:
+          type: object
+          required: [application_uuid, reservation_uuid, reservation_status, expires_at, hospital]
+          properties:
+            application_uuid: { $ref: '#/components/schemas/Uuid' }
+            reservation_uuid: { $ref: '#/components/schemas/Uuid' }
+            reservation_status: { type: string, enum: [RESERVEE_TEMPORAIREMENT, EN_ATTENTE_PAIEMENT, CONFIRMEE] }
+            expires_at: { $ref: '#/components/schemas/NullableDateTime' }
+            reservation_duration_minutes: { type: integer, enum: [30] }
+            hospital: { $ref: '#/components/schemas/CodeName' }
+            fees:
+              type: object
+              properties: { required: { type: boolean }, amount: { $ref: '#/components/schemas/NullableNumber' }, currency: { $ref: '#/components/schemas/NullableString' } }
+            frais_requis: { type: boolean, description: Variante de la réponse idempotente. }
+            montant_frais: { $ref: '#/components/schemas/NullableNumber' }
+            devise: { $ref: '#/components/schemas/NullableString' }
+            places_remaining: { type: integer, minimum: 0 }
+    ApplicationItem:
+      type: object
+      properties:
+        uuid: { $ref: '#/components/schemas/Uuid' }
+        statut: { type: string, enum: [BROUILLON, SOUMISE, EN_ETUDE, ACCEPTEE, REFUSEE, ANNULEE] }
+        motivation: { $ref: '#/components/schemas/NullableString' }
+        motif_refus: { $ref: '#/components/schemas/NullableString' }
+        submitted_at: { $ref: '#/components/schemas/NullableDateTime' }
+        responded_at: { $ref: '#/components/schemas/NullableDateTime' }
+        campaign_code: { $ref: '#/components/schemas/NullableString' }
+        campaign_title: { type: string }
+        campaign_start: { type: string, format: date }
+        campaign_end: { type: string, format: date }
+        hospital_code: { $ref: '#/components/schemas/NullableString' }
+        hospital_name: { type: string }
+        ville: { $ref: '#/components/schemas/NullableString' }
+        province: { $ref: '#/components/schemas/NullableString' }
+        reservation_uuid: { $ref: '#/components/schemas/NullableUuid' }
+        reservation_status: { $ref: '#/components/schemas/NullableString' }
+        expires_at: { $ref: '#/components/schemas/NullableDateTime' }
+        confirmed_at: { $ref: '#/components/schemas/NullableDateTime' }
+        admitted: { type: boolean }
+        assignment_uuid: { $ref: '#/components/schemas/NullableUuid' }
+        assignment_status: { $ref: '#/components/schemas/NullableString' }
+        completion_status: { $ref: '#/components/schemas/NullableString' }
+        taux_presence: { $ref: '#/components/schemas/NullableNumber' }
+        note_finale: { $ref: '#/components/schemas/NullableNumber' }
+        workflow_status: { type: string }
+    ApplicationsResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        message: { type: string }
+        data:
+          type: object
+          properties: { items: { type: array, items: { $ref: '#/components/schemas/ApplicationItem' } }, total: { type: integer, minimum: 0 } }
+    ReservationItem:
+      type: object
+      properties:
+        uuid: { $ref: '#/components/schemas/Uuid' }
+        statut: { type: string, enum: [RESERVEE_TEMPORAIREMENT, EN_ATTENTE_PAIEMENT, CONFIRMEE, EXPIREE, ANNULEE] }
+        expires_at: { $ref: '#/components/schemas/NullableDateTime' }
+        confirmed_at: { $ref: '#/components/schemas/NullableDateTime' }
+        application_uuid: { $ref: '#/components/schemas/Uuid' }
+        application_status: { type: string }
+        campaign_code: { $ref: '#/components/schemas/NullableString' }
+        campaign_title: { type: string }
+        campaign_start: { type: string, format: date }
+        campaign_end: { type: string, format: date }
+        hospital_code: { $ref: '#/components/schemas/NullableString' }
+        hospital_name: { type: string }
+        ville: { $ref: '#/components/schemas/NullableString' }
+        province: { $ref: '#/components/schemas/NullableString' }
+        frais_requis: { type: boolean }
+        montant_frais: { $ref: '#/components/schemas/NullableNumber' }
+        devise: { $ref: '#/components/schemas/NullableString' }
+        admitted: { type: boolean }
+        assignment_uuid: { $ref: '#/components/schemas/NullableUuid' }
+        assignment_status: { $ref: '#/components/schemas/NullableString' }
+        completion_status: { $ref: '#/components/schemas/NullableString' }
+        expired: { type: boolean }
+        workflow_status: { type: string }
+    ReservationStats:
+      type: object
+      properties: { total: { type: integer }, temporary: { type: integer }, waiting_payment: { type: integer }, confirmed: { type: integer }, expired: { type: integer } }
+    ReservationsResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        message: { type: string }
+        data:
+          type: object
+          properties: { items: { type: array, items: { $ref: '#/components/schemas/ReservationItem' } }, stats: { $ref: '#/components/schemas/ReservationStats' } }
+    AdmissionItem:
+      type: object
+      properties:
+        reservation:
+          type: object
+          properties: { uuid: { $ref: '#/components/schemas/Uuid' }, status: { type: string }, expires_at: { $ref: '#/components/schemas/NullableDateTime' }, confirmed_at: { $ref: '#/components/schemas/NullableDateTime' } }
+        application:
+          type: object
+          properties: { uuid: { $ref: '#/components/schemas/Uuid' }, status: { type: string } }
+        admission:
+          type: object
+          properties: { exists: { type: boolean }, uuid: { $ref: '#/components/schemas/NullableUuid' }, status: { $ref: '#/components/schemas/NullableString' }, admitted_at: { $ref: '#/components/schemas/NullableDateTime' }, observation: { $ref: '#/components/schemas/NullableString' } }
+        assignment:
+          allOf:
+            - { $ref: '#/components/schemas/AssignmentSummary' }
+            - type: object
+              properties: { exists: { type: boolean }, assigned_at: { $ref: '#/components/schemas/NullableDateTime' }, ended_at: { $ref: '#/components/schemas/NullableDateTime' }, observation: { $ref: '#/components/schemas/NullableString' }, unit: { $ref: '#/components/schemas/CodeName' } }
+        campaign: { $ref: '#/components/schemas/CampaignSummary' }
+        hospital:
+          allOf:
+            - { $ref: '#/components/schemas/CodeName' }
+            - type: object
+              properties: { city: { $ref: '#/components/schemas/NullableString' }, province: { $ref: '#/components/schemas/NullableString' } }
+        completion:
+          type: object
+          properties: { status: { $ref: '#/components/schemas/NullableString' }, attendance_rate: { $ref: '#/components/schemas/NullableNumber' }, final_score: { $ref: '#/components/schemas/NullableNumber' } }
+        workflow_status: { type: string }
+    AdmissionResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        message: { type: string }
+        data:
+          type: object
+          properties:
+            items: { type: array, items: { $ref: '#/components/schemas/AdmissionItem' } }
+            stats:
+              type: object
+              properties: { total: { type: integer }, waiting_admission: { type: integer }, admitted: { type: integer }, waiting_assignment: { type: integer }, assigned: { type: integer }, active: { type: integer }, completed: { type: integer } }
+    ReservationUuidRequest:
+      type: object
+      required: [reservation_uuid]
+      properties: { reservation_uuid: { $ref: '#/components/schemas/Uuid' } }
+    CheckoutResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        message: { type: string }
+        data:
+          type: object
+          required: [reservation_uuid, reservation_status, payment_required]
+          properties:
+            reservation_uuid: { $ref: '#/components/schemas/Uuid' }
+            reservation_status: { type: string, enum: [CONFIRMEE, EN_ATTENTE_PAIEMENT] }
+            payment_required: { type: boolean }
+            invoice:
+              type: object
+              properties: { uuid: { $ref: '#/components/schemas/NullableUuid' }, reference: { $ref: '#/components/schemas/NullableString' }, amount: { type: number, format: float }, currency: { $ref: '#/components/schemas/NullableString' } }
+            hospital: { $ref: '#/components/schemas/CodeName' }
+            payment_gateway:
+              type: object
+              properties: { integrated: { type: boolean, enum: [false] }, next_action: { type: string, enum: [AWAIT_PAYMENT] } }
+    PaymentSyncResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        message: { type: string }
+        data:
+          type: object
+          properties:
+            reservation_uuid: { $ref: '#/components/schemas/Uuid' }
+            reservation_status: { type: string, enum: [CONFIRMEE, EN_ATTENTE_PAIEMENT] }
+            payment_status: { type: string, enum: [NOT_REQUIRED, PAID, PENDING] }
+            invoice_status: { $ref: '#/components/schemas/NullableString' }
+            admission_id: { type: integer, format: int64 }
+            admission_status: { type: string, enum: [ATTENDU] }
+            amount_required: { type: number, format: float }
+            amount_validated: { $ref: '#/components/schemas/NullableNumber' }
+            amount_remaining: { $ref: '#/components/schemas/NullableNumber' }
+            currency: { $ref: '#/components/schemas/NullableString' }
+            hospital: { $ref: '#/components/schemas/CodeName' }
+    ExpiredReservationResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [false] }
+        message: { type: string }
+        data:
+          type: object
+          properties: { reservation_uuid: { $ref: '#/components/schemas/Uuid' }, reservation_status: { type: string, enum: [EXPIREE] }, payment_status: { type: string, enum: [NOT_CONFIRMED] } }
+    PaymentItem:
+      type: object
+      properties:
+        uuid: { $ref: '#/components/schemas/NullableUuid' }
+        reference: { $ref: '#/components/schemas/NullableString' }
+        amount: { $ref: '#/components/schemas/NullableNumber' }
+        currency: { $ref: '#/components/schemas/NullableString' }
+        method: { $ref: '#/components/schemas/NullableString' }
+        status: { type: string }
+        validated: { type: boolean }
+        paid_at: { $ref: '#/components/schemas/NullableDateTime' }
+        validated_at: { $ref: '#/components/schemas/NullableDateTime' }
+        observation: { $ref: '#/components/schemas/NullableString' }
+    InvoiceItem:
+      type: object
+      properties:
+        uuid: { $ref: '#/components/schemas/NullableUuid' }
+        reference: { $ref: '#/components/schemas/NullableString' }
+        amount: { $ref: '#/components/schemas/NullableNumber' }
+        currency: { $ref: '#/components/schemas/NullableString' }
+        status: { type: string }
+        paid: { type: boolean }
+        workflow_status: { type: string }
+        due_at: { $ref: '#/components/schemas/NullableDateTime' }
+        created_at: { $ref: '#/components/schemas/NullableDateTime' }
+        campaign: { $ref: '#/components/schemas/CampaignSummary' }
+        hospital: { $ref: '#/components/schemas/CodeName' }
+        payments: { type: array, items: { $ref: '#/components/schemas/PaymentItem' } }
+    PaymentsResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        message: { type: string }
+        data:
+          type: object
+          properties:
+            items: { type: array, items: { $ref: '#/components/schemas/InvoiceItem' } }
+            stats:
+              type: object
+              properties: { invoices: { type: integer }, payments: { type: integer }, validated_payments: { type: integer }, pending_payments: { type: integer }, total_paid: { type: number, format: float }, currency: { $ref: '#/components/schemas/NullableString' } }
+    StageItem:
+      type: object
+      properties:
+        uuid: { $ref: '#/components/schemas/Uuid' }
+        statut: { type: string, enum: [PLANIFIEE, ACTIVE, TERMINEE] }
+        date_debut: { type: string, format: date }
+        date_fin: { $ref: '#/components/schemas/NullableDate' }
+        observation: { $ref: '#/components/schemas/NullableString' }
+        assigned_at: { $ref: '#/components/schemas/NullableDateTime' }
+        ended_at: { $ref: '#/components/schemas/NullableDateTime' }
+        campaign_code: { $ref: '#/components/schemas/NullableString' }
+        campaign_title: { type: string }
+        campaign_start: { type: string, format: date }
+        campaign_end: { type: string, format: date }
+        hospital_code: { $ref: '#/components/schemas/NullableString' }
+        hospital_name: { type: string }
+        ville: { $ref: '#/components/schemas/NullableString' }
+        province: { $ref: '#/components/schemas/NullableString' }
+        unit_code: { $ref: '#/components/schemas/NullableString' }
+        unit_name: { $ref: '#/components/schemas/NullableString' }
+        completion_status: { $ref: '#/components/schemas/NullableString' }
+        total_rotations: { type: integer, minimum: 0 }
+        total_presences: { type: integer, minimum: 0 }
+        total_retards: { type: integer, minimum: 0 }
+        total_absences: { type: integer, minimum: 0 }
+        total_justifiees: { type: integer, minimum: 0 }
+        taux_presence: { $ref: '#/components/schemas/NullableNumber' }
+        total_journaux: { type: integer, minimum: 0 }
+        journaux_valides: { type: integer, minimum: 0 }
+        note_finale: { $ref: '#/components/schemas/NullableNumber' }
+        appreciation_finale: { $ref: '#/components/schemas/NullableString' }
+        validated_at: { $ref: '#/components/schemas/NullableDateTime' }
+        certificate_uuid: { $ref: '#/components/schemas/NullableUuid' }
+        certificate_reference: { $ref: '#/components/schemas/NullableString' }
+        certificate_type: { $ref: '#/components/schemas/NullableString' }
+        certificate_status: { $ref: '#/components/schemas/NullableString' }
+        certificate_generated_at: { $ref: '#/components/schemas/NullableDateTime' }
+        workflow_status: { type: string, enum: [PLANIFIE, EN_COURS, TERMINE, VALIDE] }
+        certificate_available: { type: boolean }
+    StagesResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        message: { type: string }
+        data:
+          type: object
+          properties:
+            items: { type: array, items: { $ref: '#/components/schemas/StageItem' } }
+            stats:
+              type: object
+              properties: { total: { type: integer }, planned: { type: integer }, active: { type: integer }, completed: { type: integer }, validated: { type: integer } }
+    AttendanceItem:
+      type: object
+      properties:
+        uuid: { $ref: '#/components/schemas/NullableUuid' }
+        date: { $ref: '#/components/schemas/NullableDate' }
+        status: { type: string, enum: [PRESENT, RETARD, ABSENT, JUSTIFIE, GARDE] }
+        arrival_time: { type: string, pattern: '^\d{2}:\d{2}:\d{2}$', nullable: true }
+        departure_time: { type: string, pattern: '^\d{2}:\d{2}:\d{2}$', nullable: true }
+        source: { type: string, nullable: true, enum: [MANUEL, QR, BIOMETRIE, RFID, MOBILE, APPAREIL, null] }
+        observation: { $ref: '#/components/schemas/NullableString' }
+        assignment: { $ref: '#/components/schemas/AssignmentSummary' }
+        campaign: { $ref: '#/components/schemas/CampaignSummary' }
+        hospital: { $ref: '#/components/schemas/CodeName' }
+        unit: { $ref: '#/components/schemas/CodeName' }
+    AttendanceResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        message: { type: string }
+        data:
+          type: object
+          properties:
+            items: { type: array, items: { $ref: '#/components/schemas/AttendanceItem' } }
+            stats:
+              type: object
+              properties: { total: { type: integer }, present: { type: integer }, late: { type: integer }, absent: { type: integer }, justified: { type: integer }, guard: { type: integer }, effective_presence: { type: integer }, attendance_rate: { type: number, minimum: 0, maximum: 100 } }
+    LogbookActivityInput:
+      type: object
+      required: [activity]
+      properties:
+        activity: { type: string, minLength: 1 }
+        category: { type: string, nullable: true }
+        involvement_level: { type: string, nullable: true }
+        quantity: { type: integer, minimum: 1, default: 1 }
+        observation: { type: string, nullable: true }
+    LogbookActivity:
+      allOf:
+        - { $ref: '#/components/schemas/LogbookActivityInput' }
+        - type: object
+          properties: { uuid: { $ref: '#/components/schemas/NullableUuid' } }
+    LogbookEntry:
+      type: object
+      properties:
+        uuid: { $ref: '#/components/schemas/NullableUuid' }
+        date: { $ref: '#/components/schemas/NullableDate' }
+        status: { type: string, enum: [BROUILLON, SOUMIS, SOUMISE, VALIDE, VALIDEE, REJETE, REJETEE] }
+        summary: { $ref: '#/components/schemas/NullableString' }
+        learning: { $ref: '#/components/schemas/NullableString' }
+        difficulties: { $ref: '#/components/schemas/NullableString' }
+        submitted_at: { $ref: '#/components/schemas/NullableDateTime' }
+        validated_at: { $ref: '#/components/schemas/NullableDateTime' }
+        validator_comment: { $ref: '#/components/schemas/NullableString' }
+        editable: { type: boolean }
+        can_submit: { type: boolean }
+        activities: { type: array, items: { $ref: '#/components/schemas/LogbookActivity' } }
+        activities_count: { type: integer, minimum: 0 }
+        assignment: { $ref: '#/components/schemas/AssignmentSummary' }
+        campaign: { $ref: '#/components/schemas/CampaignSummary' }
+        hospital: { $ref: '#/components/schemas/CodeName' }
+        unit: { $ref: '#/components/schemas/CodeName' }
+    LogbookResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        message: { type: string }
+        data:
+          type: object
+          properties:
+            items: { type: array, items: { $ref: '#/components/schemas/LogbookEntry' } }
+            stats:
+              type: object
+              properties: { total: { type: integer }, draft: { type: integer }, submitted: { type: integer }, validated: { type: integer }, rejected: { type: integer }, activities: { type: integer } }
+    LogbookSaveRequest:
+      type: object
+      required: [assignment_uuid, date]
+      properties:
+        assignment_uuid: { $ref: '#/components/schemas/Uuid' }
+        uuid: { $ref: '#/components/schemas/NullableUuid' }
+        date: { type: string, format: date }
+        summary: { type: string, nullable: true }
+        learning: { type: string, nullable: true }
+        difficulties: { type: string, nullable: true }
+        activities: { type: array, default: [], items: { $ref: '#/components/schemas/LogbookActivityInput' } }
+    LogbookSaveResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        message: { type: string }
+        data:
+          type: object
+          properties:
+            uuid: { $ref: '#/components/schemas/NullableUuid' }
+            status: { type: string, enum: [BROUILLON] }
+            date: { type: string, format: date }
+            activities_count: { type: integer, minimum: 0, description: Taille reçue; les libellés vides sont ignorés en base. }
+    UuidRequest:
+      type: object
+      required: [uuid]
+      properties: { uuid: { $ref: '#/components/schemas/Uuid' } }
+    LogbookSubmitResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        message: { type: string }
+        data:
+          type: object
+          properties: { uuid: { $ref: '#/components/schemas/Uuid' }, status: { type: string, enum: [SOUMIS, VALIDE] }, activities_count: { type: integer, minimum: 1 }, assignment_uuid: { $ref: '#/components/schemas/Uuid' } }
+    EvaluationItem:
+      type: object
+      properties:
+        uuid: { $ref: '#/components/schemas/NullableUuid' }
+        type: { type: string, enum: [CONTINUE, MI_ROTATION, FIN_ROTATION] }
+        status: { type: string, enum: [VALIDEE] }
+        note: { $ref: '#/components/schemas/NullableNumber' }
+        appreciation: { $ref: '#/components/schemas/NullableString' }
+        validated_at: { $ref: '#/components/schemas/NullableDateTime' }
+        rotation_id: { type: integer, format: int64, nullable: true }
+        assignment: { $ref: '#/components/schemas/AssignmentSummary' }
+        campaign: { $ref: '#/components/schemas/CampaignSummary' }
+        hospital: { $ref: '#/components/schemas/CodeName' }
+        unit: { $ref: '#/components/schemas/CodeName' }
+    EvaluationsResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        message: { type: string }
+        data:
+          type: object
+          properties:
+            items: { type: array, items: { $ref: '#/components/schemas/EvaluationItem' } }
+            stats:
+              type: object
+              properties: { total: { type: integer }, continuous: { type: integer }, mid_rotation: { type: integer }, final_rotation: { type: integer }, average: { $ref: '#/components/schemas/NullableNumber' } }
+            final_evaluation:
+              allOf: [{ $ref: '#/components/schemas/EvaluationItem' }]
+              nullable: true
+    OfficialDocument:
+      type: object
+      properties:
+        uuid: { $ref: '#/components/schemas/Uuid' }
+        reference: { type: string }
+        type_document: { type: string, enum: [ATTESTATION_STAGE, CERTIFICAT_STAGE] }
+        status: { type: string }
+        available: { type: boolean }
+        generated_at: { $ref: '#/components/schemas/NullableDateTime' }
+        cancelled_at: { $ref: '#/components/schemas/NullableDateTime' }
+        cancellation_reason: { $ref: '#/components/schemas/NullableString' }
+        stage:
+          type: object
+          properties: { assignment_uuid: { $ref: '#/components/schemas/Uuid' }, start_date: { type: string, format: date }, end_date: { $ref: '#/components/schemas/NullableDate' }, note_finale: { $ref: '#/components/schemas/NullableNumber' }, taux_presence: { $ref: '#/components/schemas/NullableNumber' }, validated_at: { $ref: '#/components/schemas/NullableDateTime' } }
+        campaign: { $ref: '#/components/schemas/CampaignSummary' }
+        hospital: { $ref: '#/components/schemas/CodeName' }
+        university: { $ref: '#/components/schemas/CodeName' }
+        unit: { $ref: '#/components/schemas/CodeName' }
+        pdf_endpoint: { type: string, format: uri, nullable: true, description: URL actuellement non fonctionnelle car le fichier cible est absent. }
+        verification_url: { type: string, format: uri }
+    DocumentsResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        message: { type: string }
+        data:
+          type: object
+          properties:
+            items: { type: array, items: { $ref: '#/components/schemas/OfficialDocument' } }
+            stats:
+              type: object
+              properties: { total: { type: integer }, attestations: { type: integer }, certificates: { type: integer }, available: { type: integer }, cancelled: { type: integer } }

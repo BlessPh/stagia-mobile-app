@@ -218,7 +218,7 @@ class _AjouterTacheModalState extends State<AjouterTacheModal> {
                         ),
                         const SizedBox(height: 6),
                         DropdownButtonFormField<String>(
-                          value: _type,
+                          initialValue: _type,
                           decoration: InputDecoration(
                             filled: true,
                             fillColor: const Color(0xFFF8FAFC),

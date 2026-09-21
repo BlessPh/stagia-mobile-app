@@ -1,27 +1,37 @@
 abstract final class EndpointsApi {
-  static const connexion =
-      '/stagia/api/v1/auth/login.php'; // endpoints pour la connexion
-  static const profilEtudiant = '/stagia/api/v1/me.php';
-  static const documentsEtudiant = '/stagia/api/v1/student/documents.php';
-  static const stagesEtudiant = '/stagia/api/v1/student/stages.php';
-  static const reservationsEtudiant = '/stagia/api/v1/student/reservations.php';
-  static const admissionEtudiant = '/stagia/api/v1/student/admission.php';
-  static const optionsStageEtudiant =
-      '/stagia/api/v1/student/stage-options.php';
-  static const candidaturesEtudiant = '/stagia/api/v1/student/applications.php';
-  static const tableauDeBordEtudiant = '/stagia/api/v1/student/dashboard.php';
-  static const presencesEtudiant = '/stagia/api/v1/student/attendance.php';
-  static const journalEtudiant = '/stagia/api/v1/student/logbook.php';
-  static const evaluationsEtudiant = '/stagia/api/v1/student/evaluations.php';
-  static const paiementsEtudiant = '/stagia/api/v1/student/payments.php';
-  static const rafraichirToken = '/auth/token/refresh';
-  static const deconnexion = '/auth/logout';
-  static const motDePasseOublie = '/auth/password/forgot';
-  static const reinitialiserMotDePasse = '/auth/password/reset';
+  // Authentification et profil (contrat PHP OpenAPI)
+  static const connexion = '/auth/login.php';
+  static const deconnexion = '/auth/logout.php';
+  static const rafraichirToken = '/auth/refresh.php';
+  static const profilEtudiant = '/me.php';
+  static const motDePasseOublie = '/auth/forgot-password.php';
+  static const reinitialiserMotDePasse = '/auth/reset-password.php';
+
+  // Étudiant & Stages (contrat PHP OpenAPI)
+  static const tableauDeBordEtudiant = '/student/dashboard.php';
+  static const profilActifEtudiant = '/student/profile.php';
+  static const rattachementsEtudiant = '/student/enrollments.php';
+  static const parcoursAcademiqueEtudiant = '/student/academic-path.php';
+  static const optionsStageEtudiant = '/student/stage-options.php';
+  static const reserverStage = '/student/reserve.php';
+  static const candidaturesEtudiant = '/student/applications.php';
+  static const reservationsEtudiant = '/student/reservations.php';
+  static const admissionEtudiant = '/student/admission.php';
+  static const paiementCheckout = '/student/payment-checkout.php';
+  static const paiementSync = '/student/payment-sync.php';
+  static const paiementsEtudiant = '/student/payments.php';
+  static const stagesEtudiant = '/student/stages.php';
+  static const presencesEtudiant = '/student/attendance.php';
+  static const journalEtudiant = '/student/logbook.php';
+  static const journalEnregistrer = '/student/logbook-save.php';
+  static const journalSoumettre = '/student/logbook-submit.php';
+  static const evaluationsEtudiant = '/student/evaluations.php';
+  static const documentsEtudiant = '/student/documents.php';
+
+  static const regenererIdentifiantStagia = '/me.php';
   static const rechercherInscription = '/students/claim/lookup';
   static const verifierInscription = '/students/claim/verify';
   static const creerCompteEtudiant = '/auth/student/register';
-  static const regenererIdentifiantStagia = '/stagia/api/v1/me.php';
   static const ajouterEmail = '/me/login-identifiers/email';
   static const ajouterTelephone = '/me/login-identifiers/phone';
   static String verifierIdentifiant(String id) =>

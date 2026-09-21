@@ -304,38 +304,52 @@ List<_OptionStage> _extraireOptions(List<Map<String, dynamic>> campagnes) {
       campagne['hospitals'] ?? campagne['options'] ?? campagne['stage_options'],
     );
     for (final etablissement in etablissements) {
+      final hopitalMap = etablissement['hospital'] is Map
+          ? Map<String, dynamic>.from(etablissement['hospital'] as Map)
+          : etablissement;
+
+      final nomHopital = hopitalMap['name']?.toString() ??
+          etablissement['name']?.toString() ??
+          etablissement['hospital_name']?.toString() ??
+          'Établissement';
+
+      final ville = hopitalMap['city'] ?? etablissement['city'];
+      final province = hopitalMap['province'] ?? etablissement['province'];
+      final localisation =
+          [ville, province].where((e) => e != null).join(' · ');
+
+      final lat = _double(hopitalMap['latitude']) ??
+          _double(etablissement['latitude']);
+      final lng = _double(hopitalMap['longitude']) ??
+          _double(etablissement['longitude']);
+
+      final participationId = etablissement['participation_id']?.toString();
+      final optionId = participationId ??
+          hopitalMap['code']?.toString() ??
+          etablissement['stage_option_id']?.toString() ??
+          etablissement['option_id']?.toString() ??
+          etablissement['code']?.toString() ??
+          etablissement['uuid']?.toString() ??
+          etablissement['id']?.toString() ??
+          nomHopital;
+
       resultat.add(
         _OptionStage(
-          hopital:
-              etablissement['name']?.toString() ??
-              etablissement['hospital_name']?.toString() ??
-              'Établissement',
-          campagne:
-              campagne['title']?.toString() ??
+          hopital: nomHopital,
+          campagne: campagne['title']?.toString() ??
               campagne['campaign_title']?.toString() ??
               '',
-          campagneId:
-              campagne['campaign_id']?.toString() ??
+          campagneId: campagne['campaign_id']?.toString() ??
               campagne['campaign_uuid']?.toString() ??
               campagne['code']?.toString() ??
               campagne['uuid']?.toString() ??
               campagne['id']?.toString() ??
               campagne['title']?.toString() ??
               '',
-          optionId:
-              etablissement['stage_option_id']?.toString() ??
-              etablissement['option_id']?.toString() ??
-              etablissement['code']?.toString() ??
-              etablissement['uuid']?.toString() ??
-              etablissement['id']?.toString() ??
-              etablissement['name']?.toString() ??
-              '',
-          localisation: [
-            etablissement['city'],
-            etablissement['province'],
-          ].where((e) => e != null).join(' · '),
-          latitude: _double(etablissement['latitude']),
-          longitude: _double(etablissement['longitude']),
+          optionId: optionId,
+          localisation: localisation.isNotEmpty ? localisation : 'Kinshasa',
+          latitude: lat,
+          longitude: lng,
         ),
       );
     }

@@ -52,15 +52,20 @@ class ClientApiHttp implements ClientApi {
     Object? corps,
     Map<String, String>? entetes,
   }) async {
-    if (ConfigurationApi.urlBase.trim().isEmpty) {
-      throw const ErreurApi(
-        code: 'URL_API_ABSENTE',
-        message: 'L’adresse du serveur API n’est pas configurée.',
-      );
+    final base = Uri.parse(
+      ConfigurationApi.urlBase.trim().isNotEmpty
+          ? ConfigurationApi.urlBase.trim()
+          : 'http://localhost/stagia/api/v1',
+    );
+    String basePath = base.path;
+    while (basePath.endsWith('/')) {
+      basePath = basePath.substring(0, basePath.length - 1);
     }
-
-    final base = Uri.parse(ConfigurationApi.urlBase);
-    var uri = base.replace(path: '${base.path}$chemin');
+    String endpointPath = chemin.startsWith('/') ? chemin : '/$chemin';
+    if (basePath.isNotEmpty && endpointPath.startsWith(basePath)) {
+      endpointPath = endpointPath.substring(basePath.length);
+    }
+    var uri = base.replace(path: '$basePath$endpointPath');
     if (parametres != null && parametres.isNotEmpty) {
       uri = uri.replace(
         queryParameters: parametres.map(
@@ -74,7 +79,10 @@ class ClientApiHttp implements ClientApi {
       'ngrok-skip-browser-warning': 'true',
       ...?entetes,
     };
-    if (chemin != EndpointsApi.connexion) {
+    final estRoutePublique = chemin == EndpointsApi.connexion ||
+        chemin == EndpointsApi.motDePasseOublie ||
+        chemin == EndpointsApi.reinitialiserMotDePasse;
+    if (!estRoutePublique) {
       final jeton = await SessionAuthentificationService.jeton();
       if (jeton != null && jeton.isNotEmpty) {
         headers['Authorization'] = 'Bearer $jeton';

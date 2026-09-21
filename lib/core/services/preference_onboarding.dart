@@ -7,10 +7,12 @@ class PreferenceOnboarding {
   static const afficherToujoursEnDeveloppement = true;
 
   Future<bool> estTerminee() async {
-    if (afficherToujoursEnDeveloppement) return false;
-
     final preferences = await SharedPreferences.getInstance();
-    return preferences.getBool(cleTerminee) ?? false;
+    if (preferences.containsKey(cleTerminee)) {
+      return preferences.getBool(cleTerminee) ?? false;
+    }
+    if (afficherToujoursEnDeveloppement) return false;
+    return false;
   }
 
   Future<void> terminer() async {

@@ -5,7 +5,6 @@ import '../../../../core/network/source_etudiant_distante.dart';
 import '../../../../core/widgets/contenu_adaptatif.dart';
 import '../../../../core/widgets/erreur_chargement_api.dart';
 import '../widgets/onglets_stage.dart';
-import '../font_awesome_flutter_icons.dart';
 
 enum FiltreCandidature { toutes, enCours, eligible, terminee }
 
@@ -69,11 +68,12 @@ class _CandidaturesStagePageState extends State<CandidaturesStagePage> {
                 child: CircularProgressIndicator(color: Color(0xFFFF7417)),
               );
             }
-            if (snapshot.hasError)
+            if (snapshot.hasError) {
               return ErreurChargementApi(
                 erreur: snapshot.error,
                 onReessayer: _actualiser,
               );
+            }
             final items = _liste(snapshot.data?['items']);
             final visibles = _filtrer(items);
             return RefreshIndicator(
@@ -322,18 +322,6 @@ class _Vide extends StatelessWidget {
         SizedBox(height: 10),
         Text('Aucune candidature dans cette catégorie.'),
       ],
-    ),
-  );
-}
-
-class _Erreur extends StatelessWidget {
-  const _Erreur({required this.onReessayer});
-  final VoidCallback onReessayer;
-  @override
-  Widget build(BuildContext context) => Center(
-    child: TextButton(
-      onPressed: onReessayer,
-      child: const Text('Chargement impossible · Réessayer'),
     ),
   );
 }

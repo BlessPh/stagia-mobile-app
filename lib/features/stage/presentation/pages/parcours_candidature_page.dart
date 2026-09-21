@@ -29,8 +29,9 @@ class _EtatParcours extends State<ParcoursCandidaturePage> {
       type: FileType.custom,
       allowedExtensions: const ['pdf', 'doc', 'docx', 'excel', 'xlsx'],
     );
-    if (mounted && resultat.isNotEmpty)
+    if (mounted && resultat.isNotEmpty) {
       setState(() => _document = resultat.first);
+    }
   }
 
   void _continuer() {
@@ -422,36 +423,6 @@ class _Entete extends StatelessWidget {
         ),
       ],
     ),
-  );
-}
-
-class _Titre extends StatelessWidget {
-  const _Titre(this.icone, this.titre, this.description);
-  final IconData icone;
-  final String titre;
-  final String description;
-  @override
-  Widget build(BuildContext context) => Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Icon(icone, color: const Color(0xFFFF7417)),
-      const SizedBox(width: 10),
-      Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              titre,
-              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
-            ),
-            Text(
-              description,
-              style: const TextStyle(color: Color(0xFF718096), height: 1.35),
-            ),
-          ],
-        ),
-      ),
-    ],
   );
 }
 
