@@ -30,6 +30,7 @@ class _MonStagePageState extends State<MonStagePage> {
   Future<List<Map<String, dynamic>>> _charger() => Future.wait([
     _source.stages(),
     _source.documents(),
+    _source.conventions(),
   ]);
 
   Future<void> _actualiser() async {
@@ -39,7 +40,10 @@ class _MonStagePageState extends State<MonStagePage> {
   }
 
   Future<void> _ouvrirDocument(Map<String, dynamic> document) async {
-    final endpoint = document['pdf_endpoint']?.toString();
+    final endpoint = document['file_endpoint']?.toString() ??
+        document['view_endpoint']?.toString() ??
+        document['download_endpoint']?.toString() ??
+        document['pdf_endpoint']?.toString();
     final cheminLocal = document['local_path']?.toString();
     if ((endpoint == null || endpoint.isEmpty) &&
         (cheminLocal == null || cheminLocal.isEmpty)) {
@@ -56,7 +60,7 @@ class _MonStagePageState extends State<MonStagePage> {
           ? cheminLocal
           : await _telechargeur.telechargerPdf(
               endpoint: endpoint!,
-              nom: document['reference']?.toString() ?? 'document-stagia',
+              nom: document['reference']?.toString() ?? document['title']?.toString() ?? 'document-stagia',
             );
       final resultat = await OpenFilex.open(chemin);
       if (!mounted || resultat.type == ResultType.done) return;
@@ -102,10 +106,13 @@ class _MonStagePageState extends State<MonStagePage> {
           }
           final reponses = snapshot.data!;
           final stages = _items(reponses[0]['items']);
-          final documents = _items(reponses[1]['items']);
+          final documentsOfficiels = _items(reponses[1]['items']);
+          final conventions = _items(reponses[2]['items']);
+          final tousDocuments = [...documentsOfficiels, ...conventions];
+
           return _ContenuStage(
             stage: stages.isEmpty ? null : stages.first,
-            documents: documents,
+            documents: tousDocuments,
             documentEnCours: _documentEnCours,
             onDocument: _ouvrirDocument,
             onRefresh: _actualiser,

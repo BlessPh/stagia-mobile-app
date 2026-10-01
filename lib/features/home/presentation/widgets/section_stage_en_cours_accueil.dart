@@ -3,15 +3,15 @@ import 'package:google_fonts/google_fonts.dart';
 
 class SectionStageEnCoursAccueil extends StatelessWidget {
   const SectionStageEnCoursAccueil({
-    this.titreCampagne = 'Campagne de Stage Clinique 2026',
-    this.nomEtablissement = 'Hôpital Général de Kinshasa',
-    this.joursEffectues = 45,
-    this.totalJours = 90,
-    this.servicesEffectues = 3,
-    this.totalServices = 6,
-    this.serviceActuel = 'Chirurgie Générale',
-    this.joursRestantsService = 12,
-    this.nomEncadreur = 'Dr. Marie Kabongo',
+    this.titreCampagne = '',
+    this.nomEtablissement = '',
+    this.joursEffectues = 0,
+    this.totalJours = 0,
+    this.servicesEffectues = 0,
+    this.totalServices = 0,
+    this.serviceActuel = '',
+    this.joursRestantsService = 0,
+    this.nomEncadreur = '',
     this.photoEncadreur,
     this.onTap,
     super.key,
@@ -31,7 +31,9 @@ class SectionStageEnCoursAccueil extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final progression = totalJours > 0 ? (joursEffectues / totalJours).clamp(0.0, 1.0) : 0.0;
+    final progression = totalJours > 0
+        ? (joursEffectues / totalJours).clamp(0.0, 1.0)
+        : 0.0;
     final pourcentageTexte = (progression * 100).toInt();
 
     return Column(
@@ -50,7 +52,10 @@ class SectionStageEnCoursAccueil extends StatelessWidget {
               ),
             ),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 4.5,
+              ),
               decoration: BoxDecoration(
                 color: const Color(0xFFE0F2FE),
                 borderRadius: BorderRadius.circular(20),
@@ -100,10 +105,7 @@ class SectionStageEnCoursAccueil extends StatelessWidget {
                       width: double.infinity,
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [
-                            Color(0xFF1D61F2),
-                            Color(0xFF8B5CF6),
-                          ],
+                          colors: [Color(0xFF1D61F2), Color(0xFF8B5CF6)],
                         ),
                         borderRadius: BorderRadius.circular(4),
                       ),

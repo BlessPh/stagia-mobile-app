@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import '../../../../core/network/configuration_api.dart';
 import '../../../../core/network/client_api_http.dart';
 import '../../../../core/mocks/depot_mock_etudiant.dart';
 import '../../data/datasources/source_stage_distante.dart';
@@ -52,7 +53,11 @@ class _PostulerStagePageState extends State<PostulerStagePage> {
               onReessayer: _actualiser,
             );
           }
-          final campagnes = _items(snapshot.data?[0]['campaigns']);
+          final donneesCampagnes = snapshot.data?[0];
+          final campagnes = _items(
+            donneesCampagnes?['self_reservation_campaigns'] ??
+                donneesCampagnes?['campaigns'],
+          );
           final candidatures = _items(snapshot.data?[1]['items']);
           final options = _extraireOptions(campagnes);
           return RefreshIndicator(
@@ -181,7 +186,8 @@ class _CarteOption extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final candidatureEnvoyee =
-        DepotMockEtudiant.candidatureEnvoyeePour(option.cleOption) ||
+        (ConfigurationApi.utiliserDonneesMockees &&
+            DepotMockEtudiant.candidatureEnvoyeePour(option.cleOption)) ||
         candidatures.any((candidature) => _candidaturePourOption(candidature));
     return Card(
       child: Padding(
@@ -234,7 +240,8 @@ class _CarteOption extends StatelessWidget {
     final campagneId = candidature['campaign_id']?.toString();
     final optionId =
         candidature['option_id']?.toString() ??
-        candidature['stage_option_id']?.toString();
+        candidature['stage_option_id']?.toString() ??
+        candidature['participation_id']?.toString();
     return campagneId == option.campagneId && optionId == option.optionId;
   }
 }
@@ -273,6 +280,7 @@ class _OptionStage {
     required this.campagne,
     required this.localisation,
     required this.campagneId,
+    required this.academicEnrollmentId,
     required this.optionId,
     this.latitude,
     this.longitude,
@@ -281,6 +289,7 @@ class _OptionStage {
   final String campagne;
   final String localisation;
   final String campagneId;
+  final String academicEnrollmentId;
   final String optionId;
   final double? latitude;
   final double? longitude;
@@ -289,6 +298,8 @@ class _OptionStage {
 
   Map<String, dynamic> versMap() => {
     'campagne_id': campagneId,
+    'academic_enrollment_id': academicEnrollmentId,
+    'participation_id': optionId,
     'option_id': optionId,
     'cle_option': cleOption,
     'etablissement': hopital,
@@ -308,46 +319,39 @@ List<_OptionStage> _extraireOptions(List<Map<String, dynamic>> campagnes) {
           ? Map<String, dynamic>.from(etablissement['hospital'] as Map)
           : etablissement;
 
-      final nomHopital = hopitalMap['name']?.toString() ??
+      final nomHopital =
+          hopitalMap['name']?.toString() ??
           etablissement['name']?.toString() ??
           etablissement['hospital_name']?.toString() ??
           'Établissement';
 
       final ville = hopitalMap['city'] ?? etablissement['city'];
       final province = hopitalMap['province'] ?? etablissement['province'];
-      final localisation =
-          [ville, province].where((e) => e != null).join(' · ');
+      final localisation = [
+        ville,
+        province,
+      ].where((e) => e != null).join(' · ');
 
-      final lat = _double(hopitalMap['latitude']) ??
-          _double(etablissement['latitude']);
-      final lng = _double(hopitalMap['longitude']) ??
+      final lat =
+          _double(hopitalMap['latitude']) ?? _double(etablissement['latitude']);
+      final lng =
+          _double(hopitalMap['longitude']) ??
           _double(etablissement['longitude']);
 
-      final participationId = etablissement['participation_id']?.toString();
-      final optionId = participationId ??
-          hopitalMap['code']?.toString() ??
-          etablissement['stage_option_id']?.toString() ??
-          etablissement['option_id']?.toString() ??
-          etablissement['code']?.toString() ??
-          etablissement['uuid']?.toString() ??
-          etablissement['id']?.toString() ??
-          nomHopital;
+      final optionId = etablissement['participation_id']?.toString() ?? '';
 
       resultat.add(
         _OptionStage(
           hopital: nomHopital,
-          campagne: campagne['title']?.toString() ??
+          campagne:
+              campagne['title']?.toString() ??
               campagne['campaign_title']?.toString() ??
               '',
-          campagneId: campagne['campaign_id']?.toString() ??
-              campagne['campaign_uuid']?.toString() ??
-              campagne['code']?.toString() ??
-              campagne['uuid']?.toString() ??
-              campagne['id']?.toString() ??
-              campagne['title']?.toString() ??
-              '',
+          campagneId: campagne['campaign_id']?.toString() ?? '',
+          academicEnrollmentId:
+              campagne['academic_enrollment_id']?.toString() ?? '',
           optionId: optionId,
-          localisation: localisation.isNotEmpty ? localisation : 'Kinshasa',
+          localisation: localisation,
           latitude: lat,
           longitude: lng,
         ),

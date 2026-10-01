@@ -108,4 +108,76 @@ abstract final class SourceCampagneMock {
   );
 
   static CampagneStage obtenirCampagneOuverte() => campagnePrincipale;
+
+  static CampagneStage depuisJson(Map<String, dynamic> json) {
+    final hospitalsList = (json['hospitals'] as List?)
+            ?.whereType<Map>()
+            .map((h) {
+              final hMap = Map<String, dynamic>.from(h);
+              final hospitalInfo = hMap['hospital'] is Map
+                  ? Map<String, dynamic>.from(hMap['hospital'] as Map)
+                  : <String, dynamic>{};
+              final partId = hMap['participation_id'] is int
+                  ? hMap['participation_id'] as int
+                  : int.tryParse(hMap['participation_id']?.toString() ?? '');
+              final placesDispo = hMap['available_places'] is int
+                  ? hMap['available_places'] as int
+                  : (int.tryParse(hMap['available_places']?.toString() ?? '') ?? 10);
+              final nom = hospitalInfo['name']?.toString() ??
+                  hMap['nom']?.toString() ??
+                  'Hôpital partenaire';
+              final ville = hospitalInfo['city']?.toString() ?? 'Kinshasa';
+              final commune = hospitalInfo['province']?.toString() ?? 'Kinshasa';
+
+              return HopitalCampagne(
+                id: partId != null ? 'PART-$partId' : 'HOSP-${nom.hashCode.abs()}',
+                participationId: partId,
+                nom: nom,
+                distanceKm: 3.5,
+                placesDisponibles: placesDispo,
+                placesRestantes: placesDispo,
+                fraisRequis: hMap['fees_required'] == true,
+                montantFrais: (hMap['amount'] is num ? (hMap['amount'] as num).toInt() : 0),
+                devise: hMap['currency']?.toString() ?? 'CDF',
+                ville: ville,
+                commune: commune,
+                adresse: '$commune, $ville',
+              );
+            })
+            .toList() ??
+        campagnePrincipale.hopitaux;
+
+    final campaignId = json['campaign_id']?.toString() ??
+        json['id']?.toString() ??
+        'CAM-STG-2026-001';
+    final enrollmentId = json['academic_enrollment_id'] is int
+        ? json['academic_enrollment_id'] as int
+        : int.tryParse(json['academic_enrollment_id']?.toString() ?? '');
+    final titre = json['title']?.toString() ??
+        json['titre']?.toString() ??
+        'Stage médical D4 2026';
+    final dateDebut = json['start_date']?.toString() ?? '2026-11-10';
+    final dateFin = json['end_date']?.toString() ?? '2027-01-14';
+    final mode = json['mode'] is Map ? json['mode'] as Map : null;
+    final isD4 = mode?['is_d4'] == true || (json['stage_type'] is Map && json['stage_type']['code'] == 'MEDICAL_D4');
+
+    return CampagneStage(
+      id: campaignId,
+      academicEnrollmentId: enrollmentId,
+      isD4: isD4,
+      titre: titre,
+      sousTitre: json['program']?.toString() ?? 'Médecine générale • Universités partenaires',
+      dateDebut: dateDebut,
+      dateFin: dateFin,
+      periodeTexte: '$dateDebut - $dateFin',
+      indemnite: 'Selon conditions hospitalières',
+      modalite: 'Temps plein',
+      statut: 'Inscriptions ouvertes',
+      nombreHopitaux: hospitalsList.length,
+      estEligible: true,
+      consignes: campagnePrincipale.consignes,
+      criteresEligibilite: campagnePrincipale.criteresEligibilite,
+      hopitaux: hospitalsList,
+    );
+  }
 }

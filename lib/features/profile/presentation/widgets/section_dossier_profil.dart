@@ -4,7 +4,7 @@ import 'package:open_filex/open_filex.dart';
 
 import '../../../../core/network/client_api_http.dart';
 import '../../../../core/network/configuration_api.dart';
-import '../../../../core/network/source_media_distante.dart';
+import '../../../../core/network/source_etudiant_distante.dart';
 import '../../../../core/services/documents_etudiant_service.dart';
 
 class SectionDossierProfil extends StatefulWidget {
@@ -17,7 +17,6 @@ class _SectionDossierProfilState extends State<SectionDossierProfil> {
   static const _categories = [
     'Identité', 'Académique', 'Candidature', 'Stage', 'Administratif', 'Autre',
   ];
-  final _media = SourceMediaDistante(ClientApiHttp());
   List<DocumentEtudiantLocal> _documents = [];
   bool _chargement = true;
   bool _importation = false;
@@ -78,16 +77,23 @@ class _SectionDossierProfilState extends State<SectionDossierProfil> {
       String? mediaId;
       if (!ConfigurationApi.utiliserDonneesMockees) {
         try {
-          final reponse = await _media.uploader(
+          final catApi = switch (choix.toUpperCase()) {
+            'IDENTITÉ' => 'IDENTITE',
+            'ACADÉMIQUE' => 'ACADEMIQUE',
+            'STAGE' => 'STAGE',
+            'ADMINISTRATIF' => 'ADMINISTRATIF',
+            _ => 'AUTRE',
+          };
+          final sourceEtudiant = SourceEtudiantDistante(ClientApiHttp());
+          final reponse = await sourceEtudiant.televerserDocumentPersonnel(
             cheminFichier: fichier.path!,
-            type: 'STUDENT_DOCUMENT',
-            classification: 'PRIVATE',
-            politiqueConservation: 'STANDARD',
+            titre: fichier.name,
+            categorie: catApi,
           );
           final data = reponse['data'];
-          if (data is Map) mediaId = data['id']?.toString();
+          if (data is Map) mediaId = data['uuid']?.toString() ?? data['id']?.toString();
         } catch (_) {
-          // La copie locale reste utilisable en cas d'échec de synchronisation.
+          // La copie locale reste utilisable en cas de coupure réseau
         }
       }
       final nouveau = await DocumentsEtudiantService.importer(
@@ -100,7 +106,7 @@ class _SectionDossierProfilState extends State<SectionDossierProfil> {
       }
       _documents.insert(0, nouveau);
       await DocumentsEtudiantService.enregistrer(_documents);
-      if (mounted) { setState(() {}); _message('Document conservé dans l’application.'); }
+      if (mounted) { setState(() {}); _message('Document enregistré avec succès.'); }
     } catch (_) {
       if (mounted) _message('Impossible d’importer ce document.', erreur: true);
     } finally {
@@ -127,6 +133,14 @@ class _SectionDossierProfilState extends State<SectionDossierProfil> {
       ),
     );
     if (confirme != true) return;
+    if (document.mediaId != null && !ConfigurationApi.utiliserDonneesMockees) {
+      try {
+        final sourceEtudiant = SourceEtudiantDistante(ClientApiHttp());
+        await sourceEtudiant.supprimerDocumentPersonnel(document.mediaId!);
+      } catch (_) {
+        // En cas d'erreur serveur, on supprime quand même localement
+      }
+    }
     await DocumentsEtudiantService.supprimer(document);
     _documents.removeWhere((d) => d.id == document.id);
     await DocumentsEtudiantService.enregistrer(_documents);

@@ -67,4 +67,50 @@ class MessageChat {
       statut: statut ?? this.statut,
     );
   }
+
+  factory MessageChat.fromJson(Map<String, dynamic> json) {
+    final attachments = json['attachments'] is List ? json['attachments'] as List : const [];
+    TypeMessage type = TypeMessage.texte;
+    String? nomFichier;
+    String? tailleFichier;
+
+    if (attachments.isNotEmpty) {
+      final firstAtt = attachments.first as Map<String, dynamic>;
+      nomFichier = firstAtt['name']?.toString();
+      final sizeBytes = int.tryParse(firstAtt['size']?.toString() ?? '0') ?? 0;
+      if (sizeBytes > 1024 * 1024) {
+        tailleFichier = '${(sizeBytes / (1024 * 1024)).toStringAsFixed(1)} Mo';
+      } else if (sizeBytes > 0) {
+        tailleFichier = '${(sizeBytes / 1024).toStringAsFixed(0)} Ko';
+      }
+      final mime = firstAtt['mime_type']?.toString().toLowerCase() ?? '';
+      if (mime.startsWith('image/')) {
+        type = TypeMessage.image;
+      } else {
+        type = TypeMessage.document;
+      }
+    }
+
+    DateTime parsedDate;
+    try {
+      parsedDate = DateTime.parse(json['cree_le']?.toString() ?? '');
+    } catch (_) {
+      parsedDate = DateTime.now();
+    }
+
+    final readCount = int.tryParse(json['read_by_count']?.toString() ?? '0') ?? 0;
+
+    return MessageChat(
+      id: json['uuid']?.toString() ?? json['id']?.toString() ?? '',
+      texte: json['contenu']?.toString() ?? '',
+      date: parsedDate,
+      estMien: json['is_mine'] == true,
+      expediteurNom: json['author']?.toString() ?? (json['is_mine'] == true ? 'Moi' : 'Interlocuteur'),
+      type: type,
+      nomFichier: nomFichier,
+      tailleFichier: tailleFichier,
+      statut: readCount > 0 ? StatutMessage.lu : StatutMessage.envoye,
+    );
+  }
 }
+

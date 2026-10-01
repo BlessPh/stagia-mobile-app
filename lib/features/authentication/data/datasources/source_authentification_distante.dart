@@ -46,21 +46,32 @@ class SourceAuthentificationDistante {
       final estCode = idNettoye.toUpperCase().startsWith('STG-');
 
       return <String, dynamic>{
-        'token':
+        'access_token':
             '6a4b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b',
+        'refresh_token':
+            '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
         'token_type': 'Bearer',
-        'expires_in': 2592000, // 30 jours
+        'expires_in': 3600,
+        'refresh_expires_in': 2592000,
         'user': <String, dynamic>{
           'id': 30,
+          'identifiant': 'etu.kalonji',
           'nom': 'KALONJI',
+          'postnom': 'MUKENDI',
           'prenom': 'Alfred',
           'email': estEmail ? idNettoye : 'alfred.kalonji@stagia.cd',
-          'role_code': 'STAGIAIRE',
-          'role_nom': 'Stagiaire',
+          'actif': true,
+          'statut_compte': 'ACTIF',
+          'role': {'code': 'STAGIAIRE', 'nom': 'Stagiaire'},
+          'roles': ['STAGIAIRE'],
         },
         'student': <String, dynamic>{
           'id': 30,
           'stagia_code': estCode ? idNettoye : 'STG-ETU-00000030',
+          'nom': 'KALONJI',
+          'postnom': 'MUKENDI',
+          'prenom': 'Alfred',
+          'statut': 'ACTIF',
         },
       };
     }
@@ -72,7 +83,7 @@ class SourceAuthentificationDistante {
         'password': motDePasse,
         'device_name': nomAppareil,
       },
-      entetes: const {'Content-Type': 'application/x-www-form-urlencoded'},
+      entetes: const {'Content-Type': 'application/json'},
     );
 
     if (reponse['success'] != true) {
@@ -83,7 +94,8 @@ class SourceAuthentificationDistante {
       );
     }
     final data = reponse['data'];
-    if (data is! Map<String, dynamic> || data['token'] == null) {
+    if (data is! Map<String, dynamic> ||
+        (data['access_token'] == null && data['token'] == null)) {
       throw const ErreurApi(
         code: 'JETON_ABSENT',
         message: 'Le serveur n’a pas retourné de jeton de connexion.',
@@ -92,7 +104,46 @@ class SourceAuthentificationDistante {
     return data;
   }
 
-  /// Récupère l'utilisateur connecté et son profil étudiant associé (`/me.php`).
+  /// Renouvelle l'access_token et le refresh_token (/refresh-token).
+  Future<Map<String, dynamic>> rafraichirToken(String refreshToken) async {
+    if (ConfigurationApi.utiliserDonneesMockees) {
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      return {
+        'access_token':
+            'new_access_token_6a4b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f',
+        'refresh_token':
+            'new_refresh_token_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+        'token_type': 'Bearer',
+        'expires_in': 3600,
+        'refresh_expires_in': 2592000,
+      };
+    }
+
+    final reponse = await _client.post(
+      EndpointsApi.rafraichirToken,
+      corps: {'refresh_token': refreshToken},
+      entetes: const {'Content-Type': 'application/json'},
+    );
+
+    if (reponse['success'] != true) {
+      throw ErreurApi(
+        code: 'REFRESH_REFUSE',
+        message: reponse['message']?.toString() ?? 'Session expirée.',
+        details: reponse['data'],
+      );
+    }
+
+    final data = reponse['data'];
+    if (data is! Map<String, dynamic>) {
+      throw const ErreurApi(
+        code: 'DONNEES_INVALIDES',
+        message: 'Données de renouvellement de session invalides.',
+      );
+    }
+    return data;
+  }
+
+  /// Récupère l'utilisateur connecté et son profil étudiant associé (`/me`).
   Future<Map<String, dynamic>> me() async {
     if (ConfigurationApi.utiliserDonneesMockees) {
       await Future<void>.delayed(const Duration(milliseconds: 300));
@@ -117,16 +168,21 @@ class SourceAuthentificationDistante {
     return data;
   }
 
-  /// Demande de réinitialisation de mot de passe.
+  /// Demande de réinitialisation de mot de passe (`/forgot-password`).
   Future<void> demanderReinitialisation(String identifiant) async {
     if (ConfigurationApi.utiliserDonneesMockees) {
       await Future<void>.delayed(const Duration(milliseconds: 800));
       return;
     }
 
+    final isEmail = identifiant.contains('@');
+    final corps = isEmail
+        ? {'email': identifiant.trim()}
+        : {'identifiant': identifiant.trim()};
+
     final reponse = await _client.post(
       EndpointsApi.motDePasseOublie,
-      corps: {'identifiant': identifiant},
+      corps: corps,
       entetes: const {'Content-Type': 'application/json'},
     );
     if (reponse['success'] != true) {
@@ -140,7 +196,39 @@ class SourceAuthentificationDistante {
     }
   }
 
-  /// Déconnecte la session courante.
+  /// Réinitialise le mot de passe via le token reçu (`/reset-password`).
+  Future<void> reinitialiserMotDePasse({
+    required String token,
+    required String password,
+    required String passwordConfirmation,
+  }) async {
+    if (ConfigurationApi.utiliserDonneesMockees) {
+      await Future<void>.delayed(const Duration(milliseconds: 800));
+      return;
+    }
+
+    final reponse = await _client.post(
+      EndpointsApi.reinitialiserMotDePasse,
+      corps: {
+        'token': token.trim(),
+        'password': password,
+        'password_confirmation': passwordConfirmation,
+      },
+      entetes: const {'Content-Type': 'application/json'},
+    );
+
+    if (reponse['success'] != true) {
+      throw ErreurApi(
+        code: 'REINITIALISATION_REFUSEE',
+        message:
+            reponse['message']?.toString() ??
+            'Impossible de réinitialiser le mot de passe.',
+        details: reponse['data'],
+      );
+    }
+  }
+
+  /// Déconnecte la session courante (`/logout`).
   Future<void> deconnecter() async {
     if (ConfigurationApi.utiliserDonneesMockees) {
       await Future<void>.delayed(const Duration(milliseconds: 300));
@@ -150,7 +238,7 @@ class SourceAuthentificationDistante {
     try {
       await _client.post(EndpointsApi.deconnexion);
     } catch (_) {
-      // Tolérance : si le serveur est indisponible ou si logout.php renvoie une erreur,
+      // Tolérance : si le serveur est indisponible ou répond avec une erreur,
       // la déconnexion locale doit tout de même aboutir côté mobile.
     }
   }

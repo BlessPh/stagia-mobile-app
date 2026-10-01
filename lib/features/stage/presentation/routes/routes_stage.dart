@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../../core/network/configuration_api.dart';
+import '../../domain/entities/campagne_stage.dart';
 import '../pages/candidatures_stage_page.dart';
 import '../pages/detail_campagne_page.dart';
 import '../pages/hopitaux_disponibles_page.dart';
@@ -22,12 +24,33 @@ abstract final class RoutesStage {
       postuler => const MesStagesPage(),
       candidatures => const CandidaturesStagePage(),
       monStage => const MonStagePage(),
-      detailCampagne => const DetailCampagnePage(),
-      hopitauxDisponibles => const HopitauxDisponiblesPage(),
-      reservation => const ReservationPage(),
-      parcoursCandidature => ParcoursCandidaturePage(
-          option: Map<String, dynamic>.from(parametres.arguments! as Map),
+      detailCampagne
+          when parametres.arguments is CampagneStage ||
+              ConfigurationApi.utiliserDonneesMockees =>
+        DetailCampagnePage(
+          campagne: parametres.arguments is CampagneStage
+              ? parametres.arguments as CampagneStage
+              : null,
         ),
+      hopitauxDisponibles
+          when parametres.arguments is CampagneStage ||
+              ConfigurationApi.utiliserDonneesMockees =>
+        HopitauxDisponiblesPage(
+          campagne: parametres.arguments is CampagneStage
+              ? parametres.arguments as CampagneStage
+              : null,
+        ),
+      reservation
+          when parametres.arguments is CampagneStage ||
+              ConfigurationApi.utiliserDonneesMockees =>
+        ReservationPage(
+          campagne: parametres.arguments is CampagneStage
+              ? parametres.arguments as CampagneStage
+              : null,
+        ),
+      parcoursCandidature => ParcoursCandidaturePage(
+        option: Map<String, dynamic>.from(parametres.arguments! as Map),
+      ),
       _ => const MesStagesPage(),
     };
 

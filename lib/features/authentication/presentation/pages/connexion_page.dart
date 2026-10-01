@@ -4,8 +4,11 @@ import '../../../../app/navigation/main_shell.dart';
 import '../../../../core/network/client_api_http.dart';
 import '../../../../core/network/reponse_api.dart';
 import '../../../../core/services/session_authentification_service.dart';
+import '../../../../core/services/preference_onboarding.dart';
+import '../../../../core/services/sse_notifications_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../data/datasources/source_authentification_distante.dart';
+import 'mot_de_passe_oublie_page.dart';
 
 class ConnexionPage extends StatefulWidget {
   const ConnexionPage({super.key});
@@ -22,10 +25,10 @@ class _ConnexionPageState extends State<ConnexionPage> {
     ClientApiHttp(),
   );
   bool _motDePasseMasque = true;
-  bool _resterConnecte = false;
   bool _connexionEnCours = false;
   String? _erreurMotDePasse;
   String? _erreurIdentifiant;
+  String? _erreurGenerale;
 
   @override
   void dispose() {
@@ -38,6 +41,7 @@ class _ConnexionPageState extends State<ConnexionPage> {
     setState(() {
       _erreurIdentifiant = null;
       _erreurMotDePasse = null;
+      _erreurGenerale = null;
     });
     if (!(_cleFormulaire.currentState?.validate() ?? false)) return;
 
@@ -50,48 +54,31 @@ class _ConnexionPageState extends State<ConnexionPage> {
         motDePasse: _motDePasse.text,
       );
       await SessionAuthentificationService.enregistrer(session);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          behavior: SnackBarBehavior.floating,
-          margin: EdgeInsets.all(16),
-          duration: Duration(seconds: 2),
-          backgroundColor: Color(0xFF16803C),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(16)),
-          ),
-          content: Row(
-            children: [
-              Icon(Icons.check_circle_outline_rounded, color: Colors.white),
-              SizedBox(width: 10),
-              Text('Connexion réussie.'),
-            ],
-          ),
-        ),
-      );
-      await Future<void>.delayed(const Duration(milliseconds: 500));
+      await const PreferenceOnboarding().terminer();
+      SseNotificationsService.instance.demarrer();
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(builder: (_) => const MainShell()),
       );
     } on ErreurApi catch (erreur) {
       if (!mounted) return;
-      if (_erreurReseau(erreur)) {
-        _afficherMessage(_messageErreurConnexion(erreur), erreur: true);
-      } else {
-        setState(() {
-          if (_erreurConcerneIdentifiant(erreur)) {
-            _erreurIdentifiant = _messageErreurConnexion(erreur);
-          } else {
-            _erreurMotDePasse = _messageErreurConnexion(erreur);
-          }
-        });
-      }
+      setState(() {
+        final message = _messageErreurConnexion(erreur);
+        if (_erreurReseau(erreur)) {
+          _erreurGenerale = message;
+        } else if (_erreurConcerneIdentifiant(erreur)) {
+          _erreurIdentifiant = message;
+        } else {
+          _erreurMotDePasse = message;
+        }
+      });
+      _cleFormulaire.currentState?.validate();
     } catch (_) {
       if (!mounted) return;
-      _afficherMessage(
-        'Connexion impossible. Vérifiez votre connexion internet.',
-      );
+      setState(() {
+        _erreurGenerale =
+            'Connexion impossible. Vérifiez votre connexion internet.';
+      });
     } finally {
       if (mounted) setState(() => _connexionEnCours = false);
     }
@@ -238,8 +225,12 @@ class _ConnexionPageState extends State<ConnexionPage> {
                                 ),
                               ),
                               onChanged: (_) {
-                                if (_erreurIdentifiant != null) {
-                                  setState(() => _erreurIdentifiant = null);
+                                if (_erreurIdentifiant != null ||
+                                    _erreurGenerale != null) {
+                                  setState(() {
+                                    _erreurIdentifiant = null;
+                                    _erreurGenerale = null;
+                                  });
                                 }
                               },
                               validator: (valeur) =>
@@ -292,7 +283,8 @@ class _ConnexionPageState extends State<ConnexionPage> {
                                   ),
                                   onPressed: () {
                                     setState(
-                                      () => _motDePasseMasque = !_motDePasseMasque,
+                                      () => _motDePasseMasque =
+                                          !_motDePasseMasque,
                                     );
                                   },
                                 ),
@@ -326,8 +318,12 @@ class _ConnexionPageState extends State<ConnexionPage> {
                                 ),
                               ),
                               onChanged: (_) {
-                                if (_erreurMotDePasse != null) {
-                                  setState(() => _erreurMotDePasse = null);
+                                if (_erreurMotDePasse != null ||
+                                    _erreurGenerale != null) {
+                                  setState(() {
+                                    _erreurMotDePasse = null;
+                                    _erreurGenerale = null;
+                                  });
                                 }
                               },
                               validator: _motDePasseValide,
@@ -340,11 +336,7 @@ class _ConnexionPageState extends State<ConnexionPage> {
                               children: [
                                 Flexible(
                                   child: InkWell(
-                                    onTap: () {
-                                      setState(
-                                        () => _resterConnecte = !_resterConnecte,
-                                      );
-                                    },
+                                    onTap: () {},
                                     borderRadius: BorderRadius.circular(6),
                                     child: Padding(
                                       padding: const EdgeInsets.symmetric(
@@ -357,13 +349,8 @@ class _ConnexionPageState extends State<ConnexionPage> {
                                             width: 18,
                                             height: 18,
                                             child: Checkbox(
-                                              value: _resterConnecte,
-                                              onChanged: (val) {
-                                                setState(
-                                                  () => _resterConnecte =
-                                                      val ?? false,
-                                                );
-                                              },
+                                              value: true,
+                                              onChanged: (_) {},
                                               shape: RoundedRectangleBorder(
                                                 borderRadius:
                                                     BorderRadius.circular(4),
@@ -372,10 +359,13 @@ class _ConnexionPageState extends State<ConnexionPage> {
                                                 color: Color(0xFF94A3B8),
                                                 width: 1.3,
                                               ),
-                                              activeColor: const Color(0xFF0F172A),
+                                              activeColor: const Color(
+                                                0xFF0F172A,
+                                              ),
                                               checkColor: Colors.white,
                                               materialTapTargetSize:
-                                                  MaterialTapTargetSize.shrinkWrap,
+                                                  MaterialTapTargetSize
+                                                      .shrinkWrap,
                                               visualDensity:
                                                   VisualDensity.compact,
                                             ),
@@ -412,13 +402,26 @@ class _ConnexionPageState extends State<ConnexionPage> {
                                         fontWeight: FontWeight.w600,
                                         color: const Color(0xFFFF7417),
                                         decoration: TextDecoration.underline,
-                                        decorationColor: const Color(0xFFFF7417),
+                                        decorationColor: const Color(
+                                          0xFFFF7417,
+                                        ),
                                       ),
                                     ),
                                   ),
                                 ),
                               ],
                             ),
+                            if (_erreurGenerale != null) ...[
+                              const SizedBox(height: 14),
+                              Text(
+                                _erreurGenerale!,
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: const Color(0xFFEF4444),
+                                ),
+                              ),
+                            ],
                             const SizedBox(height: 24),
 
                             // Bouton principal Se connecter
@@ -446,8 +449,9 @@ class _ConnexionPageState extends State<ConnexionPage> {
                                 color: Colors.transparent,
                                 child: InkWell(
                                   borderRadius: BorderRadius.circular(14),
-                                  onTap:
-                                      _connexionEnCours ? null : _seConnecter,
+                                  onTap: _connexionEnCours
+                                      ? null
+                                      : _seConnecter,
                                   child: Center(
                                     child: _connexionEnCours
                                         ? const SizedBox.square(
@@ -518,62 +522,9 @@ class _ConnexionPageState extends State<ConnexionPage> {
   String? _motDePasseValide(String? valeur) =>
       _erreurMotDePasse ?? _champObligatoire(valeur);
 
-  Future<void> _motDePasseOublie() async {
-    final identifiant = _identifiant.text.trim();
-    final erreur = _identifiantValide(identifiant);
-    if (erreur != null) {
-      setState(() => _erreurIdentifiant = erreur);
-      return;
-    }
-
-    final confirmation = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Mot de passe oublié ?'),
-        content: Text(
-          'Un lien de réinitialisation sera envoyé pour « $identifiant ».',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Annuler'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Envoyer'),
-          ),
-        ],
-      ),
-    );
-    if (confirmation != true || !mounted) return;
-
-    try {
-      await _sourceAuthentification.demanderReinitialisation(identifiant);
-      if (!mounted) return;
-      _afficherMessage('Le lien de réinitialisation a été envoyé.');
-    } on ErreurApi catch (erreur) {
-      if (!mounted) return;
-      _afficherMessage(erreur.message, erreur: true);
-    } catch (_) {
-      if (!mounted) return;
-      _afficherMessage(
-        'Impossible de contacter le serveur. Vérifiez votre connexion internet.',
-        erreur: true,
-      );
-    }
-  }
-
-  void _afficherMessage(String message, {bool erreur = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
-        backgroundColor: erreur
-            ? const Color(0xFFB3261E)
-            : const Color(0xFF16803C),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        content: Text(message),
-      ),
+  void _motDePasseOublie() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const MotDePasseOubliePage()),
     );
   }
 

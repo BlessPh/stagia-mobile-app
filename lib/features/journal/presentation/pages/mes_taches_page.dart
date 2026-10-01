@@ -1,17 +1,116 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../../core/network/client_api_http.dart';
+import '../../../../core/network/configuration_api.dart';
+import '../../../../core/network/source_etudiant_distante.dart';
 import '../../../notifications/presentation/pages/notifications_page.dart';
 
 class MesTachesPage extends StatefulWidget {
-  const MesTachesPage({super.key});
+  const MesTachesPage({this.assignmentUuid, super.key});
+
+  final String? assignmentUuid;
 
   @override
   State<MesTachesPage> createState() => _MesTachesPageState();
 }
 
 class _MesTachesPageState extends State<MesTachesPage> {
-  int _ongletIndex = 1; // Par défaut sur Historique (3) comme sur l'Image 5
+  final _source = SourceEtudiantDistante(ClientApiHttp());
+  int _ongletIndex = 0; // 0 = En cours, 1 = Historique
+  late Future<Map<String, dynamic>> _chargement;
+
+  @override
+  void initState() {
+    super.initState();
+    _chargement = _charger();
+  }
+
+  Future<Map<String, dynamic>> _charger() =>
+      _source.taches(assignmentUuid: widget.assignmentUuid);
+
+  Future<void> _actualiser() async {
+    final futur = _charger();
+    setState(() => _chargement = futur);
+    await futur;
+  }
+
+  Future<void> _demarrer(String uuid) async {
+    try {
+      await _source.demarrerTache(uuid);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Tâche démarrée avec succès !')),
+        );
+      }
+      await _actualiser();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: $e'),
+            backgroundColor: const Color(0xFFDC2626),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _terminer(String uuid) async {
+    final commentCtrl = TextEditingController();
+    final valide = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          'Terminer la tâche',
+          style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 17),
+        ),
+        content: TextField(
+          controller: commentCtrl,
+          decoration: const InputDecoration(
+            labelText: 'Rapport / Commentaire d\'exécution (optionnel)',
+            hintText: 'Précisez les gestes ou observations...',
+          ),
+          maxLines: 3,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Confirmer'),
+          ),
+        ],
+      ),
+    );
+    if (valide != true) return;
+
+    try {
+      await _source.terminerTache(
+        uuid,
+        commentaire: commentCtrl.text.trim().isNotEmpty
+            ? commentCtrl.text.trim()
+            : null,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Tâche terminée avec succès !')),
+        );
+      }
+      await _actualiser();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: $e'),
+            backgroundColor: const Color(0xFFDC2626),
+          ),
+        );
+      }
+    }
+  }
 
   final List<Map<String, dynamic>> _tachesEnCours = [
     {
@@ -47,7 +146,8 @@ class _MesTachesPageState extends State<MesTachesPage> {
       'statutBg': const Color(0xFFFFF7ED),
       'statutCouleur': const Color(0xFFEA580C),
       'titre': 'Rapport d\'admission - Traumatisme thoracique',
-      'retour': 'À réviser : Compléter la partie description du mécanisme de traumatisme.',
+      'retour':
+          'À réviser : Compléter la partie description du mécanisme de traumatisme.',
       'infoLigne': 'Échéance : Aujourd\'hui, 14:00',
       'actionLibelle': 'Reprendre la tâche',
     },
@@ -79,8 +179,6 @@ class _MesTachesPageState extends State<MesTachesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final listeAffichee = _ongletIndex == 0 ? _tachesEnCours : _tachesHistorique;
-
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
@@ -88,7 +186,11 @@ class _MesTachesPageState extends State<MesTachesPage> {
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(CupertinoIcons.chevron_left, color: Color(0xFF0F172A), size: 24),
+          icon: const Icon(
+            CupertinoIcons.chevron_left,
+            color: Color(0xFF0F172A),
+            size: 24,
+          ),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
@@ -105,55 +207,179 @@ class _MesTachesPageState extends State<MesTachesPage> {
             children: [
               IconButton(
                 onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(builder: (_) => const NotificationsPage()),
-                ),
-                icon: const Icon(CupertinoIcons.bell, color: Color(0xFF0F172A), size: 25),
-              ),
-              Positioned(
-                top: 8,
-                right: 6,
-                child: Container(
-                  padding: const EdgeInsets.all(3),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFEF4444),
-                    shape: BoxShape.circle,
-                  ),
-                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                  child: const Text(
-                    '5',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.w800, height: 1),
+                  MaterialPageRoute<void>(
+                    builder: (_) => const NotificationsPage(),
                   ),
                 ),
+                icon: const Icon(
+                  CupertinoIcons.bell,
+                  color: Color(0xFF0F172A),
+                  size: 25,
+                ),
               ),
+              if (ConfigurationApi.utiliserDonneesMockees)
+                Positioned(
+                  top: 8,
+                  right: 6,
+                  child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFEF4444),
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: const Text(
+                      '5',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w800,
+                        height: 1,
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
           const SizedBox(width: 8),
         ],
       ),
       body: SafeArea(
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 28),
-          children: [
-            // Onglets pilules En cours (2) / Historique (3)
-            Row(
-              children: [
-                _buildOngletPill('En cours (2)', 0),
-                const SizedBox(width: 10),
-                _buildOngletPill('Historique (3)', 1),
-              ],
-            ),
+        child: FutureBuilder<Map<String, dynamic>>(
+          future: _chargement,
+          builder: (context, snapshot) {
+            final data = snapshot.data ?? {};
+            final apiItems = (data['items'] as List? ?? [])
+                .whereType<Map>()
+                .map(Map<String, dynamic>.from)
+                .toList();
 
-            const SizedBox(height: 18),
+            final List<Map<String, dynamic>> sourceEnCours;
+            final List<Map<String, dynamic>> sourceHistorique;
 
-            // Liste des cartes de tâches
-            for (final t in listeAffichee)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 14),
-                child: _buildCarteTache(t),
+            if (apiItems.isNotEmpty) {
+              sourceEnCours = apiItems
+                  .where((t) {
+                    final statut = t['statut'] ?? t['status'];
+                    return statut == 'A_FAIRE' || statut == 'EN_COURS';
+                  })
+                  .map(
+                    (t) => {
+                      'uuid': t['uuid'],
+                      'priorite': (t['priorite'] ?? t['priority'] ?? '')
+                          .toString()
+                          .toUpperCase(),
+                      'prioriteBg': const Color(0xFFFFF7ED),
+                      'prioriteCouleur': const Color(0xFFEA580C),
+                      'statut': (t['statut'] ?? t['status'] ?? '')
+                          .toString()
+                          .replaceAll('_', ' '),
+                      'statutBg': (t['statut'] ?? t['status']) == 'EN_COURS'
+                          ? const Color(0xFFE0F2FE)
+                          : const Color(0xFFFEF3C7),
+                      'statutCouleur':
+                          (t['statut'] ?? t['status']) == 'EN_COURS'
+                          ? const Color(0xFF0284C7)
+                          : const Color(0xFFD97706),
+                      'titre': (t['titre'] ?? t['title'])?.toString() ?? '',
+                      'echeance':
+                          (t['date_echeance'] ?? t['due_date'])?.toString() ??
+                          '',
+                      'action': (t['statut'] ?? t['status']) == 'EN_COURS'
+                          ? 'Terminer la tâche'
+                          : 'Démarrer',
+                    },
+                  )
+                  .toList();
+
+              sourceHistorique = apiItems
+                  .where((t) {
+                    final statut = t['statut'] ?? t['status'];
+                    return statut != 'A_FAIRE' && statut != 'EN_COURS';
+                  })
+                  .map(
+                    (t) => {
+                      'uuid': t['uuid'],
+                      'priorite': (t['priorite'] ?? t['priority'] ?? '')
+                          .toString()
+                          .toUpperCase(),
+                      'prioriteBg': const Color(0xFFF3E8FF),
+                      'prioriteCouleur': const Color(0xFF7E22CE),
+                      'statut': (t['statut'] ?? t['status'] ?? '')
+                          .toString()
+                          .replaceAll('_', ' '),
+                      'statutBg': const Color(0xFFDCFCE7),
+                      'statutCouleur': const Color(0xFF16A34A),
+                      'titre': (t['titre'] ?? t['title'])?.toString() ?? '',
+                      'retour':
+                          t['commentaire_encadreur'] ??
+                          t['comment'] ??
+                          t['feedback'],
+                      'infoLigne':
+                          (t['completed_at'] ?? t['updated_at'])?.toString() ??
+                          '',
+                      'actionLibelle': 'Consulter',
+                    },
+                  )
+                  .toList();
+            } else {
+              sourceEnCours = ConfigurationApi.utiliserDonneesMockees
+                  ? _tachesEnCours
+                  : const [];
+              sourceHistorique = ConfigurationApi.utiliserDonneesMockees
+                  ? _tachesHistorique
+                  : const [];
+            }
+
+            final listeAffichee = _ongletIndex == 0
+                ? sourceEnCours
+                : sourceHistorique;
+
+            return RefreshIndicator(
+              color: const Color(0xFF1D61F2),
+              onRefresh: _actualiser,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 28),
+                children: [
+                  Row(
+                    children: [
+                      _buildOngletPill('En cours (${sourceEnCours.length})', 0),
+                      const SizedBox(width: 10),
+                      _buildOngletPill(
+                        'Historique (${sourceHistorique.length})',
+                        1,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  if (listeAffichee.isEmpty)
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 40),
+                        child: Text(
+                          'Aucune tâche dans cette section.',
+                          style: GoogleFonts.inter(
+                            color: const Color(0xFF94A3B8),
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    for (final t in listeAffichee)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 14),
+                        child: _buildCarteTache(t),
+                      ),
+                ],
               ),
-          ],
+            );
+          },
         ),
       ),
     );
@@ -306,16 +532,29 @@ class _MesTachesPageState extends State<MesTachesPage> {
               ),
               GestureDetector(
                 onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Action: ${t['actionLibelle'] ?? t['action']}')),
-                  );
+                  final uuid = t['uuid']?.toString();
+                  final action = t['actionLibelle'] ?? t['action'];
+                  if (uuid != null) {
+                    if (action == 'Démarrer') {
+                      _demarrer(uuid);
+                      return;
+                    } else if (action == 'Terminer la tâche') {
+                      _terminer(uuid);
+                      return;
+                    }
+                  }
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text('Action: $action')));
                 },
                 child: Text(
                   (t['actionLibelle'] ?? t['action']) as String,
                   style: GoogleFonts.inter(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w700,
-                    color: (t['actionLibelle'] == 'Consulter' || t['action'] == 'Consulter')
+                    color:
+                        (t['actionLibelle'] == 'Consulter' ||
+                            t['action'] == 'Consulter')
                         ? const Color(0xFF64748B)
                         : const Color(0xFF1D61F2),
                   ),

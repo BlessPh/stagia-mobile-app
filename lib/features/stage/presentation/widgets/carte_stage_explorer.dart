@@ -16,6 +16,7 @@ class CarteStageExplorer extends StatelessWidget {
     this.estFavori = false,
     this.onFavoriTap,
     this.onPostuler,
+    this.libelleAction = 'Postuler',
     super.key,
   });
 
@@ -31,6 +32,7 @@ class CarteStageExplorer extends StatelessWidget {
   final bool estFavori;
   final VoidCallback? onFavoriTap;
   final VoidCallback? onPostuler;
+  final String libelleAction;
 
   @override
   Widget build(BuildContext context) {
@@ -104,7 +106,9 @@ class CarteStageExplorer extends StatelessWidget {
               GestureDetector(
                 onTap: onFavoriTap,
                 child: Icon(
-                  estFavori ? CupertinoIcons.bookmark_fill : CupertinoIcons.bookmark,
+                  estFavori
+                      ? CupertinoIcons.bookmark_fill
+                      : CupertinoIcons.bookmark,
                   color: const Color(0xFF2563EB),
                   size: 22,
                 ),
@@ -130,7 +134,10 @@ class CarteStageExplorer extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFE0F2FE),
                   borderRadius: BorderRadius.circular(6),
@@ -188,7 +195,7 @@ class CarteStageExplorer extends StatelessWidget {
               GestureDetector(
                 onTap: onPostuler,
                 child: Text(
-                  'Postuler',
+                  libelleAction,
                   style: GoogleFonts.inter(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,

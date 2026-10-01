@@ -9,6 +9,7 @@ import '../../../../core/network/client_api_http.dart';
 import '../../../../core/network/source_etudiant_distante.dart';
 import '../../../../core/services/photo_profil_service.dart';
 import '../../../../core/services/session_authentification_service.dart';
+import '../../../../core/services/sse_notifications_service.dart';
 import '../../../../core/widgets/contenu_adaptatif.dart';
 import '../../../authentication/data/datasources/source_authentification_distante.dart';
 import '../../../journal/presentation/pages/journal_page.dart';
@@ -212,6 +213,7 @@ class _ProfilePageState extends State<ProfilePage> {
       } catch (_) {
         // Tolérance : la déconnexion locale s'effectue même si le serveur est indisponible
       }
+      SseNotificationsService.instance.arreter();
       await SessionAuthentificationService.supprimer();
       if (!mounted) return;
       Navigator.of(

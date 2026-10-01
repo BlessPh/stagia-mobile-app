@@ -66,4 +66,78 @@ class TachePlanning {
       couleur: couleur ?? this.couleur,
     );
   }
+
+  factory TachePlanning.fromJson(Map<String, dynamic> json) {
+    DateTime startsAt;
+    try {
+      startsAt = DateTime.parse(json['starts_at']?.toString() ?? '');
+    } catch (_) {
+      startsAt = DateTime.now();
+    }
+
+    DateTime endsAt;
+    try {
+      endsAt = DateTime.parse(json['ends_at']?.toString() ?? '');
+    } catch (_) {
+      endsAt = startsAt.add(const Duration(minutes: 60));
+    }
+
+    final hDebut =
+        '${startsAt.hour.toString().padLeft(2, '0')}:${startsAt.minute.toString().padLeft(2, '0')}';
+    final hFin =
+        '${endsAt.hour.toString().padLeft(2, '0')}:${endsAt.minute.toString().padLeft(2, '0')}';
+
+    final typeRaw = json['type']?.toString().toLowerCase() ?? 'stage';
+    String typeLibelle = 'Stage';
+    Color couleur = const Color(0xFF10B981);
+
+    switch (typeRaw) {
+      case 'reunion':
+        typeLibelle = 'Chirurgie';
+        couleur = const Color(0xFF2563EB);
+        break;
+      case 'convocation':
+        typeLibelle = 'Garde';
+        couleur = const Color(0xFFEF4444);
+        break;
+      case 'visite':
+        typeLibelle = 'Stage';
+        couleur = const Color(0xFF10B981);
+        break;
+      case 'evaluation':
+        typeLibelle = 'Examen';
+        couleur = const Color(0xFF8B5CF6);
+        break;
+      case 'echeance':
+        typeLibelle = 'Projet';
+        couleur = const Color(0xFFF97316);
+        break;
+      default:
+        typeLibelle = json['type']?.toString() ?? 'Stage';
+        couleur = const Color(0xFF3B82F6);
+        break;
+    }
+
+    final status = json['status']?.toString() == 'termine'
+        ? 'Terminé'
+        : 'À venir';
+
+    return TachePlanning(
+      id: json['uuid']?.toString() ?? json['id']?.toString() ?? '',
+      titre: json['title']?.toString() ?? 'Événement calendrier',
+      date: startsAt,
+      heureDebut: hDebut,
+      heureFin: hFin,
+      type: typeLibelle,
+      service: json['service']?.toString() ?? 'Service Hospitalier',
+      departement: json['departement']?.toString() ?? 'Département Médical',
+      superviseur: json['superviseur']?.toString() ?? 'Superviseur de Stage',
+      description: json['description']?.toString() ?? '',
+      lieu: json['location']?.toString() ?? json['lieu']?.toString(),
+      statut: status,
+      noteRappel: json['note_rappel']?.toString(),
+      couleur: couleur,
+    );
+  }
 }
+

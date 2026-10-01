@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/widgets/contenu_adaptatif.dart';
-import '../../data/datasources/source_messagerie_mock.dart';
+import '../../../../core/network/client_api_http.dart';
+import '../../../../core/network/source_etudiant_distante.dart';
 import '../../domain/entities/discussion.dart';
 import '../widgets/barre_recherche_messagerie.dart';
 import '../widgets/element_discussion.dart';
@@ -16,16 +17,40 @@ class MessageriePage extends StatefulWidget {
 
 class _MessageriePageState extends State<MessageriePage>
     with SingleTickerProviderStateMixin {
+  final _source = SourceEtudiantDistante(ClientApiHttp());
   late TabController _tabController;
   final TextEditingController _controleurRecherche = TextEditingController();
-  late List<Discussion> _discussions;
+  List<Discussion> _discussions = [];
   String _requeteRecherche = '';
+  bool _chargement = true;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 5, vsync: this);
-    _discussions = SourceMessagerieMock.obtenirDiscussions();
+    _chargerConversations();
+  }
+
+  Future<void> _chargerConversations() async {
+    setState(() => _chargement = true);
+    try {
+      final res = await _source.conversations();
+      final items = (res['items'] as List?)
+              ?.whereType<Map>()
+              .map((m) => Discussion.fromJson(Map<String, dynamic>.from(m)))
+              .toList() ??
+          <Discussion>[];
+      if (mounted) {
+        setState(() {
+          _discussions = items;
+          _chargement = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _chargement = false);
+      }
+    }
   }
 
   @override
@@ -87,8 +112,9 @@ class _MessageriePageState extends State<MessageriePage>
       MaterialPageRoute<void>(
         builder: (_) => ChatPage(discussion: discussion),
       ),
-    );
+    ).then((_) => _chargerConversations());
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -209,63 +235,77 @@ class _MessageriePageState extends State<MessageriePage>
           children: List.generate(5, (indexOnglet) {
             final liste = _filtrerDiscussions(indexOnglet);
 
-            if (liste.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 68,
-                      height: 68,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1D61F2).withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.chat_bubble_outline_rounded,
-                        color: Color(0xFF1D61F2),
-                        size: 32,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Text(
-                      _requeteRecherche.isEmpty
-                          ? 'Aucune discussion dans cette catégorie'
-                          : 'Aucun résultat trouvé pour "$_requeteRecherche"',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF64748B),
-                      ),
-                    ),
-                  ],
-                ),
+            if (_chargement) {
+              return const Center(
+                child: CircularProgressIndicator(color: Color(0xFFFF7417)),
               );
             }
 
-            return ListView.separated(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              itemCount: liste.length,
-              separatorBuilder: (_, _) => Divider(
-                height: 1,
-                indent: 78,
-                endIndent: 16,
-                color: modeSombre
-                    ? const Color(0xFF262626)
-                    : const Color(0xFFF1F5F9),
-              ),
-              itemBuilder: (context, index) {
-                final discussion = liste[index];
-                return ElementDiscussion(
-                  discussion: discussion,
-                  onTap: () => _ouvrirDiscussion(discussion),
-                );
-              },
+            return RefreshIndicator(
+              color: const Color(0xFFFF7417),
+              onRefresh: _chargerConversations,
+              child: liste.isEmpty
+                  ? ListView(
+                      children: [
+                        const SizedBox(height: 100),
+                        Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                width: 68,
+                                height: 68,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF1D61F2).withValues(alpha: 0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.chat_bubble_outline_rounded,
+                                  color: Color(0xFF1D61F2),
+                                  size: 32,
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              Text(
+                                _requeteRecherche.isEmpty
+                                    ? 'Aucune discussion dans cette catégorie'
+                                    : 'Aucun résultat trouvé pour "$_requeteRecherche"',
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.inter(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      itemCount: liste.length,
+                      separatorBuilder: (_, _) => Divider(
+                        height: 1,
+                        indent: 78,
+                        endIndent: 16,
+                        color: modeSombre
+                            ? const Color(0xFF262626)
+                            : const Color(0xFFF1F5F9),
+                      ),
+                      itemBuilder: (context, index) {
+                        final discussion = liste[index];
+                        return ElementDiscussion(
+                          discussion: discussion,
+                          onTap: () => _ouvrirDiscussion(discussion),
+                        );
+                      },
+                    ),
             );
           }),
         ),
       ),
+
     );
   }
 }

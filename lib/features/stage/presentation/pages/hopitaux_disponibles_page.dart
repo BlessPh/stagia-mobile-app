@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
+import '../../../../core/network/configuration_api.dart';
 import '../../../notifications/presentation/pages/notifications_page.dart';
 import '../../data/datasources/source_campagne_mock.dart';
 import '../../domain/entities/campagne_stage.dart';
@@ -30,20 +31,24 @@ class _HopitauxDisponiblesPageState extends State<HopitauxDisponiblesPage> {
   @override
   void initState() {
     super.initState();
-    _campagne = widget.campagne ?? SourceCampagneMock.obtenirCampagneOuverte();
-    _hopitalSelectionne = widget.hopitalInitial ??
+    _campagne =
+        widget.campagne ??
+        (ConfigurationApi.utiliserDonneesMockees
+            ? SourceCampagneMock.obtenirCampagneOuverte()
+            : throw StateError('Une campagne API est requise.'));
+    _hopitalSelectionne =
+        widget.hopitalInitial ??
         (_campagne.hopitaux.isNotEmpty
             ? _campagne.hopitaux.first
-            : SourceCampagneMock.campagnePrincipale.hopitaux.first);
+            : ConfigurationApi.utiliserDonneesMockees
+            ? SourceCampagneMock.campagnePrincipale.hopitaux.first
+            : throw StateError('Aucun hôpital disponible.'));
   }
 
   void _selectionnerHopital(HopitalCampagne hopital) {
     setState(() => _hopitalSelectionne = hopital);
     if (hopital.latitude != null && hopital.longitude != null) {
-      _mapController.move(
-        LatLng(hopital.latitude!, hopital.longitude!),
-        13.8,
-      );
+      _mapController.move(LatLng(hopital.latitude!, hopital.longitude!), 13.8);
     }
   }
 
@@ -80,91 +85,100 @@ class _HopitauxDisponiblesPageState extends State<HopitauxDisponiblesPage> {
                         userAgentPackageName: 'com.stagia.stagia',
                       ),
                       MarkerLayer(
-                        markers: _campagne.hopitaux.map((hopital) {
-                          final estSelectionne =
-                              hopital.id == _hopitalSelectionne.id;
-                          final lat = hopital.latitude ?? -4.3060;
-                          final lng = hopital.longitude ?? 15.2866;
+                        markers: _campagne.hopitaux
+                            .where(
+                              (hopital) =>
+                                  hopital.latitude != null &&
+                                  hopital.longitude != null,
+                            )
+                            .map((hopital) {
+                              final estSelectionne =
+                                  hopital.id == _hopitalSelectionne.id;
+                              final lat = hopital.latitude!;
+                              final lng = hopital.longitude!;
 
-                          if (estSelectionne) {
-                            return Marker(
-                              point: LatLng(lat, lng),
-                              width: 150,
-                              height: 80,
-                              alignment: Alignment.topCenter,
-                              child: GestureDetector(
-                                onTap: () => _selectionnerHopital(hopital),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.location_on,
-                                      color: Color(0xFFEF4444),
-                                      size: 42,
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 3.5,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF1D61F2),
-                                        borderRadius: BorderRadius.circular(20),
-                                        boxShadow: const [
-                                          BoxShadow(
-                                            color: Color(0x33000000),
-                                            blurRadius: 6,
-                                            offset: Offset(0, 2),
-                                          ),
-                                        ],
-                                      ),
-                                      child: Text(
-                                        hopital.nom,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: GoogleFonts.inter(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w700,
-                                          color: Colors.white,
+                              if (estSelectionne) {
+                                return Marker(
+                                  point: LatLng(lat, lng),
+                                  width: 150,
+                                  height: 80,
+                                  alignment: Alignment.topCenter,
+                                  child: GestureDetector(
+                                    onTap: () => _selectionnerHopital(hopital),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                          Icons.location_on,
+                                          color: Color(0xFFEF4444),
+                                          size: 42,
                                         ),
-                                      ),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 3.5,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF1D61F2),
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                            boxShadow: const [
+                                              BoxShadow(
+                                                color: Color(0x33000000),
+                                                blurRadius: 6,
+                                                offset: Offset(0, 2),
+                                              ),
+                                            ],
+                                          ),
+                                          child: Text(
+                                            hopital.nom,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: GoogleFonts.inter(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ],
+                                  ),
+                                );
+                              }
+
+                              // Marqueurs des autres hôpitaux (colorés)
+                              Color couleurMarker;
+                              switch (hopital.id) {
+                                case 'HOSP-002':
+                                  couleurMarker = const Color(0xFF9333EA);
+                                  break;
+                                case 'HOSP-003':
+                                  couleurMarker = const Color(0xFFF59E0B);
+                                  break;
+                                case 'HOSP-004':
+                                  couleurMarker = const Color(0xFFEC4899);
+                                  break;
+                                default:
+                                  couleurMarker = const Color(0xFF0EA5E9);
+                              }
+
+                              return Marker(
+                                point: LatLng(lat, lng),
+                                width: 36,
+                                height: 36,
+                                child: GestureDetector(
+                                  onTap: () => _selectionnerHopital(hopital),
+                                  child: Icon(
+                                    Icons.location_on,
+                                    color: couleurMarker,
+                                    size: 34,
+                                  ),
                                 ),
-                              ),
-                            );
-                          }
-
-                          // Marqueurs des autres hôpitaux (colorés)
-                          Color couleurMarker;
-                          switch (hopital.id) {
-                            case 'HOSP-002':
-                              couleurMarker = const Color(0xFF9333EA);
-                              break;
-                            case 'HOSP-003':
-                              couleurMarker = const Color(0xFFF59E0B);
-                              break;
-                            case 'HOSP-004':
-                              couleurMarker = const Color(0xFFEC4899);
-                              break;
-                            default:
-                              couleurMarker = const Color(0xFF0EA5E9);
-                          }
-
-                          return Marker(
-                            point: LatLng(lat, lng),
-                            width: 36,
-                            height: 36,
-                            child: GestureDetector(
-                              onTap: () => _selectionnerHopital(hopital),
-                              child: Icon(
-                                Icons.location_on,
-                                color: couleurMarker,
-                                size: 34,
-                              ),
-                            ),
-                          );
-                        }).toList(),
+                              );
+                            })
+                            .toList(),
                       ),
                     ],
                   ),
@@ -222,27 +236,34 @@ class _HopitauxDisponiblesPageState extends State<HopitauxDisponiblesPage> {
                           hopital: hopital,
                           estSelectionne: estSelectionne,
                           onSelectionner: () => _selectionnerHopital(hopital),
-                          onReserver: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => ReservationPage(
-                                  campagne: _campagne,
-                                  hopital: hopital,
-                                ),
-                              ),
-                            );
-                          },
+                          onReserver: _campagne.autoriseReservationAutonome
+                              ? () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
+                                      builder: (_) => ReservationPage(
+                                        campagne: _campagne,
+                                        hopital: hopital,
+                                      ),
+                                    ),
+                                  );
+                                }
+                              : null,
                           onVoirItineraire: () {
-                            _mapController.move(
-                              LatLng(
-                                hopital.latitude ?? -4.3060,
-                                hopital.longitude ?? 15.2866,
-                              ),
-                              15.0,
-                            );
+                            final latitude = hopital.latitude;
+                            final longitude = hopital.longitude;
+                            if (latitude != null && longitude != null) {
+                              _mapController.move(
+                                LatLng(latitude, longitude),
+                                15.0,
+                              );
+                            }
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text('Itinéraire vers ${hopital.nom} (${hopital.distanceKm} km)'),
+                                content: Text(
+                                  latitude != null && longitude != null
+                                      ? 'Itinéraire vers ${hopital.nom} (${hopital.distanceKm} km)'
+                                      : 'Coordonnées indisponibles pour ${hopital.nom}.',
+                                ),
                                 duration: const Duration(seconds: 2),
                               ),
                             );
@@ -259,16 +280,18 @@ class _HopitauxDisponiblesPageState extends State<HopitauxDisponiblesPage> {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: _FicheDetailHopital(
                       hopital: _hopitalSelectionne,
-                      onReserver: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => ReservationPage(
-                              campagne: _campagne,
-                              hopital: _hopitalSelectionne,
-                            ),
-                          ),
-                        );
-                      },
+                      onReserver: _campagne.autoriseReservationAutonome
+                          ? () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => ReservationPage(
+                                    campagne: _campagne,
+                                    hopital: _hopitalSelectionne,
+                                  ),
+                                ),
+                              );
+                            }
+                          : null,
                     ),
                   ),
                 ],
@@ -366,7 +389,7 @@ class _CarteHopitalHorizontal extends StatelessWidget {
   final HopitalCampagne hopital;
   final bool estSelectionne;
   final VoidCallback onSelectionner;
-  final VoidCallback onReserver;
+  final VoidCallback? onReserver;
   final VoidCallback onVoirItineraire;
 
   @override
@@ -505,13 +528,10 @@ class _CarteHopitalHorizontal extends StatelessWidget {
 // FICHE DÉTAILLÉE DE L'HÔPITAL
 // -------------------------------------------------------------
 class _FicheDetailHopital extends StatelessWidget {
-  const _FicheDetailHopital({
-    required this.hopital,
-    required this.onReserver,
-  });
+  const _FicheDetailHopital({required this.hopital, required this.onReserver});
 
   final HopitalCampagne hopital;
-  final VoidCallback onReserver;
+  final VoidCallback? onReserver;
 
   @override
   Widget build(BuildContext context) {

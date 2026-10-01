@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../../core/network/configuration_api.dart';
 import '../../data/datasources/source_planning_mock.dart';
 import '../../domain/entities/tache_planning.dart';
 
 class DetailTachePage extends StatefulWidget {
-  const DetailTachePage({
-    required this.tache,
-    this.onTacheModifiee,
-    super.key,
-  });
+  const DetailTachePage({required this.tache, this.onTacheModifiee, super.key});
 
   final TachePlanning tache;
   final ValueChanged<TachePlanning>? onTacheModifiee;
@@ -62,7 +59,9 @@ class _DetailTachePageState extends State<DetailTachePage> {
     setState(() {
       _tacheActuelle = nouvelleTache;
     });
-    SourcePlanningMock.mettreAJourTache(nouvelleTache);
+    if (ConfigurationApi.utiliserDonneesMockees) {
+      SourcePlanningMock.mettreAJourTache(nouvelleTache);
+    }
     widget.onTacheModifiee?.call(nouvelleTache);
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -75,9 +74,15 @@ class _DetailTachePageState extends State<DetailTachePage> {
 
   void _ouvrirDialogueModification() {
     final titreController = TextEditingController(text: _tacheActuelle.titre);
-    final descController = TextEditingController(text: _tacheActuelle.description);
-    final lieuController = TextEditingController(text: _tacheActuelle.lieu ?? '');
-    final rappelController = TextEditingController(text: _tacheActuelle.noteRappel ?? '');
+    final descController = TextEditingController(
+      text: _tacheActuelle.description,
+    );
+    final lieuController = TextEditingController(
+      text: _tacheActuelle.lieu ?? '',
+    );
+    final rappelController = TextEditingController(
+      text: _tacheActuelle.noteRappel ?? '',
+    );
 
     showDialog<void>(
       context: context,
@@ -95,7 +100,9 @@ class _DetailTachePageState extends State<DetailTachePage> {
                 controller: titreController,
                 decoration: InputDecoration(
                   labelText: 'Titre',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -103,7 +110,9 @@ class _DetailTachePageState extends State<DetailTachePage> {
                 controller: lieuController,
                 decoration: InputDecoration(
                   labelText: 'Localisation / Lieu',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -112,7 +121,9 @@ class _DetailTachePageState extends State<DetailTachePage> {
                 maxLines: 3,
                 decoration: InputDecoration(
                   labelText: 'Description',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -121,7 +132,9 @@ class _DetailTachePageState extends State<DetailTachePage> {
                 maxLines: 2,
                 decoration: InputDecoration(
                   labelText: 'Note / Rappel',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ],
@@ -138,12 +151,16 @@ class _DetailTachePageState extends State<DetailTachePage> {
                 titre: titreController.text.trim(),
                 lieu: lieuController.text.trim(),
                 description: descController.text.trim(),
-                noteRappel: rappelController.text.trim().isEmpty ? null : rappelController.text.trim(),
+                noteRappel: rappelController.text.trim().isEmpty
+                    ? null
+                    : rappelController.text.trim(),
               );
               setState(() {
                 _tacheActuelle = modifiee;
               });
-              SourcePlanningMock.mettreAJourTache(modifiee);
+              if (ConfigurationApi.utiliserDonneesMockees) {
+                SourcePlanningMock.mettreAJourTache(modifiee);
+              }
               widget.onTacheModifiee?.call(modifiee);
               Navigator.pop(dialogCtx);
 
@@ -165,7 +182,8 @@ class _DetailTachePageState extends State<DetailTachePage> {
   Widget build(BuildContext context) {
     final estCours = _tacheActuelle.type == 'Cours';
     final libelleResponsable = estCours ? 'Enseignant' : 'Superviseur';
-    final localisation = _tacheActuelle.lieu != null && _tacheActuelle.lieu!.isNotEmpty
+    final localisation =
+        _tacheActuelle.lieu != null && _tacheActuelle.lieu!.isNotEmpty
         ? _tacheActuelle.lieu!
         : '${_tacheActuelle.service} • ${_tacheActuelle.departement}';
 
@@ -431,11 +449,7 @@ class _DetailTachePageState extends State<DetailTachePage> {
             color: Color(0xFFEFF6FF),
             shape: BoxShape.circle,
           ),
-          child: Icon(
-            icone,
-            color: const Color(0xFF2563EB),
-            size: 19,
-          ),
+          child: Icon(icone, color: const Color(0xFF2563EB), size: 19),
         ),
         const SizedBox(width: 14),
         Expanded(
@@ -506,7 +520,8 @@ class _DetailTachePageState extends State<DetailTachePage> {
   }
 
   Widget _buildCarteRappel() {
-    final rappel = _tacheActuelle.noteRappel ??
+    final rappel =
+        _tacheActuelle.noteRappel ??
         'Consultez les consignes d\'usage auprès de votre superviseur de stage.';
 
     return Container(

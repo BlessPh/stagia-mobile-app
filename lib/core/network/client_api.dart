@@ -19,5 +19,11 @@ abstract interface class ClientApi {
     String chemin, {
     required String cheminFichier,
     required Map<String, String> champs,
+    String cleFichier = 'document',
+  });
+
+  Future<List<int>> getBytes(
+    String chemin, {
+    Map<String, dynamic>? parametres,
   });
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/mocks/depot_mock_etudiant.dart';
+import '../../core/network/configuration_api.dart';
 import '../barre_navigation/barre_navigation_principale.dart';
 import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/stage/presentation/pages/stage_page.dart';
@@ -22,7 +23,9 @@ class _MainShellState extends State<MainShell> {
     final pages = <Widget>[
       HomePage(
         onOuvrirStages: () {
-          DepotMockEtudiant.marquerCampagnesConsultees();
+          if (ConfigurationApi.utiliserDonneesMockees) {
+            DepotMockEtudiant.marquerCampagnesConsultees();
+          }
           setState(() => _currentIndex = 1);
         },
       ),
@@ -44,7 +47,9 @@ class _MainShellState extends State<MainShell> {
               indexActuel: _currentIndex,
               onDestinationSelectionnee: (index) {
                 if (index == 1) {
-                  DepotMockEtudiant.marquerCampagnesConsultees();
+                  if (ConfigurationApi.utiliserDonneesMockees) {
+                    DepotMockEtudiant.marquerCampagnesConsultees();
+                  }
                 }
                 setState(() => _currentIndex = index);
               },

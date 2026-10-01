@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../../core/network/configuration_api.dart';
 import '../../domain/entities/tache_planning.dart';
 
 class AjouterTacheModal extends StatefulWidget {
@@ -25,10 +26,7 @@ class AjouterTacheModal extends StatefulWidget {
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(modalCtx).viewInsets.bottom,
         ),
-        child: AjouterTacheModal(
-          dateParDefaut: date,
-          onAjouter: onAjouter,
-        ),
+        child: AjouterTacheModal(dateParDefaut: date, onAjouter: onAjouter),
       ),
     );
   }
@@ -63,10 +61,19 @@ class _AjouterTacheModalState extends State<AjouterTacheModal> {
   void initState() {
     super.initState();
     _titreController = TextEditingController();
-    _serviceController = TextEditingController(text: 'Chirurgie');
-    _departementController = TextEditingController(text: 'Soins intensifs');
-    _superviseurController = TextEditingController(text: 'Ngoy Jean');
-    _lieuController = TextEditingController(text: 'Bloc opératoire B');
+    final modeMock = ConfigurationApi.utiliserDonneesMockees;
+    _serviceController = TextEditingController(
+      text: modeMock ? 'Chirurgie' : '',
+    );
+    _departementController = TextEditingController(
+      text: modeMock ? 'Soins intensifs' : '',
+    );
+    _superviseurController = TextEditingController(
+      text: modeMock ? 'Ngoy Jean' : '',
+    );
+    _lieuController = TextEditingController(
+      text: modeMock ? 'Bloc opératoire B' : '',
+    );
     _descriptionController = TextEditingController();
   }
 
@@ -224,7 +231,9 @@ class _AjouterTacheModalState extends State<AjouterTacheModal> {
                             fillColor: const Color(0xFFF8FAFC),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFE2E8F0),
+                              ),
                             ),
                           ),
                           items: _typesDisponibles.map((t) {
@@ -260,10 +269,15 @@ class _AjouterTacheModalState extends State<AjouterTacheModal> {
                                 decoration: InputDecoration(
                                   filled: true,
                                   fillColor: const Color(0xFFF8FAFC),
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 12,
+                                  ),
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
-                                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                                    borderSide: const BorderSide(
+                                      color: Color(0xFFE2E8F0),
+                                    ),
                                   ),
                                 ),
                                 onChanged: (val) => _heureDebut = val,
@@ -280,10 +294,15 @@ class _AjouterTacheModalState extends State<AjouterTacheModal> {
                                 decoration: InputDecoration(
                                   filled: true,
                                   fillColor: const Color(0xFFF8FAFC),
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 12,
+                                  ),
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
-                                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                                    borderSide: const BorderSide(
+                                      color: Color(0xFFE2E8F0),
+                                    ),
                                   ),
                                 ),
                                 onChanged: (val) => _heureFin = val,
@@ -321,7 +340,9 @@ class _AjouterTacheModalState extends State<AjouterTacheModal> {
                             fillColor: const Color(0xFFF8FAFC),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFE2E8F0),
+                              ),
                             ),
                           ),
                         ),
@@ -349,7 +370,9 @@ class _AjouterTacheModalState extends State<AjouterTacheModal> {
                             fillColor: const Color(0xFFF8FAFC),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFE2E8F0),
+                              ),
                             ),
                           ),
                         ),

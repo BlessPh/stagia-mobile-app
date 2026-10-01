@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/network/client_api_http.dart';
+import '../../../../core/network/configuration_api.dart';
 import '../../../../core/network/reponse_api.dart';
 import '../../../notifications/presentation/pages/notifications_page.dart';
 import '../../data/datasources/source_campagne_mock.dart';
@@ -9,11 +10,7 @@ import '../../data/datasources/source_stage_distante.dart';
 import '../../domain/entities/campagne_stage.dart';
 
 class ReservationPage extends StatefulWidget {
-  const ReservationPage({
-    this.campagne,
-    this.hopital,
-    super.key,
-  });
+  const ReservationPage({this.campagne, this.hopital, super.key});
 
   final CampagneStage? campagne;
   final HopitalCampagne? hopital;
@@ -42,15 +39,22 @@ class _ReservationPageState extends State<ReservationPage> {
   @override
   void initState() {
     super.initState();
-    _campagne = widget.campagne ?? SourceCampagneMock.obtenirCampagneOuverte();
-    _hopital = widget.hopital ??
+    _campagne =
+        widget.campagne ??
+        (ConfigurationApi.utiliserDonneesMockees
+            ? SourceCampagneMock.obtenirCampagneOuverte()
+            : throw StateError('Une campagne API est requise.'));
+    _hopital =
+        widget.hopital ??
         (_campagne.hopitaux.isNotEmpty
             ? _campagne.hopitaux.first
-            : SourceCampagneMock.campagnePrincipale.hopitaux.first);
+            : ConfigurationApi.utiliserDonneesMockees
+            ? SourceCampagneMock.campagnePrincipale.hopitaux.first
+            : throw StateError('Aucun hôpital disponible.'));
 
     _serviceSelectionne = _hopital.services.isNotEmpty
         ? _hopital.services.first
-        : 'Pédiatrie';
+        : '';
   }
 
   @override
@@ -60,6 +64,17 @@ class _ReservationPageState extends State<ReservationPage> {
   }
 
   void _confirmerReservation() async {
+    if (!_campagne.autoriseReservationAutonome) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Le placement de cette campagne est géré par votre université.',
+          ),
+          backgroundColor: Color(0xFFEF4444),
+        ),
+      );
+      return;
+    }
     if (!_conditionsAcceptees) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -72,22 +87,39 @@ class _ReservationPageState extends State<ReservationPage> {
 
     setState(() => _enCoursDeSoumission = true);
 
-    final participationIdNum = int.tryParse(
-          _hopital.id.replaceAll(RegExp(r'[^0-9]'), ''),
-        ) ??
-        101;
-    final campaignIdNum = int.tryParse(
-          _campagne.id.replaceAll(RegExp(r'[^0-9]'), ''),
-        ) ??
-        1;
+    final participationIdNum =
+        _hopital.participationId ??
+        int.tryParse(_hopital.id) ??
+        (ConfigurationApi.utiliserDonneesMockees ? 101 : null);
+    final campaignIdNum =
+        int.tryParse(_campagne.id) ??
+        (ConfigurationApi.utiliserDonneesMockees ? 1 : null);
+    final enrollmentIdNum =
+        _campagne.academicEnrollmentId ??
+        (ConfigurationApi.utiliserDonneesMockees ? 1 : null);
+
+    if (participationIdNum == null ||
+        campaignIdNum == null ||
+        enrollmentIdNum == null) {
+      setState(() => _enCoursDeSoumission = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Cette option de stage ne contient pas les identifiants requis.',
+          ),
+          backgroundColor: Color(0xFFEF4444),
+        ),
+      );
+      return;
+    }
 
     try {
       final resultat = await _source.reserver(
         campaignId: campaignIdNum,
-        academicEnrollmentId: 1,
+        academicEnrollmentId: enrollmentIdNum,
         participationId: participationIdNum,
         motivation: _motivationController.text.trim().isEmpty
-            ? 'Candidature pour le service $_serviceSelectionne'
+            ? null
             : _motivationController.text.trim(),
         cleOption: '${_campagne.id}::${_hopital.id}',
         campagneTitre: _campagne.titre,
@@ -99,14 +131,7 @@ class _ReservationPageState extends State<ReservationPage> {
       if (!mounted) return;
       setState(() => _enCoursDeSoumission = false);
 
-      final donnees = resultat['data'] is Map
-          ? Map<String, dynamic>.from(resultat['data'] as Map)
-          : resultat;
-      final ref = donnees['reservation_uuid']?.toString() ??
-          donnees['reference']?.toString() ??
-          'STG-RES-84920';
-
-      _afficherConfirmationModal(ref);
+      _afficherConfirmationModal(resultat);
     } on ErreurApi catch (erreur) {
       if (!mounted) return;
       setState(() => _enCoursDeSoumission = false);
@@ -128,7 +153,16 @@ class _ReservationPageState extends State<ReservationPage> {
     }
   }
 
-  void _afficherConfirmationModal(String reference) {
+  void _afficherConfirmationModal(Map<String, dynamic> donnees) {
+    final reference =
+        donnees['reservation_uuid']?.toString() ??
+        donnees['application_uuid']?.toString() ??
+        donnees['reference']?.toString() ??
+        '';
+    final reservationCreee = donnees['created'] != false;
+    final expiration = donnees['expires_at']?.toString() ?? '';
+    final statut = donnees['reservation_status']?.toString() ?? '';
+
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -167,7 +201,9 @@ class _ReservationPageState extends State<ReservationPage> {
               ),
               const SizedBox(height: 16),
               Text(
-                'Réservation confirmée !',
+                reservationCreee
+                    ? 'Candidature & Réservation soumises !'
+                    : 'Réservation déjà active',
                 style: GoogleFonts.inter(
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
@@ -176,7 +212,9 @@ class _ReservationPageState extends State<ReservationPage> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Votre place a été pré-réservée auprès de ${_hopital.nom}.',
+                reservationCreee
+                    ? 'Votre place est réservée temporairement auprès de ${_hopital.nom}. Elle sera confirmée après la décision universitaire et le règlement des frais le cas échéant.'
+                    : 'Votre réservation auprès de ${_hopital.nom} était déjà active. Aucune réservation supplémentaire n’a été créée.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
                   fontSize: 14,
@@ -184,23 +222,44 @@ class _ReservationPageState extends State<ReservationPage> {
                   color: const Color(0xFF64748B),
                 ),
               ),
-              const SizedBox(height: 14),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
-                child: Text(
-                  'Référence : $reference',
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF1D61F2),
+              if (reference.isNotEmpty || statut.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Text(
+                    [
+                      if (reference.isNotEmpty) 'Référence : $reference',
+                      if (statut.isNotEmpty) statut,
+                    ].join(' · '),
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF1D61F2),
+                    ),
                   ),
                 ),
-              ),
+              ],
+              if (expiration.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Expiration : $expiration',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFF64748B),
+                  ),
+                ),
+              ],
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
@@ -289,7 +348,10 @@ class _ReservationPageState extends State<ReservationPage> {
                     ),
                   ),
                   trailing: estChoisi
-                      ? const Icon(Icons.check_rounded, color: Color(0xFF1D61F2))
+                      ? const Icon(
+                          Icons.check_rounded,
+                          color: Color(0xFF1D61F2),
+                        )
                       : null,
                   onTap: () {
                     setState(() => _serviceSelectionne = service);
@@ -360,7 +422,10 @@ class _ReservationPageState extends State<ReservationPage> {
                     ),
                   ),
                   trailing: estChoisi
-                      ? const Icon(Icons.check_rounded, color: Color(0xFF1D61F2))
+                      ? const Icon(
+                          Icons.check_rounded,
+                          color: Color(0xFF1D61F2),
+                        )
                       : null,
                   onTap: () {
                     setState(() => _periodeSelectionnee = periode);
@@ -386,10 +451,7 @@ class _ReservationPageState extends State<ReservationPage> {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
           children: [
             // 1. CARTE VOTRE SÉLECTION
-            _CarteVotreSelection(
-              campagne: _campagne,
-              hopital: _hopital,
-            ),
+            _CarteVotreSelection(campagne: _campagne, hopital: _hopital),
 
             const SizedBox(height: 22),
 
@@ -528,7 +590,11 @@ class _ReservationPageState extends State<ReservationPage> {
               width: double.infinity,
               height: 52,
               child: FilledButton(
-                onPressed: _enCoursDeSoumission ? null : _confirmerReservation,
+                onPressed:
+                    _enCoursDeSoumission ||
+                        !_campagne.autoriseReservationAutonome
+                    ? null
+                    : _confirmerReservation,
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF1D61F2),
                   foregroundColor: Colors.white,
@@ -650,10 +716,7 @@ class _ReservationPageState extends State<ReservationPage> {
 // 1. CARTE VOTRE SÉLECTION
 // -------------------------------------------------------------
 class _CarteVotreSelection extends StatelessWidget {
-  const _CarteVotreSelection({
-    required this.campagne,
-    required this.hopital,
-  });
+  const _CarteVotreSelection({required this.campagne, required this.hopital});
 
   final CampagneStage campagne;
   final HopitalCampagne hopital;
@@ -701,10 +764,7 @@ class _CarteVotreSelection extends StatelessWidget {
           ),
 
           const SizedBox(height: 12),
-          Container(
-            height: 1,
-            color: const Color(0xFFF1F5F9),
-          ),
+          Container(height: 1, color: const Color(0xFFF1F5F9)),
           const SizedBox(height: 12),
 
           // Hôpital avec icône
@@ -877,10 +937,7 @@ class _CarteResumeFinancier extends StatelessWidget {
           ),
 
           const SizedBox(height: 12),
-          Container(
-            height: 1,
-            color: const Color(0xFFF1F5F9),
-          ),
+          Container(height: 1, color: const Color(0xFFF1F5F9)),
           const SizedBox(height: 12),
 
           // Ligne 1ère tranche

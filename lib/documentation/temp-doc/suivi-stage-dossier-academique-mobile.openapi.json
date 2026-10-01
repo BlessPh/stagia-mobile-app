@@ -1,0 +1,244 @@
+{
+  "openapi": "3.1.0",
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "info": {
+    "title": "STAGIA - API mobile de suivi et dossier étudiant",
+    "version": "1.0.0",
+    "description": "Contrat des tâches 6 et 7 : exécution du stage, dossier académique et documents. Toutes les routes nécessitent un Bearer token étudiant."
+  },
+  "servers": [
+    { "url": "http://localhost/stagia/api/v1", "description": "Wamp local" },
+    { "url": "http://{host}/stagia/api/v1", "variables": { "host": { "default": "192.168.1.20" } } }
+  ],
+  "security": [{ "bearerAuth": [] }],
+  "tags": [
+    { "name": "Stages" }, { "name": "Présences" }, { "name": "Journal" },
+    { "name": "Tâches" }, { "name": "Feedbacks" }, { "name": "Évaluations" },
+    { "name": "Profil académique" }, { "name": "Documents officiels" }, { "name": "Documents personnels" }
+  ],
+  "paths": {
+    "/student/stages": {
+      "get": {
+        "tags": ["Stages"], "operationId": "getAssignedStages", "summary": "Lister les stages, groupes et rotations",
+        "responses": { "200": { "$ref": "#/components/responses/Stages" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "405": { "$ref": "#/components/responses/MethodNotAllowed" }, "500": { "$ref": "#/components/responses/InternalError" } }
+      }
+    },
+    "/student/attendance/context": {
+      "get": {
+        "tags": ["Stages", "Présences"], "operationId": "getAttendanceContext", "summary": "Obtenir la rotation active et le prochain pointage",
+        "parameters": [{ "$ref": "#/components/parameters/AssignmentUuidQuery" }],
+        "responses": { "200": { "$ref": "#/components/responses/ExecutionContext" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" }, "405": { "$ref": "#/components/responses/MethodNotAllowed" }, "500": { "$ref": "#/components/responses/InternalError" } }
+      }
+    },
+    "/student/execution-context": {
+      "get": {
+        "tags": ["Stages"], "operationId": "getExecutionContextCompatibility", "summary": "Alias de /student/attendance/context", "deprecated": true,
+        "parameters": [{ "$ref": "#/components/parameters/AssignmentUuidQuery" }],
+        "responses": { "200": { "$ref": "#/components/responses/ExecutionContext" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" }, "500": { "$ref": "#/components/responses/InternalError" } }
+      }
+    },
+    "/student/attendance": {
+      "get": {
+        "tags": ["Présences"], "operationId": "getAttendanceHistory", "summary": "Lister l'historique des présences",
+        "parameters": [{ "$ref": "#/components/parameters/AssignmentUuidQuery" }],
+        "responses": { "200": { "$ref": "#/components/responses/Collection" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "405": { "$ref": "#/components/responses/MethodNotAllowed" }, "500": { "$ref": "#/components/responses/InternalError" } }
+      }
+    },
+    "/student/attendance/arrival": {
+      "post": {
+        "tags": ["Présences"], "operationId": "punchArrival", "summary": "Pointer l'arrivée", "description": "Corps vide. Utilise l'heure du serveur et la rotation active.",
+        "responses": { "200": { "$ref": "#/components/responses/Punch" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "405": { "$ref": "#/components/responses/MethodNotAllowed" }, "422": { "$ref": "#/components/responses/ValidationError" }, "500": { "$ref": "#/components/responses/InternalError" } }
+      }
+    },
+    "/student/attendance/departure": {
+      "post": {
+        "tags": ["Présences"], "operationId": "punchDeparture", "summary": "Pointer le départ", "description": "Corps vide. Une arrivée non clôturée est obligatoire.",
+        "responses": { "200": { "$ref": "#/components/responses/Punch" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "405": { "$ref": "#/components/responses/MethodNotAllowed" }, "422": { "$ref": "#/components/responses/ValidationError" }, "500": { "$ref": "#/components/responses/InternalError" } }
+      }
+    },
+    "/student/logbook": {
+      "get": {
+        "tags": ["Journal"], "operationId": "getLogbook", "summary": "Lister le journal de stage",
+        "parameters": [{ "$ref": "#/components/parameters/AssignmentUuidQuery" }],
+        "responses": { "200": { "$ref": "#/components/responses/Collection" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "405": { "$ref": "#/components/responses/MethodNotAllowed" }, "500": { "$ref": "#/components/responses/InternalError" } }
+      },
+      "post": {
+        "tags": ["Journal"], "operationId": "saveLogbookDraft", "summary": "Créer ou modifier un brouillon",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LogbookSaveRequest" } }, "application/x-www-form-urlencoded": { "schema": { "$ref": "#/components/schemas/LogbookSaveRequest" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/LogbookSaved" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "405": { "$ref": "#/components/responses/MethodNotAllowed" }, "409": { "$ref": "#/components/responses/Conflict" }, "422": { "$ref": "#/components/responses/ValidationError" }, "500": { "$ref": "#/components/responses/InternalError" } }
+      }
+    },
+    "/student/logbook/{uuid}/submit": {
+      "post": {
+        "tags": ["Journal"], "operationId": "submitLogbook", "summary": "Soumettre un journal pour validation", "parameters": [{ "$ref": "#/components/parameters/UuidPath" }],
+        "responses": { "200": { "$ref": "#/components/responses/LogbookSubmitted" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "405": { "$ref": "#/components/responses/MethodNotAllowed" }, "409": { "$ref": "#/components/responses/Conflict" }, "422": { "$ref": "#/components/responses/ValidationError" }, "500": { "$ref": "#/components/responses/InternalError" } }
+      }
+    },
+    "/student/tasks": {
+      "get": {
+        "tags": ["Tâches"], "operationId": "getStudentTasks", "summary": "Lister les tâches",
+        "parameters": [{ "$ref": "#/components/parameters/AssignmentUuidQuery" }, { "name": "status", "in": "query", "schema": { "$ref": "#/components/schemas/TaskStatus" } }],
+        "responses": { "200": { "$ref": "#/components/responses/Collection" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "405": { "$ref": "#/components/responses/MethodNotAllowed" }, "500": { "$ref": "#/components/responses/InternalError" } }
+      }
+    },
+    "/student/tasks/{uuid}/start": { "$ref": "#/components/pathItems/TaskStartPath" },
+    "/student/tasks/{uuid}/comment": { "$ref": "#/components/pathItems/TaskCommentPath" },
+    "/student/tasks/{uuid}/complete": { "$ref": "#/components/pathItems/TaskCompletePath" },
+    "/student/feedbacks": {
+      "get": {
+        "tags": ["Feedbacks"], "operationId": "getVisibleFeedbacks", "summary": "Lister les feedbacks publiés et visibles",
+        "parameters": [{ "name": "type", "in": "query", "schema": { "type": "string", "enum": ["OBSERVATION", "ENCOURAGEMENT", "A_AMELIORER", "AVERTISSEMENT"] } }],
+        "responses": { "200": { "$ref": "#/components/responses/Collection" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "405": { "$ref": "#/components/responses/MethodNotAllowed" }, "500": { "$ref": "#/components/responses/InternalError" } }
+      }
+    },
+    "/student/evaluations": {
+      "get": {
+        "tags": ["Évaluations"], "operationId": "getVisibleEvaluations", "summary": "Lister les évaluations validées/finalisées",
+        "parameters": [{ "$ref": "#/components/parameters/AssignmentUuidQuery" }],
+        "responses": { "200": { "$ref": "#/components/responses/Collection" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "405": { "$ref": "#/components/responses/MethodNotAllowed" }, "500": { "$ref": "#/components/responses/InternalError" } }
+      }
+    },
+    "/student/profile": {
+      "get": {
+        "tags": ["Profil académique"], "operationId": "getStudentProfile", "summary": "Obtenir le profil et le parcours courant",
+        "responses": { "200": { "$ref": "#/components/responses/Profile" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" }, "405": { "$ref": "#/components/responses/MethodNotAllowed" }, "500": { "$ref": "#/components/responses/InternalError" } }
+      }
+    },
+    "/student/enrollments": {
+      "get": {
+        "tags": ["Profil académique"], "operationId": "getStudentEnrollments", "summary": "Lister les rattachements universitaires",
+        "responses": { "200": { "$ref": "#/components/responses/Collection" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "405": { "$ref": "#/components/responses/MethodNotAllowed" }, "500": { "$ref": "#/components/responses/InternalError" } }
+      }
+    },
+    "/student/academic-path": {
+      "get": {
+        "tags": ["Profil académique"], "operationId": "getAcademicPath", "summary": "Obtenir le parcours d'un rattachement",
+        "parameters": [{ "name": "enrollment_id", "in": "query", "required": true, "schema": { "type": "integer", "minimum": 1 } }],
+        "responses": { "200": { "$ref": "#/components/responses/AcademicPath" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" }, "405": { "$ref": "#/components/responses/MethodNotAllowed" }, "422": { "$ref": "#/components/responses/ValidationError" }, "500": { "$ref": "#/components/responses/InternalError" } }
+      }
+    },
+    "/student/notes": {
+      "get": {
+        "tags": ["Profil académique"], "operationId": "getAcademicNotes", "summary": "Lister les matières et notes académiques",
+        "parameters": [{ "name": "academic_enrollment_id", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 1 } }],
+        "responses": { "200": { "$ref": "#/components/responses/Notes" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" }, "405": { "$ref": "#/components/responses/MethodNotAllowed" }, "500": { "$ref": "#/components/responses/InternalError" } }
+      }
+    },
+    "/student/documents": {
+      "get": {
+        "tags": ["Documents officiels"], "operationId": "getCertificates", "summary": "Lister attestations et certificats",
+        "responses": { "200": { "$ref": "#/components/responses/Collection" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "405": { "$ref": "#/components/responses/MethodNotAllowed" }, "500": { "$ref": "#/components/responses/InternalError" } }
+      }
+    },
+    "/student/certificates/{uuid}/file": {
+      "get": {
+        "tags": ["Documents officiels"], "operationId": "getCertificateFile", "summary": "Afficher ou télécharger un certificat", "parameters": [{ "$ref": "#/components/parameters/UuidPath" }, { "$ref": "#/components/parameters/Download" }],
+        "responses": { "200": { "$ref": "#/components/responses/CertificateBinary" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" }, "409": { "$ref": "#/components/responses/Conflict" }, "422": { "$ref": "#/components/responses/ValidationError" }, "500": { "$ref": "#/components/responses/InternalError" } }
+      }
+    },
+    "/student/conventions": {
+      "get": {
+        "tags": ["Documents officiels"], "operationId": "getConventions", "summary": "Lister les conventions signées ou archivées",
+        "responses": { "200": { "$ref": "#/components/responses/Collection" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "405": { "$ref": "#/components/responses/MethodNotAllowed" }, "500": { "$ref": "#/components/responses/InternalError" } }
+      }
+    },
+    "/student/conventions/{uuid}/file": {
+      "get": {
+        "tags": ["Documents officiels"], "operationId": "getConventionFile", "summary": "Afficher ou télécharger une convention", "parameters": [{ "$ref": "#/components/parameters/UuidPath" }, { "$ref": "#/components/parameters/Download" }],
+        "responses": { "200": { "$ref": "#/components/responses/PdfBinary" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" }, "409": { "$ref": "#/components/responses/Conflict" }, "422": { "$ref": "#/components/responses/ValidationError" }, "500": { "$ref": "#/components/responses/InternalError" } }
+      }
+    },
+    "/student/academic-documents": {
+      "get": {
+        "tags": ["Documents officiels"], "operationId": "getAcademicDocuments", "summary": "Lister les documents académiques actifs",
+        "responses": { "200": { "$ref": "#/components/responses/Collection" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "405": { "$ref": "#/components/responses/MethodNotAllowed" }, "500": { "$ref": "#/components/responses/InternalError" } }
+      }
+    },
+    "/student/academic-documents/{id}/file": {
+      "get": {
+        "tags": ["Documents officiels"], "operationId": "getAcademicDocumentFile", "summary": "Afficher ou télécharger un document académique",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer", "minimum": 1 } }, { "$ref": "#/components/parameters/Download" }],
+        "responses": { "200": { "$ref": "#/components/responses/GenericBinary" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" }, "422": { "$ref": "#/components/responses/ValidationError" }, "500": { "$ref": "#/components/responses/InternalError" } }
+      }
+    },
+    "/student/personal-documents": {
+      "get": {
+        "tags": ["Documents personnels"], "operationId": "getPersonalDocuments", "summary": "Lister les documents personnels",
+        "responses": { "200": { "$ref": "#/components/responses/Collection" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "405": { "$ref": "#/components/responses/MethodNotAllowed" }, "500": { "$ref": "#/components/responses/InternalError" } }
+      },
+      "post": {
+        "tags": ["Documents personnels"], "operationId": "uploadPersonalDocument", "summary": "Téléverser un document personnel",
+        "requestBody": { "required": true, "content": { "multipart/form-data": { "schema": { "$ref": "#/components/schemas/PersonalDocumentUpload" } } } },
+        "responses": { "201": { "$ref": "#/components/responses/PersonalDocumentCreated" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "405": { "$ref": "#/components/responses/MethodNotAllowed" }, "422": { "$ref": "#/components/responses/ValidationError" }, "500": { "$ref": "#/components/responses/InternalError" } }
+      }
+    },
+    "/student/personal-documents/{uuid}/file": {
+      "get": {
+        "tags": ["Documents personnels"], "operationId": "getPersonalDocumentFile", "summary": "Afficher ou télécharger un document personnel", "parameters": [{ "$ref": "#/components/parameters/UuidPath" }, { "$ref": "#/components/parameters/Download" }],
+        "responses": { "200": { "$ref": "#/components/responses/GenericBinary" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" }, "500": { "$ref": "#/components/responses/InternalError" } }
+      }
+    },
+    "/student/personal-documents/{uuid}": { "$ref": "#/components/pathItems/PersonalDocumentDeletePath" }
+  },
+  "components": {
+    "securitySchemes": { "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "Opaque token" } },
+    "parameters": {
+      "UuidPath": { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+      "AssignmentUuidQuery": { "name": "assignment_uuid", "in": "query", "required": false, "schema": { "type": "string", "format": "uuid" } },
+      "Download": { "name": "download", "in": "query", "required": false, "schema": { "type": "integer", "enum": [1] }, "description": "1 force Content-Disposition: attachment; sinon inline." }
+    },
+    "pathItems": {
+      "TaskStartPath": { "post": { "tags": ["Tâches"], "operationId": "startStudentTask", "summary": "Démarrer une tâche", "parameters": [{ "$ref": "#/components/parameters/UuidPath" }], "requestBody": { "$ref": "#/components/requestBodies/TaskComment" }, "responses": { "200": { "$ref": "#/components/responses/TaskChanged" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" }, "422": { "$ref": "#/components/responses/ValidationError" }, "500": { "$ref": "#/components/responses/InternalError" } } } },
+      "TaskCommentPath": { "post": { "tags": ["Tâches"], "operationId": "commentStudentTask", "summary": "Commenter une tâche", "parameters": [{ "$ref": "#/components/parameters/UuidPath" }], "requestBody": { "$ref": "#/components/requestBodies/RequiredTaskComment" }, "responses": { "200": { "$ref": "#/components/responses/TaskChanged" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" }, "422": { "$ref": "#/components/responses/ValidationError" }, "500": { "$ref": "#/components/responses/InternalError" } } } },
+      "TaskCompletePath": { "post": { "tags": ["Tâches"], "operationId": "completeStudentTask", "summary": "Terminer une tâche", "parameters": [{ "$ref": "#/components/parameters/UuidPath" }], "requestBody": { "$ref": "#/components/requestBodies/TaskComment" }, "responses": { "200": { "$ref": "#/components/responses/TaskChanged" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" }, "422": { "$ref": "#/components/responses/ValidationError" }, "500": { "$ref": "#/components/responses/InternalError" } } } },
+      "PersonalDocumentDeletePath": {
+        "delete": { "tags": ["Documents personnels"], "operationId": "deletePersonalDocument", "summary": "Supprimer un document personnel", "parameters": [{ "$ref": "#/components/parameters/UuidPath" }], "responses": { "200": { "$ref": "#/components/responses/EmptySuccess" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" }, "405": { "$ref": "#/components/responses/MethodNotAllowed" }, "500": { "$ref": "#/components/responses/InternalError" } } },
+        "post": { "tags": ["Documents personnels"], "operationId": "deletePersonalDocumentUsingPost", "summary": "Alias POST de suppression", "deprecated": true, "parameters": [{ "$ref": "#/components/parameters/UuidPath" }], "responses": { "200": { "$ref": "#/components/responses/EmptySuccess" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" }, "405": { "$ref": "#/components/responses/MethodNotAllowed" }, "500": { "$ref": "#/components/responses/InternalError" } } }
+      }
+    },
+    "requestBodies": {
+      "TaskComment": { "required": false, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TaskCommentRequest" } } } },
+      "RequiredTaskComment": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RequiredTaskCommentRequest" } } } }
+    },
+    "schemas": {
+      "EmptyData": { "type": "array", "maxItems": 0, "items": false },
+      "Error": { "type": "object", "properties": { "success": { "const": false }, "message": { "type": "string" }, "data": { "oneOf": [{ "$ref": "#/components/schemas/EmptyData" }, { "type": "object" }] } }, "required": ["success", "message", "data"] },
+      "GenericSuccess": { "type": "object", "properties": { "success": { "const": true }, "message": { "type": "string" }, "data": { "type": "object", "additionalProperties": true } }, "required": ["success", "message", "data"] },
+      "CollectionSuccess": { "type": "object", "properties": { "success": { "const": true }, "message": { "type": "string" }, "data": { "type": "object", "properties": { "items": { "type": "array", "items": { "type": "object", "additionalProperties": true } }, "stats": { "type": "object", "additionalProperties": true }, "total": { "type": "integer" }, "progress": { "type": "number" } }, "required": ["items"], "additionalProperties": true } }, "required": ["success", "message", "data"] },
+      "TaskStatus": { "type": "string", "enum": ["A_FAIRE", "EN_COURS", "TERMINEE", "A_REVOIR", "VALIDEE", "ANNULEE"] },
+      "TaskCommentRequest": { "type": "object", "additionalProperties": false, "properties": { "comment": { "type": "string" }, "commentaire": { "type": "string" } } },
+      "RequiredTaskCommentRequest": { "allOf": [{ "$ref": "#/components/schemas/TaskCommentRequest" }, { "anyOf": [{ "required": ["comment"] }, { "required": ["commentaire"] }] }] },
+      "LogbookActivity": { "type": "object", "additionalProperties": false, "properties": { "category": { "type": "string", "enum": ["OBSERVATION", "PARTICIPATION", "REALISATION", "GARDE", "CONSULTATION", "AUTRE"] }, "activity": { "type": "string", "minLength": 1 }, "description": { "type": "string" }, "involvement_level": { "type": "string", "enum": ["", "OBSERVE", "ASSISTE", "REALISE_SUPERVISE", "REALISE_AUTONOME"] }, "quantity": { "type": "integer", "minimum": 1 }, "observation": { "type": "string" } }, "required": ["activity"] },
+      "LogbookSaveRequest": { "type": "object", "additionalProperties": false, "properties": { "assignment_uuid": { "type": "string", "format": "uuid" }, "uuid": { "type": ["string", "null"], "format": "uuid" }, "date": { "type": "string", "format": "date" }, "summary": { "type": "string", "minLength": 1 }, "resume_activites": { "type": "string" }, "learning": { "type": "string" }, "difficulties": { "type": "string" }, "observation": { "type": "string" }, "activities": { "type": "array", "items": { "$ref": "#/components/schemas/LogbookActivity" } } }, "required": ["assignment_uuid", "date", "activities"], "anyOf": [{ "required": ["summary"] }, { "required": ["resume_activites"] }] },
+      "PersonalDocumentUpload": { "type": "object", "properties": { "title": { "type": "string", "minLength": 1, "maxLength": 180 }, "titre": { "type": "string", "minLength": 1, "maxLength": 180 }, "category": { "$ref": "#/components/schemas/DocumentCategory" }, "categorie": { "$ref": "#/components/schemas/DocumentCategory" }, "document": { "type": "string", "format": "binary", "description": "PDF, JPG, PNG, DOC ou DOCX; maximum 8 Mo." } }, "required": ["document"], "anyOf": [{ "required": ["title"] }, { "required": ["titre"] }] },
+      "DocumentCategory": { "type": "string", "enum": ["IDENTITE", "ACADEMIQUE", "STAGE", "ADMINISTRATIF", "AUTRE"], "default": "AUTRE" },
+      "ProfileResponse": { "allOf": [{ "$ref": "#/components/schemas/GenericSuccess" }], "description": "data.student contient identité, contacts, statut et photo_available; data.current_academic contient université, année, promotion, programme, département et faculté." },
+      "AcademicPathResponse": { "allOf": [{ "$ref": "#/components/schemas/GenericSuccess" }], "description": "data contient enrollment, current, items et total." },
+      "NotesResponse": { "allOf": [{ "$ref": "#/components/schemas/GenericSuccess" }], "description": "data contient academics, academic, subjects, notes et stats. Chaque note expose note_sur_20 et result." }
+    },
+    "responses": {
+      "Stages": { "description": "Stages affectés", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericSuccess" } } } },
+      "ExecutionContext": { "description": "Contexte retourné", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericSuccess" } } } },
+      "Punch": { "description": "Pointage enregistré", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericSuccess" } } } },
+      "Collection": { "description": "Collection retournée", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CollectionSuccess" } } } },
+      "Profile": { "description": "Profil retourné", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProfileResponse" } } } },
+      "AcademicPath": { "description": "Parcours retourné", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AcademicPathResponse" } } } },
+      "Notes": { "description": "Notes retournées", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/NotesResponse" } } } },
+      "LogbookSaved": { "description": "Brouillon enregistré", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericSuccess" }, "example": { "success": true, "message": "Journal enregistré en brouillon.", "data": { "uuid": "55555555-5555-4555-8555-555555555555", "status": "BROUILLON", "date": "2026-09-26", "activities_count": 1 } } } } },
+      "LogbookSubmitted": { "description": "Journal soumis ou déjà soumis/validé", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericSuccess" } } } },
+      "TaskChanged": { "description": "Tâche modifiée", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericSuccess" }, "example": { "success": true, "message": "Tâche démarrée.", "data": { "task": { "uuid": "66666666-6666-4666-8666-666666666666", "status": "EN_COURS" } } } } } },
+      "PersonalDocumentCreated": { "description": "Document créé", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericSuccess" } } } },
+      "EmptySuccess": { "description": "Opération réussie", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "const": true }, "message": { "type": "string" }, "data": { "$ref": "#/components/schemas/EmptyData" } }, "required": ["success", "message", "data"] } } } },
+      "PdfBinary": { "description": "PDF privé", "headers": { "Content-Disposition": { "schema": { "type": "string" } }, "Cache-Control": { "schema": { "type": "string" } } }, "content": { "application/pdf": { "schema": { "type": "string", "format": "binary" } } } },
+      "CertificateBinary": { "description": "PDF ou fallback HTML privé", "content": { "application/pdf": { "schema": { "type": "string", "format": "binary" } }, "text/html": { "schema": { "type": "string" } } } },
+      "GenericBinary": { "description": "Fichier privé dans son type MIME enregistré", "content": { "application/octet-stream": { "schema": { "type": "string", "format": "binary" } }, "application/pdf": { "schema": { "type": "string", "format": "binary" } }, "image/jpeg": { "schema": { "type": "string", "format": "binary" } }, "image/png": { "schema": { "type": "string", "format": "binary" } } } },
+      "Unauthorized": { "description": "Bearer token absent, invalide ou expiré", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "Forbidden": { "description": "Accès étudiant refusé", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "NotFound": { "description": "Ressource inexistante ou n'appartenant pas au compte", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "Conflict": { "description": "État métier incompatible", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "ValidationError": { "description": "Payload ou transition invalide", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "MethodNotAllowed": { "description": "Méthode HTTP incorrecte", "headers": { "Allow": { "schema": { "type": "string" } } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "InternalError": { "description": "Erreur interne", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+    }
+  }
+}

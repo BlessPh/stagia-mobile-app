@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../../core/network/configuration_api.dart';
 import '../../../planning/data/datasources/source_planning_mock.dart';
 import '../../../planning/domain/entities/tache_planning.dart';
 import '../../../planning/presentation/pages/detail_tache_page.dart';
@@ -28,11 +29,14 @@ class SectionTachesJourAccueil extends StatelessWidget {
     if (now.year == 2026 && now.month == 9) {
       return dateNow;
     }
-    if (SourcePlanningMock.dateContientTaches(dateNow)) {
+    if (ConfigurationApi.utiliserDonneesMockees &&
+        SourcePlanningMock.dateContientTaches(dateNow)) {
       return dateNow;
     }
     // Date de référence par défaut dans la période mockée
-    return DateTime(2026, 9, 17);
+    return ConfigurationApi.utiliserDonneesMockees
+        ? DateTime(2026, 9, 17)
+        : dateNow;
   }
 
   bool _memeJour(DateTime a, DateTime b) =>
@@ -41,8 +45,18 @@ class SectionTachesJourAccueil extends StatelessWidget {
   String _formaterDateCourte(DateTime date) {
     const jours = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
     const mois = [
-      'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin',
-      'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc',
+      'Jan',
+      'Fév',
+      'Mar',
+      'Avr',
+      'Mai',
+      'Juin',
+      'Juil',
+      'Août',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Déc',
     ];
     final j = jours[date.weekday - 1];
     final m = mois[date.month - 1];
@@ -66,8 +80,10 @@ class SectionTachesJourAccueil extends StatelessWidget {
       tachesAujourdHui = tachesPersonnalisees!
           .where((t) => _memeJour(t.date, aujourdHui))
           .toList();
-    } else {
+    } else if (ConfigurationApi.utiliserDonneesMockees) {
       tachesAujourdHui = SourcePlanningMock.obtenirTachesPourDate(aujourdHui);
+    } else {
+      tachesAujourdHui = const [];
     }
 
     if (tachesAujourdHui.isNotEmpty) {
@@ -81,8 +97,10 @@ class SectionTachesJourAccueil extends StatelessWidget {
         tachesDemain = tachesPersonnalisees!
             .where((t) => _memeJour(t.date, demain))
             .toList();
-      } else {
+      } else if (ConfigurationApi.utiliserDonneesMockees) {
         tachesDemain = SourcePlanningMock.obtenirTachesPourDate(demain);
+      } else {
+        tachesDemain = const [];
       }
 
       if (tachesDemain.isNotEmpty) {
@@ -91,18 +109,21 @@ class SectionTachesJourAccueil extends StatelessWidget {
         dateCible = demain;
       } else {
         // 3. Pas de tâche demain -> Tâches à venir (après demain)
-        final List<TachePlanning> poolTaches = tachesPersonnalisees ??
-            SourcePlanningMock.toutesLesTaches();
+        final List<TachePlanning> poolTaches =
+            tachesPersonnalisees ??
+            (ConfigurationApi.utiliserDonneesMockees
+                ? SourcePlanningMock.toutesLesTaches()
+                : const <TachePlanning>[]);
 
-        final tachesFutures = poolTaches.where((t) {
-          final d = DateTime(t.date.year, t.date.month, t.date.day);
-          return !d.isBefore(apresDemain);
-        }).toList()
-          ..sort((a, b) {
-            final compDate = a.date.compareTo(b.date);
-            if (compDate != 0) return compDate;
-            return a.heureDebut.compareTo(b.heureDebut);
-          });
+        final tachesFutures =
+            poolTaches.where((t) {
+              final d = DateTime(t.date.year, t.date.month, t.date.day);
+              return !d.isBefore(apresDemain);
+            }).toList()..sort((a, b) {
+              final compDate = a.date.compareTo(b.date);
+              if (compDate != 0) return compDate;
+              return a.heureDebut.compareTo(b.heureDebut);
+            });
 
         if (tachesFutures.isNotEmpty) {
           titreSection = 'Tâches à venir';
@@ -167,11 +188,8 @@ class SectionTachesJourAccueil extends StatelessWidget {
 
         // Cartes des tâches (maximum 2)
         ...tachesAffichees.map(
-          (tache) => _buildCarteTache(
-            context,
-            tache,
-            afficherDate: estTachesAVenir,
-          ),
+          (tache) =>
+              _buildCarteTache(context, tache, afficherDate: estTachesAVenir),
         ),
       ],
     );
@@ -213,7 +231,9 @@ class SectionTachesJourAccueil extends StatelessWidget {
         break;
     }
 
-    final datePrefix = afficherDate ? '${_formaterDateCourte(tache.date)} • ' : '';
+    final datePrefix = afficherDate
+        ? '${_formaterDateCourte(tache.date)} • '
+        : '';
     final lieuTexte =
         '$datePrefix${tache.lieu ?? '${tache.service} • ${tache.departement}'}';
 

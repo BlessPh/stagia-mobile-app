@@ -93,4 +93,51 @@ class Discussion {
       statutMessage: statutMessage ?? this.statutMessage,
     );
   }
+
+  factory Discussion.fromJson(Map<String, dynamic> json) {
+    final typeConv = json['type_conversation']?.toString().toLowerCase() ?? '';
+    final estGrp = typeConv == 'groupe';
+    final estDiff = typeConv == 'institutionnelle';
+
+    CategorieDiscussion cat;
+    if (estDiff) {
+      cat = CategorieDiscussion.diffusion;
+    } else if (estGrp) {
+      cat = CategorieDiscussion.groupes;
+    } else {
+      cat = CategorieDiscussion.encadreurs;
+    }
+
+    DateTime parsedDate;
+    try {
+      final dateStr = json['last_activity_at'] ?? json['cree_le'];
+      parsedDate = DateTime.parse(dateStr?.toString() ?? '');
+    } catch (_) {
+      parsedDate = DateTime.now();
+    }
+
+    final nbNonLus = int.tryParse(json['unread_count']?.toString() ?? '0') ?? 0;
+
+    return Discussion(
+      id: json['uuid']?.toString() ?? json['id']?.toString() ?? '',
+      nom: json['objet']?.toString() ?? json['nom']?.toString() ?? 'Discussion',
+      roleOuService: estGrp
+          ? '${json['participant_count'] ?? 2} participants'
+          : (json['role_ou_service']?.toString() ?? 'Encadrement STAGIA'),
+      dernierMessage: json['last_message']?.toString() ??
+          json['dernier_message']?.toString() ??
+          'Nouvelle conversation',
+      date: parsedDate,
+      categorie: cat,
+      avatarUrl: json['avatar_url']?.toString(),
+      nbNonLus: nbNonLus,
+      estEnLigne: json['est_en_ligne'] == true,
+      estGroupe: estGrp,
+      estDiffusion: estDiff,
+      estEpingle: json['est_epingle'] == true,
+      dernierMessageEstMien: json['dernier_message_est_mien'] == true,
+      statutMessage: nbNonLus > 0 ? StatutMessage.distribue : StatutMessage.lu,
+    );
+  }
 }
+

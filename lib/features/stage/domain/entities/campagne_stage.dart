@@ -4,27 +4,30 @@ class HopitalCampagne {
     required this.nom,
     required this.distanceKm,
     required this.placesDisponibles,
+    this.participationId,
     this.placesRestantes,
+    this.fraisRequis = false,
+    this.montantFrais = 0,
+    this.devise = '',
     this.adresse,
-    this.commune = 'Gombe',
-    this.ville = 'Kinshasa',
-    this.description = 'Hôpital Clinique de référence provinciale',
-    this.telephone = '+243 81 234 56 78',
-    this.services = const [
-      'Pédiatrie',
-      'Gynécologie-Obstétrique',
-      'Médecine Interne',
-      'Chirurgie',
-    ],
+    this.commune = '',
+    this.ville = '',
+    this.description = '',
+    this.telephone = '',
+    this.services = const [],
     this.latitude,
     this.longitude,
   });
 
   final String id;
+  final int? participationId;
   final String nom;
   final double distanceKm;
   final int placesDisponibles;
   final int? placesRestantes;
+  final bool fraisRequis;
+  final int montantFrais;
+  final String devise;
   final String? adresse;
   final String commune;
   final String ville;
@@ -57,6 +60,10 @@ class HopitalCampagne {
 class CampagneStage {
   const CampagneStage({
     required this.id,
+    this.academicEnrollmentId,
+    this.isD4 = true,
+    this.autoriseReservationAutonome = true,
+    this.modeReservation = 'SELF_RESERVATION',
     required this.titre,
     required this.sousTitre,
     required this.dateDebut,
@@ -67,13 +74,17 @@ class CampagneStage {
     required this.statut,
     required this.nombreHopitaux,
     required this.estEligible,
-    this.messageEligibilite = 'Vous êtes éligible pour cette campagne',
+    this.messageEligibilite = '',
     required this.consignes,
     required this.criteresEligibilite,
     required this.hopitaux,
   });
 
   final String id;
+  final int? academicEnrollmentId;
+  final bool isD4;
+  final bool autoriseReservationAutonome;
+  final String modeReservation;
   final String titre;
   final String sousTitre;
   final String dateDebut;

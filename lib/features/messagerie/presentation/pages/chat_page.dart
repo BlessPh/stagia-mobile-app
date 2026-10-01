@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/widgets/contenu_adaptatif.dart';
-import '../../data/datasources/source_messagerie_mock.dart';
+import '../../../../core/network/client_api_http.dart';
+import '../../../../core/network/source_etudiant_distante.dart';
+import '../../../../core/services/sse_notifications_service.dart';
 import '../../domain/entities/discussion.dart';
 import '../../domain/entities/message_chat.dart';
 import '../widgets/avatar_discussion.dart';
@@ -22,30 +25,74 @@ class ChatPage extends StatefulWidget {
 }
 
 class _ChatPageState extends State<ChatPage> {
+  final _source = SourceEtudiantDistante(ClientApiHttp());
   final TextEditingController _controleurTexte = TextEditingController();
   final ScrollController _controleurDefilement = ScrollController();
   final FocusNode _focusNode = FocusNode();
 
-  late List<MessageChat> _messages;
+  List<MessageChat> _messages = [];
   MessageChat? _messageEnReponse;
   bool _chargementLotPrecedent = false;
   bool _aDesLotsAnciens = true;
+  bool _chargementInitial = true;
+  StreamSubscription? _sseSubscription;
 
   @override
   void initState() {
     super.initState();
-    _messages = SourceMessagerieMock.obtenirMessages(widget.discussion.id);
+    _chargerMessages();
     _controleurDefilement.addListener(_surDefilement);
+
+    // Écoute SSE pour réception des messages en direct
+    _sseSubscription = SseNotificationsService.instance.fluxMessages.listen((msgMap) {
+      final convTarget = msgMap['action']?['target_id']?.toString() ??
+          msgMap['conversation_uuid']?.toString();
+      if (convTarget == null || convTarget == widget.discussion.id) {
+        final messageItem = MessageChat.fromJson(msgMap);
+        if (mounted && !_messages.any((m) => m.id == messageItem.id)) {
+          setState(() {
+            _messages.add(messageItem);
+          });
+          _defilerVersBas();
+        }
+      }
+    });
+  }
+
+
+  Future<void> _chargerMessages() async {
+    setState(() => _chargementInitial = true);
+    try {
+      final res = await _source.messagesConversation(widget.discussion.id);
+      final items = (res['items'] as List?)
+              ?.whereType<Map>()
+              .map((m) => MessageChat.fromJson(Map<String, dynamic>.from(m)))
+              .toList() ??
+          <MessageChat>[];
+      if (mounted) {
+        setState(() {
+          _messages = items;
+          _chargementInitial = false;
+        });
+        _defilerVersBas();
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _chargementInitial = false);
+      }
+    }
   }
 
   @override
   void dispose() {
+    _sseSubscription?.cancel();
     _controleurTexte.dispose();
     _controleurDefilement.removeListener(_surDefilement);
     _controleurDefilement.dispose();
     _focusNode.dispose();
     super.dispose();
   }
+
 
   void _surDefilement() {
     // Si on arrive vers le haut de la liste (messages plus anciens)
@@ -62,20 +109,19 @@ class _ChatPageState extends State<ChatPage> {
     await Future<void>.delayed(const Duration(milliseconds: 600));
     if (!mounted) return;
 
-    final anciens = SourceMessagerieMock.obtenirLotsAnciens(widget.discussion.id);
     setState(() {
       _chargementLotPrecedent = false;
-      _aDesLotsAnciens = false; // Lot unique simulé pour la pagination
-      _messages.insertAll(0, anciens);
+      _aDesLotsAnciens = false;
     });
   }
 
-  void _envoyerMessage(String texte) {
+  Future<void> _envoyerMessage(String texte) async {
     if (texte.trim().isEmpty) return;
 
+    final texteEnvoye = texte.trim();
     final nouveauMessage = MessageChat(
       id: 'm_${DateTime.now().millisecondsSinceEpoch}',
-      texte: texte.trim(),
+      texte: texteEnvoye,
       date: DateTime.now(),
       estMien: true,
       expediteurNom: 'Moi',
@@ -87,30 +133,29 @@ class _ChatPageState extends State<ChatPage> {
       _messages.add(nouveauMessage);
       _messageEnReponse = null;
     });
-
     _defilerVersBas();
+
+    try {
+      await _source.envoyerMessageConversation(
+        widget.discussion.id,
+        contenu: texteEnvoye,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur d\'envoi : $e'),
+            backgroundColor: const Color(0xFFEF4444),
+          ),
+        );
+      }
+    }
   }
 
   void _envoyerVocal() {
-    final nouveauMessage = MessageChat(
-      id: 'm_voc_${DateTime.now().millisecondsSinceEpoch}',
-      texte: 'Message vocal',
-      date: DateTime.now(),
-      estMien: true,
-      expediteurNom: 'Moi',
-      type: TypeMessage.vocal,
-      dureeVocal: const Duration(seconds: 18),
-      reponseA: _messageEnReponse,
-      statut: StatutMessage.envoye,
-    );
-
-    setState(() {
-      _messages.add(nouveauMessage);
-      _messageEnReponse = null;
-    });
-
-    _defilerVersBas();
+    _envoyerMessage('🎤 Message vocal (0:15)');
   }
+
 
   void _envoyerPieceJointe(OptionPieceJointe option) {
     String nomFichier = 'Document_medical.pdf';
@@ -210,12 +255,16 @@ class _ChatPageState extends State<ChatPage> {
 
             // Liste des messages (inversée pour une UX de chat moderne)
             Expanded(
-              child: ListView.builder(
-                controller: _controleurDefilement,
-                reverse: true,
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                itemCount: _messages.length,
-                itemBuilder: (context, index) {
+              child: _chargementInitial
+                  ? const Center(
+                      child: CircularProgressIndicator(color: Color(0xFF1D61F2)),
+                    )
+                  : ListView.builder(
+                      controller: _controleurDefilement,
+                      reverse: true,
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                      itemCount: _messages.length,
+                      itemBuilder: (context, index) {
                   // Vue inversée : dernier message = index 0
                   final messageIndex = _messages.length - 1 - index;
                   final message = _messages[messageIndex];

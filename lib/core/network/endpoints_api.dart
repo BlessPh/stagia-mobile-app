@@ -1,32 +1,71 @@
 abstract final class EndpointsApi {
-  // Authentification et profil (contrat PHP OpenAPI)
-  static const connexion = '/auth/login.php';
-  static const deconnexion = '/auth/logout.php';
-  static const rafraichirToken = '/auth/refresh.php';
-  static const profilEtudiant = '/me.php';
-  static const motDePasseOublie = '/auth/forgot-password.php';
-  static const reinitialiserMotDePasse = '/auth/reset-password.php';
+  // Authentification et profil (API Mobile v1)
+  static const connexion = '/login';
+  static const deconnexion = '/logout';
+  static const rafraichirToken = '/refresh-token';
+  static const profilEtudiant = '/me';
+  static const motDePasseOublie = '/forgot-password';
+  static const reinitialiserMotDePasse = '/reset-password';
 
-  // Étudiant & Stages (contrat PHP OpenAPI)
-  static const tableauDeBordEtudiant = '/student/dashboard.php';
-  static const profilActifEtudiant = '/student/profile.php';
-  static const rattachementsEtudiant = '/student/enrollments.php';
-  static const parcoursAcademiqueEtudiant = '/student/academic-path.php';
-  static const optionsStageEtudiant = '/student/stage-options.php';
-  static const reserverStage = '/student/reserve.php';
-  static const candidaturesEtudiant = '/student/applications.php';
-  static const reservationsEtudiant = '/student/reservations.php';
-  static const admissionEtudiant = '/student/admission.php';
-  static const paiementCheckout = '/student/payment-checkout.php';
-  static const paiementSync = '/student/payment-sync.php';
-  static const paiementsEtudiant = '/student/payments.php';
-  static const stagesEtudiant = '/student/stages.php';
-  static const presencesEtudiant = '/student/attendance.php';
-  static const journalEtudiant = '/student/logbook.php';
-  static const journalEnregistrer = '/student/logbook-save.php';
-  static const journalSoumettre = '/student/logbook-submit.php';
-  static const evaluationsEtudiant = '/student/evaluations.php';
-  static const documentsEtudiant = '/student/documents.php';
+  // Étudiant & Stages (API Mobile v1)
+  static const tableauDeBordEtudiant = '/student/dashboard';
+  static const profilActifEtudiant = '/student/profile';
+  static const rattachementsEtudiant = '/student/enrollments';
+  static const parcoursAcademiqueEtudiant = '/student/academic-path';
+  static const notesEtudiant = '/student/notes';
+  static const optionsStageEtudiant = '/student/stage-options';
+  static const reserverStage = '/student/reservations';
+  static const candidaturesEtudiant = '/student/applications';
+  static const reservationsEtudiant = '/student/reservations';
+  static String confirmerReservationEtudiant(String uuid) =>
+      '/student/reservations/$uuid/confirm';
+  static String annulerReservationEtudiant(String uuid) =>
+      '/student/reservations/$uuid/cancel';
+  static const admissionEtudiant = '/student/admissions';
+  static const paiementsEtudiant = '/student/payments';
+  static const initierPaiementEtudiant = '/student/payments/initiate';
+  static const paiementSync = '/student/payments/sync';
+
+  // Suivi de Stage & Présences
+  static const stagesEtudiant = '/student/stages';
+  static const contextePointage = '/student/attendance/context';
+  static const pointageArrivee = '/student/attendance/arrival';
+  static const pointageDepart = '/student/attendance/departure';
+  static const presencesEtudiant = '/student/attendance';
+
+  // Journal de Stage
+  static const journalEtudiant = '/student/logbook';
+  static String soumettreJournal(String uuid) =>
+      '/student/logbook/$uuid/submit';
+
+  // Tâches de Stage
+  static const tachesEtudiant = '/student/tasks';
+  static String demarrerTache(String uuid) =>
+      '/student/tasks/$uuid/start';
+  static String commenterTache(String uuid) =>
+      '/student/tasks/$uuid/comment';
+  static String terminerTache(String uuid) =>
+      '/student/tasks/$uuid/complete';
+
+  // Feedbacks & Évaluations
+  static const feedbacksEtudiant = '/student/feedbacks';
+  static const evaluationsEtudiant = '/student/evaluations';
+
+  // Documents
+  static const documentsEtudiant = '/student/documents';
+  static String fichierCertificat(String uuid, {bool download = false}) =>
+      '/student/certificates/$uuid/file${download ? '?download=1' : ''}';
+  static const conventionsEtudiant = '/student/conventions';
+  static String fichierConvention(String uuid, {bool download = false}) =>
+      '/student/conventions/$uuid/file${download ? '?download=1' : ''}';
+  static const documentsAcademiques = '/student/academic-documents';
+  static String fichierDocumentAcademique(int id, {bool download = false}) =>
+      '/student/academic-documents/$id/file${download ? '?download=1' : ''}';
+  static const documentsPersonnels = '/student/personal-documents';
+  static String documentPersonnel(String uuid) =>
+      '/student/personal-documents/$uuid';
+  static String fichierDocumentPersonnel(String uuid, {bool download = false}) =>
+      '/student/personal-documents/$uuid/file${download ? '?download=1' : ''}';
 
   static const regenererIdentifiantStagia = '/me.php';
   static const rechercherInscription = '/students/claim/lookup';
@@ -83,4 +122,45 @@ abstract final class EndpointsApi {
 
   // Accueil
   static const tableauDeBord = '/analytics/overview';
+
+  // Notifications (Tâche 8)
+  static const notificationsEtudiant = '/student/notifications';
+  static const notificationsCounts = '/student/notifications/counts';
+  static String marquerNotificationLue(String uuid) =>
+      '/student/notifications/$uuid/read';
+  static String archiverNotification(String uuid) =>
+      '/student/notifications/$uuid/archive';
+  static const notificationsStream = '/student/notifications/stream';
+  static const notificationsPreferences = '/student/notifications/preferences';
+  static const notificationsDevices = '/student/notifications/devices';
+  static String supprimerNotificationDevice(String uuid) =>
+      '/student/notifications/devices/$uuid';
+
+  // Messagerie et contacts (Tâche 8)
+  static const communicationContacts = '/student/communication/contacts';
+  static const conversations = '/student/conversations';
+  static String conversationMessages(String uuid) =>
+      '/student/conversations/$uuid/messages';
+  static String marquerMessagesConversationLus(String uuid) =>
+      '/student/conversations/$uuid/messages/read';
+  static String conversationBrouillon(String uuid) =>
+      '/student/conversations/$uuid/draft';
+  static String pieceJointeMessage(
+    String conversationUuid,
+    String messageUuid,
+    String fileUuid, {
+    bool download = false,
+  }) =>
+      '/student/conversations/$conversationUuid/messages/$messageUuid/attachments/$fileUuid${download ? '?download=1' : ''}';
+
+  // Communications officielles (Tâche 8)
+  static const communicationsOfficielles = '/student/communications';
+  static String marquerCommunicationLue(String uuid) =>
+      '/student/communications/$uuid/read';
+
+  // Calendrier (Tâche 8)
+  static const calendrierEtudiant = '/student/calendar';
+  static String repondreInvitationCalendrier(String uuid) =>
+      '/student/calendar/$uuid/response';
 }
+

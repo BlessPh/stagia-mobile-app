@@ -1,7 +1,11 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/mocks/depot_mock_etudiant.dart';
+import '../../../../core/network/client_api_http.dart';
+import '../../../../core/network/configuration_api.dart';
+import '../../../../core/network/reponse_api.dart';
 import '../../../../core/widgets/contenu_adaptatif.dart';
+import '../../data/datasources/source_stage_distante.dart';
 import '../routes/routes_stage.dart';
 
 class ParcoursCandidaturePage extends StatefulWidget {
@@ -17,6 +21,8 @@ class _EtatParcours extends State<ParcoursCandidaturePage> {
   int _etape = 0;
   PlatformFile? _document;
   Map<String, dynamic>? _candidature;
+  bool _envoiEnCours = false;
+  final _source = SourceStageDistante(ClientApiHttp());
 
   @override
   void dispose() {
@@ -39,18 +45,51 @@ class _EtatParcours extends State<ParcoursCandidaturePage> {
     setState(() => _etape++);
   }
 
-  void _soumettre() {
-    _candidature = DepotMockEtudiant.ajouterCandidature(
-      cleOption: '${widget.option['cle_option'] ?? ''}',
-      campagneId: '${widget.option['campagne_id'] ?? ''}',
-      campagne: '${widget.option['campagne'] ?? ''}',
-      etablissement: '${widget.option['etablissement'] ?? ''}',
-      localisation: '${widget.option['localisation'] ?? ''}',
-      motivation: _motivation.text.trim(),
-      document: _document?.name,
-      cheminDocument: _document?.path,
-    );
-    setState(() => _etape = 3);
+  Future<void> _soumettre() async {
+    if (_envoiEnCours) return;
+    setState(() => _envoiEnCours = true);
+
+    try {
+      if (ConfigurationApi.utiliserDonneesMockees) {
+        _candidature = DepotMockEtudiant.ajouterCandidature(
+          cleOption: '${widget.option['cle_option'] ?? ''}',
+          campagneId: '${widget.option['campagne_id'] ?? ''}',
+          campagne: '${widget.option['campagne'] ?? ''}',
+          etablissement: '${widget.option['etablissement'] ?? ''}',
+          localisation: '${widget.option['localisation'] ?? ''}',
+          motivation: _motivation.text.trim(),
+          document: _document?.name,
+          cheminDocument: _document?.path,
+        );
+      } else {
+        _candidature = await _source.creerCandidature(
+          campagneId: '${widget.option['campagne_id'] ?? ''}',
+          academicEnrollmentId:
+              '${widget.option['academic_enrollment_id'] ?? ''}',
+          participationId:
+              '${widget.option['participation_id'] ?? widget.option['option_id'] ?? ''}',
+          motivation: _motivation.text.trim(),
+        );
+      }
+
+      if (mounted) setState(() => _etape = 3);
+    } on ErreurApi catch (erreur) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(erreur.message)));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Impossible d\'envoyer la candidature.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _envoiEnCours = false);
+    }
   }
 
   @override
@@ -237,7 +276,7 @@ class _EtatParcours extends State<ParcoursCandidaturePage> {
       const SizedBox(height: 24),
       _Bouton(
         child: FilledButton(
-          onPressed: _soumettre,
+          onPressed: _envoiEnCours ? null : _soumettre,
           child: const Text('Envoyer ma candidature'),
         ),
       ),

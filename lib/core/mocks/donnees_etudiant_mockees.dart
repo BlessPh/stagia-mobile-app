@@ -81,6 +81,58 @@ abstract final class DonneesEtudiantMockees {
         },
       };
     }
+    if (endpoint == EndpointsApi.notificationsEtudiant) {
+      final items = DepotMockEtudiant.notifications;
+      return {
+        'items': items,
+        'next_before_id': null,
+        'counts': DepotMockEtudiant.notificationCounts,
+      };
+    }
+    if (endpoint == EndpointsApi.notificationsCounts) {
+      return DepotMockEtudiant.notificationCounts;
+    }
+    if (endpoint == EndpointsApi.communicationContacts) {
+      final items = DepotMockEtudiant.contacts;
+      return {'items': items, 'total': items.length};
+    }
+    if (endpoint == EndpointsApi.conversations) {
+      final items = DepotMockEtudiant.conversations;
+      return {'items': items, 'limit': 30, 'offset': 0};
+    }
+    if (endpoint == EndpointsApi.communicationsOfficielles) {
+      final items = DepotMockEtudiant.communications;
+      return {'items': items, 'limit': 30, 'offset': 0};
+    }
+    if (endpoint == EndpointsApi.calendrierEtudiant) {
+      final items = DepotMockEtudiant.calendrier;
+      return {'items': items};
+    }
+    if (endpoint == EndpointsApi.notificationsPreferences) {
+      return {
+        'items': [
+          {'type': '*', 'channel': 'push', 'active': true},
+          {'type': '*', 'channel': 'email', 'active': true},
+          {'type': '*', 'channel': 'sms', 'active': false},
+        ],
+        'defaults': {'email': true, 'sms': false, 'push': true},
+        'internal_notifications': true,
+      };
+    }
+    if (endpoint == EndpointsApi.notificationsDevices) {
+      return {
+        'items': [
+          {
+            'uuid': '01JQ0DEV000000000000000001',
+            'platform': 'android',
+            'device_name': 'Pixel 8 Pro',
+            'app_version': '1.0.0',
+            'active': true,
+            'last_seen_at': DateTime.now().toIso8601String(),
+          }
+        ]
+      };
+    }
     return Map<String, dynamic>.from(switch (endpoint) {
       EndpointsApi.profilEtudiant => profil,
       EndpointsApi.profilActifEtudiant => profil,
@@ -93,11 +145,12 @@ abstract final class DonneesEtudiantMockees {
       EndpointsApi.presencesEtudiant => presences,
       EndpointsApi.evaluationsEtudiant => evaluations,
       EndpointsApi.paiementsEtudiant => paiements,
-      EndpointsApi.paiementCheckout => paiementCheckout,
+      EndpointsApi.initierPaiementEtudiant => paiementCheckout,
       EndpointsApi.paiementSync => paiementSync,
       _ => <String, dynamic>{},
     });
   }
+
 
   static const profil = <String, dynamic>{
     'user': {

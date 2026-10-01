@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/network/client_api_http.dart';
+import '../../../../core/network/configuration_api.dart';
 import '../../../../core/network/source_etudiant_distante.dart';
 import '../../../messagerie/presentation/pages/messagerie_page.dart';
 import '../../../notifications/presentation/pages/notifications_page.dart';
@@ -29,20 +30,28 @@ class _JournalPageState extends State<JournalPage> {
   final TextEditingController _rechercheController = TextEditingController();
 
   // État onglet Tâches
-  DateTime _dateSelectionneeTaches = DateTime(2026, 1, 15);
+  late DateTime _dateSelectionneeTaches;
 
   // État onglet Journal
-  String _filtreJournal = 'Aujourd\'hui (5)';
+  String _filtreJournal = 'Aujourd\'hui';
+
+  int _nombreTachesAujourdhui = 0;
 
   // État pointage de présence
-  bool _arriveeEnregistree = true;
-  String _heureArrivee = '07:54 AM';
+  bool _pointageEnCours = false;
 
   late Future<List<Map<String, dynamic>>> _chargement;
 
   @override
   void initState() {
     super.initState();
+    _dateSelectionneeTaches = ConfigurationApi.utiliserDonneesMockees
+        ? DateTime(2026, 1, 15)
+        : DateTime.now();
+    if (ConfigurationApi.utiliserDonneesMockees) {
+      _filtreJournal = 'Aujourd\'hui (5)';
+      _nombreTachesAujourdhui = 5;
+    }
     _chargement = _charger();
   }
 
@@ -52,11 +61,30 @@ class _JournalPageState extends State<JournalPage> {
     super.dispose();
   }
 
-  Future<List<Map<String, dynamic>>> _charger() => Future.wait([
-        _source.journal(),
-        _source.presences(),
-        _source.evaluations(),
-      ]);
+  Future<List<Map<String, dynamic>>> _charger() async {
+    final reponses = await Future.wait([
+      _source.journal(),
+      _source.presences(),
+      _source.evaluations(),
+      _source.contextePointage(),
+      _source.taches(),
+    ]);
+    final taches = _items(reponses[4]['items']);
+    final aujourdHui = DateTime.now();
+    final nombre = taches.where((tache) {
+      final date = DateTime.tryParse(
+        (tache['date_echeance'] ?? tache['due_date'])?.toString() ?? '',
+      );
+      return date != null &&
+          date.year == aujourdHui.year &&
+          date.month == aujourdHui.month &&
+          date.day == aujourdHui.day;
+    }).length;
+    if (mounted) {
+      setState(() => _nombreTachesAujourdhui = nombre);
+    }
+    return reponses;
+  }
 
   Future<void> _actualiser() async {
     final futur = _charger();
@@ -64,18 +92,62 @@ class _JournalPageState extends State<JournalPage> {
     await futur;
   }
 
+  Future<void> _actionnerPointage(String action) async {
+    if (_pointageEnCours) return;
+    setState(() => _pointageEnCours = true);
+    try {
+      if (action == 'ARRIVEE') {
+        await _source.pointerArrivee();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Arrivée enregistrée avec succès !'),
+              backgroundColor: Color(0xFF16A34A),
+            ),
+          );
+        }
+      } else {
+        await _source.pointerDepart();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Départ enregistré avec succès !'),
+              backgroundColor: Color(0xFFF97316),
+            ),
+          );
+        }
+      }
+      await _actualiser();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: const Color(0xFFDC2626),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _pointageEnCours = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: EnTeteJournal(
-        nombreTachesAujourdhui: 5,
-        onOuvrirChat: () => Navigator.of(context, rootNavigator: true).push(
-          MaterialPageRoute<void>(builder: (_) => const MessageriePage()),
-        ),
-        onOuvrirNotifications: () => Navigator.of(context, rootNavigator: true).push(
-          MaterialPageRoute<void>(builder: (_) => const NotificationsPage()),
-        ),
+        nombreTachesAujourdhui: _nombreTachesAujourdhui,
+        onOuvrirChat: () => Navigator.of(
+          context,
+          rootNavigator: true,
+        ).push(MaterialPageRoute<void>(builder: (_) => const MessageriePage())),
+        onOuvrirNotifications: () =>
+            Navigator.of(context, rootNavigator: true).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const NotificationsPage(),
+              ),
+            ),
         onOuvrirTaches: () {
           setState(() => _indexOnglet = 0);
         },
@@ -109,14 +181,38 @@ class _JournalPageState extends State<JournalPage> {
               child: FutureBuilder<List<Map<String, dynamic>>>(
                 future: _chargement,
                 builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: CircularProgressIndicator(
+                        color: Color(0xFFFF7417),
+                      ),
+                    );
+                  }
+                  final reponses = snapshot.data ?? [{}, {}, {}, {}, {}];
+                  final journalData = reponses.isNotEmpty
+                      ? reponses[0]
+                      : <String, dynamic>{};
+                  final presencesData = reponses.length > 1
+                      ? reponses[1]
+                      : <String, dynamic>{};
+                  final evaluationsData = reponses.length > 2
+                      ? reponses[2]
+                      : <String, dynamic>{};
+                  final pointageData = reponses.length > 3
+                      ? reponses[3]
+                      : <String, dynamic>{};
+                  final tachesData = reponses.length > 4
+                      ? reponses[4]
+                      : <String, dynamic>{};
+
                   return RefreshIndicator(
                     color: const Color(0xFF1D61F2),
                     onRefresh: _actualiser,
                     child: switch (_indexOnglet) {
-                      0 => _buildOngletMesTaches(),
-                      1 => _buildOngletPresences(),
-                      2 => _buildOngletEvaluations(),
-                      3 => _buildOngletJournal(),
+                      0 => _buildOngletMesTaches(tachesData),
+                      1 => _buildOngletPresences(presencesData, pointageData),
+                      2 => _buildOngletEvaluations(evaluationsData),
+                      3 => _buildOngletJournal(journalData),
                       _ => const SizedBox.shrink(),
                     },
                   );
@@ -132,7 +228,21 @@ class _JournalPageState extends State<JournalPage> {
   // ==========================================
   // ONGLET 1 : MES TÂCHES (Image 1)
   // ==========================================
-  Widget _buildOngletMesTaches() {
+  Widget _buildOngletMesTaches(Map<String, dynamic> tachesData) {
+    final items = _items(tachesData['items']);
+    final points = <int, Color>{};
+    for (final tache in items) {
+      final date = DateTime.tryParse(
+        (tache['date_echeance'] ?? tache['due_date'])?.toString() ?? '',
+      );
+      if (date != null &&
+          date.year == _dateSelectionneeTaches.year &&
+          date.month == _dateSelectionneeTaches.month) {
+        points[date.day] = const Color(0xFF1D61F2);
+      }
+    }
+    final mois = _nomMois(_dateSelectionneeTaches.month);
+
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
@@ -140,11 +250,13 @@ class _JournalPageState extends State<JournalPage> {
         // Sélecteur de calendrier mois entier Janvier 2026
         CalendrierMoisEntier(
           dateSelectionnee: _dateSelectionneeTaches,
-          pointsCouleursParDate: const {
-            14: Color(0xFFF97316), // point orange sous le 14
-            15: Color(0xFF1D61F2),
-            18: Color(0xFF16A34A),
-          },
+          pointsCouleursParDate: ConfigurationApi.utiliserDonneesMockees
+              ? const {
+                  14: Color(0xFFF97316),
+                  15: Color(0xFF1D61F2),
+                  18: Color(0xFF16A34A),
+                }
+              : points,
           onDateSelectionnee: (date) {
             setState(() => _dateSelectionneeTaches = date);
           },
@@ -152,12 +264,11 @@ class _JournalPageState extends State<JournalPage> {
 
         const SizedBox(height: 22),
 
-        // Titre Échéances du 15 Janvier + Lien vers Mes tâches
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'Échéances du ${_dateSelectionneeTaches.day} Janvier',
+              'Échéances du ${_dateSelectionneeTaches.day} $mois',
               style: GoogleFonts.inter(
                 fontSize: 17,
                 fontWeight: FontWeight.w800,
@@ -186,38 +297,45 @@ class _JournalPageState extends State<JournalPage> {
 
         const SizedBox(height: 14),
 
-        // Liste des cartes d'échéances
-        CarteEcheanceTache(
-          horaireTexte: 'Toute la',
-          sousHoraireTexte: 'journée',
-          tagLibelle: 'EVALUATION',
-          tagCouleurFond: const Color(0xFFE0F2FE),
-          tagCouleurTexte: const Color(0xFF0284C7),
-          titre: 'Remise du rapport de stage de mi-...',
-          onTap: () {},
-        ),
-        const SizedBox(height: 12),
-        CarteEcheanceTache(
-          horaireTexte: '18:00',
-          sousHoraireTexte: 'Échéance',
-          tagLibelle: 'LOGBOOK',
-          tagCouleurFond: const Color(0xFFF3E8FF),
-          tagCouleurTexte: const Color(0xFF7E22CE),
-          titre: 'Saisie du journal clinique quotidien',
-          onTap: () {
-            setState(() => _indexOnglet = 3);
-          },
-        ),
-        const SizedBox(height: 12),
-        CarteEcheanceTache(
-          horaireTexte: '10:00',
-          sousHoraireTexte: '12:30',
-          tagLibelle: 'CHIRURGIE',
-          tagCouleurFond: const Color(0xFFDCFCE7),
-          tagCouleurTexte: const Color(0xFF16A34A),
-          titre: 'Aide opératoire en cure de hernie',
-          onTap: () {},
-        ),
+        if (items.isNotEmpty)
+          for (final t in items.take(4)) ...[
+            CarteEcheanceTache(
+              horaireTexte: _heureTache(t),
+              sousHoraireTexte: '',
+              tagLibelle:
+                  (t['statut'] ?? t['status'])?.toString().replaceAll(
+                    '_',
+                    ' ',
+                  ) ??
+                  '',
+              tagCouleurFond: const Color(0xFFE0F2FE),
+              tagCouleurTexte: const Color(0xFF0284C7),
+              titre: (t['titre'] ?? t['title'])?.toString() ?? '',
+              onTap: () {},
+            ),
+            const SizedBox(height: 12),
+          ]
+        else if (ConfigurationApi.utiliserDonneesMockees) ...[
+          CarteEcheanceTache(
+            horaireTexte: 'Toute la',
+            sousHoraireTexte: 'journée',
+            tagLibelle: 'EVALUATION',
+            tagCouleurFond: const Color(0xFFE0F2FE),
+            tagCouleurTexte: const Color(0xFF0284C7),
+            titre: 'Remise du rapport de stage de mi-parcours',
+            onTap: () {},
+          ),
+          const SizedBox(height: 12),
+          CarteEcheanceTache(
+            horaireTexte: '18:00',
+            sousHoraireTexte: 'Échéance',
+            tagLibelle: 'LOGBOOK',
+            tagCouleurFond: const Color(0xFFF3E8FF),
+            tagCouleurTexte: const Color(0xFF7E22CE),
+            titre: 'Saisie du journal clinique quotidien',
+            onTap: () => setState(() => _indexOnglet = 3),
+          ),
+        ] else ...[_etatVide("Vous n'avez aucune tâche assignée.")],
       ],
     );
   }
@@ -225,7 +343,55 @@ class _JournalPageState extends State<JournalPage> {
   // ==========================================
   // ONGLET 2 : PRÉSENCES (Image 2)
   // ==========================================
-  Widget _buildOngletPresences() {
+  Widget _buildOngletPresences(
+    Map<String, dynamic> presencesData,
+    Map<String, dynamic> pointageData,
+  ) {
+    final items = _items(presencesData['items']);
+    final punch = _map(pointageData['punch']).isNotEmpty
+        ? _map(pointageData['punch'])
+        : pointageData;
+    final execution = _map(pointageData['execution']);
+    final rotation = _map(punch['rotation']).isNotEmpty
+        ? _map(punch['rotation'])
+        : _map(execution['current_rotation']).isNotEmpty
+        ? _map(execution['current_rotation'])
+        : _map(pointageData['active_rotation']);
+    final attendance = _map(punch['attendance']);
+
+    if (items.isEmpty && rotation.isEmpty && attendance.isEmpty) {
+      return _listeEtatVide("Vous n'avez aucune présence ni rotation active.");
+    }
+
+    final nomService =
+        (rotation['unit_name'] ?? rotation['title'])?.toString() ?? '';
+    final canPunch = punch['can_punch'] == true;
+    final nextAction = punch['next_action']?.toString() ?? '';
+    final estArrivee = nextAction == 'ARRIVEE';
+    final lastPunchAt =
+        (attendance['heure_depart'] ??
+                attendance['departure_time'] ??
+                attendance['heure_arrivee'] ??
+                attendance['arrival_time'] ??
+                pointageData['last_punch_at'])
+            ?.toString() ??
+        '';
+    final statutPointage =
+        (attendance['statut'] ?? attendance['status'])?.toString() ?? '';
+
+    final stats = presencesData['stats'] is Map
+        ? Map<String, dynamic>.from(presencesData['stats'] as Map)
+        : null;
+    final tauxBrut = stats?['attendance_rate'] ?? stats?['taux_presence'];
+    final tauxGlobal = tauxBrut == null ? '0%' : '$tauxBrut%';
+    final presents =
+        stats?['present']?.toString() ?? stats?['presents']?.toString() ?? '0';
+    final retards =
+        stats?['late']?.toString() ?? stats?['retards']?.toString() ?? '0';
+    final absences =
+        stats?['absent']?.toString() ?? stats?['absences']?.toString() ?? '0';
+    final gardes = stats?['guard']?.toString() ?? '0';
+
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
@@ -249,7 +415,6 @@ class _JournalPageState extends State<JournalPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Ligne Service + Badge Garde active
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -262,13 +427,16 @@ class _JournalPageState extends State<JournalPage> {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4.5,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFDCFCE7),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      'Garde active',
+                      rotation['statut']?.toString() ?? '',
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
@@ -278,22 +446,16 @@ class _JournalPageState extends State<JournalPage> {
                   ),
                 ],
               ),
-
               const SizedBox(height: 6),
-
-              // Titre du service
               Text(
-                'Urgences Générales (HKG)',
+                nomService,
                 style: GoogleFonts.inter(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
                   color: const Color(0xFF0F172A),
                 ),
               ),
-
               const SizedBox(height: 16),
-
-              // Ligne Arrivée enregistrée + Statut À l'heure
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -301,7 +463,7 @@ class _JournalPageState extends State<JournalPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Arrivée enregistrée',
+                        estArrivee ? 'Dernier pointage' : 'Arrivée enregistrée',
                         style: GoogleFonts.inter(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
@@ -310,7 +472,7 @@ class _JournalPageState extends State<JournalPage> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        _heureArrivee,
+                        lastPunchAt,
                         style: GoogleFonts.inter(
                           fontSize: 16.5,
                           fontWeight: FontWeight.w800,
@@ -332,7 +494,7 @@ class _JournalPageState extends State<JournalPage> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'À l\'heure',
+                        statutPointage.replaceAll('_', ' '),
                         style: GoogleFonts.inter(
                           fontSize: 14.5,
                           fontWeight: FontWeight.w800,
@@ -343,34 +505,33 @@ class _JournalPageState extends State<JournalPage> {
                   ),
                 ],
               ),
-
               const SizedBox(height: 18),
-
-              // Bouton orange Enregistrer mon départ / Arrivée
               SizedBox(
                 width: double.infinity,
                 height: 48,
                 child: FilledButton.icon(
-                  onPressed: () {
-                    setState(() {
-                      _arriveeEnregistree = !_arriveeEnregistree;
-                      if (_arriveeEnregistree) {
-                        _heureArrivee = '07:54 AM';
-                      }
-                    });
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          _arriveeEnregistree
-                              ? 'Arrivée validée à 07:54 AM'
-                              : 'Départ enregistré avec succès !',
+                  onPressed: (!canPunch || _pointageEnCours)
+                      ? null
+                      : () => _actionnerPointage(nextAction),
+                  icon: _pointageEnCours
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : Icon(
+                          estArrivee
+                              ? Icons.login_rounded
+                              : Icons.logout_rounded,
+                          size: 18,
                         ),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.logout_rounded, size: 18),
                   label: Text(
-                    _arriveeEnregistree ? 'Enregistrer mon départ' : 'Enregistrer mon arrivée',
+                    estArrivee
+                        ? 'Enregistrer mon arrivée'
+                        : 'Enregistrer mon départ',
                     style: GoogleFonts.inter(
                       fontSize: 14.5,
                       fontWeight: FontWeight.w700,
@@ -378,7 +539,9 @@ class _JournalPageState extends State<JournalPage> {
                     ),
                   ),
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFFF97316),
+                    backgroundColor: estArrivee
+                        ? const Color(0xFF16A34A)
+                        : const Color(0xFFF97316),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
@@ -394,7 +557,7 @@ class _JournalPageState extends State<JournalPage> {
 
         // Titre Statistiques du mois
         Text(
-          'Statistiques du mois (Janvier)',
+          'Statistiques du mois (${_nomMois(DateTime.now().month)})',
           style: GoogleFonts.inter(
             fontSize: 17,
             fontWeight: FontWeight.w800,
@@ -411,7 +574,7 @@ class _JournalPageState extends State<JournalPage> {
               child: _buildCarteStatistiquePresence(
                 titre: 'Taux global',
                 valeurWidget: Text(
-                  '96%',
+                  tauxGlobal,
                   style: GoogleFonts.inter(
                     fontSize: 24,
                     fontWeight: FontWeight.w900,
@@ -427,7 +590,7 @@ class _JournalPageState extends State<JournalPage> {
                 valeurWidget: Row(
                   children: [
                     Text(
-                      '12',
+                      presents,
                       style: GoogleFonts.inter(
                         fontSize: 24,
                         fontWeight: FontWeight.w900,
@@ -443,7 +606,7 @@ class _JournalPageState extends State<JournalPage> {
                       ),
                     ),
                     Text(
-                      '1',
+                      retards,
                       style: GoogleFonts.inter(
                         fontSize: 24,
                         fontWeight: FontWeight.w900,
@@ -465,7 +628,7 @@ class _JournalPageState extends State<JournalPage> {
               child: _buildCarteStatistiquePresence(
                 titre: 'Absences',
                 valeurWidget: Text(
-                  '0',
+                  absences,
                   style: GoogleFonts.inter(
                     fontSize: 24,
                     fontWeight: FontWeight.w900,
@@ -479,7 +642,7 @@ class _JournalPageState extends State<JournalPage> {
               child: _buildCarteStatistiquePresence(
                 titre: 'Gardes effectuées',
                 valeurWidget: Text(
-                  '4',
+                  gardes,
                   style: GoogleFonts.inter(
                     fontSize: 24,
                     fontWeight: FontWeight.w900,
@@ -567,7 +730,18 @@ class _JournalPageState extends State<JournalPage> {
   // ==========================================
   // ONGLET 3 : EVALUATIONS (Image 3)
   // ==========================================
-  Widget _buildOngletEvaluations() {
+  Widget _buildOngletEvaluations(Map<String, dynamic> evaluationsData) {
+    final items = _items(evaluationsData['items']);
+    if (items.isEmpty && !ConfigurationApi.utiliserDonneesMockees) {
+      return _listeEtatVide("Vous n'avez aucune évaluation disponible.");
+    }
+    final stats = evaluationsData['stats'] is Map
+        ? Map<String, dynamic>.from(evaluationsData['stats'] as Map)
+        : null;
+    final moyenneScore =
+        stats?['average'] ??
+        (ConfigurationApi.utiliserDonneesMockees ? '16.8' : null);
+    final moyenneNumerique = double.tryParse(moyenneScore?.toString() ?? '');
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
@@ -604,7 +778,7 @@ class _JournalPageState extends State<JournalPage> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '16.8 / 20',
+                    moyenneScore == null ? '—' : '$moyenneScore / 20',
                     style: GoogleFonts.inter(
                       fontSize: 26,
                       fontWeight: FontWeight.w900,
@@ -613,7 +787,7 @@ class _JournalPageState extends State<JournalPage> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Excellent travail d\'équipe',
+                    'Évaluations validées',
                     style: GoogleFonts.inter(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
@@ -632,7 +806,7 @@ class _JournalPageState extends State<JournalPage> {
                 ),
                 alignment: Alignment.center,
                 child: Text(
-                  'A',
+                  _gradeEvaluation(moyenneNumerique),
                   style: GoogleFonts.inter(
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
@@ -646,9 +820,9 @@ class _JournalPageState extends State<JournalPage> {
 
         const SizedBox(height: 22),
 
-        // Titre Fiches d'évaluations (3)
+        // Titre Fiches d'évaluations
         Text(
-          'Fiches d\'évaluations (3)',
+          'Fiches d\'évaluations (${items.isNotEmpty ? items.length : 2})',
           style: GoogleFonts.inter(
             fontSize: 17,
             fontWeight: FontWeight.w800,
@@ -658,33 +832,56 @@ class _JournalPageState extends State<JournalPage> {
 
         const SizedBox(height: 14),
 
-        // Carte 1 : FIN DE ROTATION
-        _buildCarteEvaluation(
-          tagLibelle: 'FIN DE ROTATION',
-          tagCouleurFond: const Color(0xFFE0F2FE),
-          tagCouleurTexte: const Color(0xFF0284C7),
-          note: '17.5 / 20',
-          titre: 'Stage Clinique - Urgences de Jour',
-          evaluateur: 'Dr. Marie Dupont',
-          appreciation:
-              '"Très bon sens clinique. Aptitude remarquable à gérer le stress en période de forte affluence..."',
-          dateTexte: '10 Janvier 2026',
-        ),
+        if (items.isNotEmpty)
+          for (final ev in items)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: _buildCarteEvaluation(
+                tagLibelle: ev['type']?.toString().replaceAll('_', ' ') ?? '',
+                tagCouleurFond: const Color(0xFFE0F2FE),
+                tagCouleurTexte: const Color(0xFF0284C7),
+                note: ev['note'] == null ? '—' : '${ev['note']}/20',
+                titre: _titreEvaluation(ev),
+                evaluateur:
+                    (ev['evaluator_name'] ?? ev['supervisor'])?.toString() ??
+                    '',
+                appreciation:
+                    (ev['appreciation'] ?? ev['comment'])?.toString() ?? '',
+                dateTexte:
+                    (ev['validated_at'] ?? ev['finalized_at'])?.toString() ??
+                    '',
+                donneesEvaluation: ev,
+              ),
+            )
+        else ...[
+          // Carte 1 : FIN DE ROTATION
+          _buildCarteEvaluation(
+            tagLibelle: 'FIN DE ROTATION',
+            tagCouleurFond: const Color(0xFFE0F2FE),
+            tagCouleurTexte: const Color(0xFF0284C7),
+            note: '17.5 / 20',
+            titre: 'Stage Clinique - Urgences de Jour',
+            evaluateur: 'Dr. Marie Dupont',
+            appreciation:
+                '"Très bon sens clinique. Aptitude remarquable à gérer le stress en période de forte affluence..."',
+            dateTexte: '10 Janvier 2026',
+          ),
 
-        const SizedBox(height: 14),
+          const SizedBox(height: 14),
 
-        // Carte 2 : MI-PARCOURS
-        _buildCarteEvaluation(
-          tagLibelle: 'MI-PARCOURS',
-          tagCouleurFond: const Color(0xFFF3E8FF),
-          tagCouleurTexte: const Color(0xFF7E22CE),
-          note: '16.0 / 20',
-          titre: 'Gestes Techniques & Sutures',
-          evaluateur: 'Dr. Jean-Pierre Mwamba',
-          appreciation:
-              '"Maîtrise les bases aseptiques. Rapidité d’exécution à perfectionner."',
-          dateTexte: '05 Janvier 2026',
-        ),
+          // Carte 2 : MI-PARCOURS
+          _buildCarteEvaluation(
+            tagLibelle: 'MI-PARCOURS',
+            tagCouleurFond: const Color(0xFFF3E8FF),
+            tagCouleurTexte: const Color(0xFF7E22CE),
+            note: '16.0 / 20',
+            titre: 'Gestes Techniques & Sutures',
+            evaluateur: 'Dr. Jean-Pierre Mwamba',
+            appreciation:
+                '"Maîtrise les bases aseptiques. Rapidité d’exécution à perfectionner."',
+            dateTexte: '05 Janvier 2026',
+          ),
+        ],
       ],
     );
   }
@@ -698,6 +895,7 @@ class _JournalPageState extends State<JournalPage> {
     required String evaluateur,
     required String appreciation,
     required String dateTexte,
+    Map<String, dynamic>? donneesEvaluation,
   }) {
     return Container(
       width: double.infinity,
@@ -820,7 +1018,9 @@ class _JournalPageState extends State<JournalPage> {
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
                       builder: (_) => FicheEvaluationPage(
-                        scoreGlobal: double.tryParse(note.split('/').first.trim()) ?? 17.5,
+                        donneesEvaluation: donneesEvaluation,
+                        scoreGlobal:
+                            double.tryParse(note.split('/').first.trim()) ?? 0,
                         nomEvaluateur: evaluateur,
                         initialesEvaluateur: evaluateur
                             .split(' ')
@@ -851,7 +1051,22 @@ class _JournalPageState extends State<JournalPage> {
   // ==========================================
   // ONGLET 4 : JOURNAL (Image 4)
   // ==========================================
-  Widget _buildOngletJournal() {
+  Widget _buildOngletJournal(Map<String, dynamic> journalData) {
+    final items = _items(journalData['items']);
+    if (items.isEmpty && !ConfigurationApi.utiliserDonneesMockees) {
+      return _listeEtatVide("Vous n'avez aucun journal enregistré.");
+    }
+    final stats = _map(journalData['stats']);
+    final total = _entier(stats['total']);
+    final termines =
+        _entier(stats['submitted']) +
+        _entier(stats['validated']) +
+        _entier(stats['rejected']);
+    final progression = total > 0 ? termines / total : 0.0;
+    final journauxFiltres = ConfigurationApi.utiliserDonneesMockees
+        ? const <Map<String, dynamic>>[]
+        : items.where(_journalCorrespondAuFiltre).toList();
+
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
@@ -886,7 +1101,7 @@ class _JournalPageState extends State<JournalPage> {
                     ),
                   ),
                   Text(
-                    '60% effectué',
+                    '${(progression * 100).round()}% effectué',
                     style: GoogleFonts.inter(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
@@ -898,16 +1113,16 @@ class _JournalPageState extends State<JournalPage> {
               const SizedBox(height: 10),
               ClipRRect(
                 borderRadius: BorderRadius.circular(6),
-                child: const LinearProgressIndicator(
-                  value: 0.6,
+                child: LinearProgressIndicator(
+                  value: progression,
                   minHeight: 7,
-                  backgroundColor: Color(0x33FFFFFF),
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  backgroundColor: const Color(0x33FFFFFF),
+                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
                 ),
               ),
               const SizedBox(height: 10),
               Text(
-                '3 sur 5 tâches cliniques obligatoires validées',
+                '$termines sur $total journaux traités',
                 style: GoogleFonts.inter(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w500,
@@ -920,15 +1135,29 @@ class _JournalPageState extends State<JournalPage> {
 
         const SizedBox(height: 16),
 
-        // Filtres (Aujourd'hui (5), À venir, Terminées) + Lien vers Mes journaux
+        // Filtres défilables horizontalement + Lien vers Mes journaux
         Row(
           children: [
-            _buildFiltreJournalChip('Aujourd\'hui (5)'),
-            const SizedBox(width: 8),
-            _buildFiltreJournalChip('À venir'),
-            const SizedBox(width: 8),
-            _buildFiltreJournalChip('Terminées'),
-            const Spacer(),
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                child: Row(
+                  children: [
+                    _buildFiltreJournalChip(
+                      ConfigurationApi.utiliserDonneesMockees
+                          ? 'Aujourd\'hui (5)'
+                          : 'Aujourd\'hui',
+                    ),
+                    const SizedBox(width: 8),
+                    _buildFiltreJournalChip('À venir'),
+                    const SizedBox(width: 8),
+                    _buildFiltreJournalChip('Terminées'),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
             IconButton(
               tooltip: 'Historique des journaux',
               onPressed: () {
@@ -938,44 +1167,75 @@ class _JournalPageState extends State<JournalPage> {
                   ),
                 );
               },
-              icon: const Icon(Icons.list_alt_rounded, color: Color(0xFF1D61F2), size: 22),
+              icon: const Icon(
+                Icons.list_alt_rounded,
+                color: Color(0xFF1D61F2),
+                size: 22,
+              ),
             ),
           ],
         ),
 
         const SizedBox(height: 16),
 
-        // Carte 1 : HAUTE PRIORITÉ - En cours
-        _buildCarteActiviteJournal(
-          tagPriorite: 'HAUTE PRIORITÉ',
-          tagPrioriteBg: const Color(0xFFFFF7ED),
-          tagPrioriteTexte: const Color(0xFFEA580C),
-          statutLibelle: 'En cours',
-          statutBg: const Color(0xFFE0F2FE),
-          statutTexte: const Color(0xFF0284C7),
-          titre: 'Rapport d\'admission - Traumatisme thoracique',
-          description: 'Patient transféré suite à un accident de la route...',
-          echeanceTexte: 'Échéance : Aujourd\'hui, 14:00',
-          actionTexte: 'Ouvrir',
-          actionCouleur: const Color(0xFF1D61F2),
-        ),
+        if (!ConfigurationApi.utiliserDonneesMockees && journauxFiltres.isEmpty)
+          _etatVide('Aucun journal ne correspond à ce filtre.'),
 
-        const SizedBox(height: 14),
+        if (!ConfigurationApi.utiliserDonneesMockees)
+          for (final journal in journauxFiltres) ...[
+            _buildCarteActiviteJournal(
+              tagPriorite: _categorieJournal(journal),
+              tagPrioriteBg: const Color(0xFFF3E8FF),
+              tagPrioriteTexte: const Color(0xFF7E22CE),
+              statutLibelle:
+                  journal['status']?.toString().replaceAll('_', ' ') ?? '',
+              statutBg: const Color(0xFFE0F2FE),
+              statutTexte: const Color(0xFF0284C7),
+              titre:
+                  (journal['learning'] ?? journal['summary'])?.toString() ?? '',
+              description: journal['summary']?.toString() ?? '',
+              echeanceTexte: journal['date']?.toString() ?? '',
+              actionTexte: journal['editable'] == true ? 'Corriger' : 'Ouvrir',
+              actionCouleur: const Color(0xFF1D61F2),
+              donneesJournal: journal,
+            ),
+            const SizedBox(height: 14),
+          ],
 
-        // Carte 2 : PROCÉDURE - À corriger
-        _buildCarteActiviteJournal(
-          tagPriorite: 'PROCÉDURE',
-          tagPrioriteBg: const Color(0xFFF3E8FF),
-          tagPrioriteTexte: const Color(0xFF7E22CE),
-          statutLibelle: 'À corriger',
-          statutBg: const Color(0xFFFEF3C7),
-          statutTexte: const Color(0xFFD97706),
-          titre: 'Suture et parage de plaie complexe',
-          description: 'Suture effectuée sous la supervision du Dr. Marie Dupo...',
-          echeanceTexte: 'Échéance : Aujourd\'hui, 18:00',
-          actionTexte: 'Corriger',
-          actionCouleur: const Color(0xFF1D61F2),
-        ),
+        if (ConfigurationApi.utiliserDonneesMockees) ...[
+          // Carte 1 : HAUTE PRIORITÉ - En cours
+          _buildCarteActiviteJournal(
+            tagPriorite: 'HAUTE PRIORITÉ',
+            tagPrioriteBg: const Color(0xFFFFF7ED),
+            tagPrioriteTexte: const Color(0xFFEA580C),
+            statutLibelle: 'En cours',
+            statutBg: const Color(0xFFE0F2FE),
+            statutTexte: const Color(0xFF0284C7),
+            titre: 'Rapport d\'admission - Traumatisme thoracique',
+            description: 'Patient transféré suite à un accident de la route...',
+            echeanceTexte: 'Échéance : Aujourd\'hui, 14:00',
+            actionTexte: 'Ouvrir',
+            actionCouleur: const Color(0xFF1D61F2),
+          ),
+
+          const SizedBox(height: 14),
+
+          // Carte 2 : PROCÉDURE - À corriger
+          _buildCarteActiviteJournal(
+            tagPriorite: 'PROCÉDURE',
+            tagPrioriteBg: const Color(0xFFF3E8FF),
+            tagPrioriteTexte: const Color(0xFF7E22CE),
+            statutLibelle: 'À corriger',
+            statutBg: const Color(0xFFFEF3C7),
+            statutTexte: const Color(0xFFD97706),
+            titre: 'Suture et parage de plaie complexe',
+            description:
+                'Suture effectuée sous la supervision du Dr. Marie Dupo...',
+            echeanceTexte: 'Échéance : Aujourd\'hui, 18:00',
+            actionTexte: 'Corriger',
+            actionCouleur: const Color(0xFF1D61F2),
+          ),
+        ],
       ],
     );
   }
@@ -1005,6 +1265,93 @@ class _JournalPageState extends State<JournalPage> {
     );
   }
 
+  String _nomMois(int mois) => const [
+    'Janvier',
+    'Février',
+    'Mars',
+    'Avril',
+    'Mai',
+    'Juin',
+    'Juillet',
+    'Août',
+    'Septembre',
+    'Octobre',
+    'Novembre',
+    'Décembre',
+  ][mois - 1];
+
+  String _heureTache(Map<String, dynamic> tache) {
+    final valeur = tache['date_echeance'] ?? tache['due_date'];
+    final date = DateTime.tryParse(valeur?.toString() ?? '');
+    if (date == null) return '';
+    return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+  }
+
+  bool _journalCorrespondAuFiltre(Map<String, dynamic> journal) {
+    final date = DateTime.tryParse(journal['date']?.toString() ?? '');
+    final maintenant = DateTime.now();
+    final aujourdHui = DateTime(
+      maintenant.year,
+      maintenant.month,
+      maintenant.day,
+    );
+    final jour = date == null
+        ? null
+        : DateTime(date.year, date.month, date.day);
+    if (_filtreJournal.startsWith('Aujourd')) return jour == aujourdHui;
+    if (_filtreJournal == 'À venir') {
+      return jour != null && jour.isAfter(aujourdHui);
+    }
+    final statut = journal['status']?.toString().toUpperCase() ?? '';
+    return const {
+      'SOUMIS',
+      'SOUMISE',
+      'VALIDE',
+      'VALIDEE',
+      'REJETE',
+      'REJETEE',
+    }.contains(statut);
+  }
+
+  String _categorieJournal(Map<String, dynamic> journal) {
+    final activites = _items(journal['activities']);
+    return activites.isEmpty
+        ? 'JOURNAL'
+        : activites.first['category']?.toString() ?? 'JOURNAL';
+  }
+
+  String _gradeEvaluation(double? moyenne) {
+    if (moyenne == null) return '—';
+    if (moyenne >= 16) return 'A';
+    if (moyenne >= 14) return 'B';
+    if (moyenne >= 12) return 'C';
+    if (moyenne >= 10) return 'D';
+    return 'E';
+  }
+
+  String _titreEvaluation(Map<String, dynamic> evaluation) {
+    final unit = _map(evaluation['unit']);
+    final campaign = _map(evaluation['campaign']);
+    return unit['name']?.toString() ?? campaign['title']?.toString() ?? '';
+  }
+
+  Widget _etatVide(String message) => Center(
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 32),
+      child: Text(
+        message,
+        textAlign: TextAlign.center,
+        style: GoogleFonts.inter(color: const Color(0xFF64748B)),
+      ),
+    ),
+  );
+
+  Widget _listeEtatVide(String message) => ListView(
+    physics: const AlwaysScrollableScrollPhysics(),
+    padding: const EdgeInsets.all(32),
+    children: [_etatVide(message)],
+  );
+
   Widget _buildCarteActiviteJournal({
     required String tagPriorite,
     required Color tagPrioriteBg,
@@ -1017,6 +1364,7 @@ class _JournalPageState extends State<JournalPage> {
     required String echeanceTexte,
     required String actionTexte,
     required Color actionCouleur,
+    Map<String, dynamic>? donneesJournal,
   }) {
     return Container(
       width: double.infinity,
@@ -1118,13 +1466,20 @@ class _JournalPageState extends State<JournalPage> {
                   if (actionTexte == 'Ouvrir') {
                     Navigator.of(context).push(
                       MaterialPageRoute<void>(
-                        builder: (_) => const DetailJournalPage(),
+                        builder: (_) =>
+                            DetailJournalPage(donneesJournal: donneesJournal),
                       ),
                     );
                   } else {
                     Navigator.of(context).push(
                       MaterialPageRoute<void>(
-                        builder: (_) => const SaisirJournalPage(),
+                        builder: (_) => SaisirJournalPage(
+                          donneesJournal: donneesJournal,
+                          assignmentUuid: _map(
+                            donneesJournal?['assignment'],
+                          )['uuid']?.toString(),
+                          logbookUuid: donneesJournal?['uuid']?.toString(),
+                        ),
                       ),
                     );
                   }
@@ -1145,3 +1500,17 @@ class _JournalPageState extends State<JournalPage> {
     );
   }
 }
+
+List<Map<String, dynamic>> _items(Object? valeur) => valeur is List
+    ? valeur
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList()
+    : <Map<String, dynamic>>[];
+
+Map<String, dynamic> _map(Object? valeur) =>
+    valeur is Map ? Map<String, dynamic>.from(valeur) : <String, dynamic>{};
+
+int _entier(Object? valeur) => valeur is num
+    ? valeur.toInt()
+    : int.tryParse(valeur?.toString() ?? '') ?? 0;

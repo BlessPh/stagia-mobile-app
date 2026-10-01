@@ -3,10 +3,15 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/services/photo_profil_service.dart';
+import '../../../../core/network/client_api_http.dart';
+import '../../../../core/network/source_etudiant_distante.dart';
 import '../../../messagerie/presentation/pages/messagerie_page.dart';
 import '../../../notifications/presentation/pages/notifications_page.dart';
 
-class EnTeteAccueil extends StatelessWidget implements PreferredSizeWidget {
+import 'dart:async';
+import '../../../../core/services/sse_notifications_service.dart';
+
+class EnTeteAccueil extends StatefulWidget implements PreferredSizeWidget {
   const EnTeteAccueil({required this.etudiant, super.key});
 
   final Map<String, dynamic> etudiant;
@@ -15,22 +20,65 @@ class EnTeteAccueil extends StatelessWidget implements PreferredSizeWidget {
   Size get preferredSize => const Size.fromHeight(74);
 
   @override
+  State<EnTeteAccueil> createState() => _EnTeteAccueilState();
+}
+
+class _EnTeteAccueilState extends State<EnTeteAccueil> {
+  final _source = SourceEtudiantDistante(ClientApiHttp());
+  Map<String, dynamic>? _counts;
+  StreamSubscription? _sseSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _chargerCounts();
+    // Écoute temps réel des compteurs du flux SSE
+    _sseSubscription = SseNotificationsService.instance.fluxCompteurs.listen((
+      counts,
+    ) {
+      if (mounted) {
+        setState(() => _counts = counts);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _sseSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _chargerCounts() async {
+    try {
+      final res = await _source.notificationCounts();
+      if (mounted) {
+        setState(() => _counts = res);
+      }
+    } catch (_) {}
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final nom = etudiant['nom']?.toString().trim() ?? '';
-    final prenom = etudiant['prenom']?.toString().trim() ?? '';
+    final nom = widget.etudiant['nom']?.toString().trim() ?? '';
+    final prenom = widget.etudiant['prenom']?.toString().trim() ?? '';
     final modeSombre = Theme.of(context).brightness == Brightness.dark;
 
-    // Nom complet par défaut comme sur la maquette : Alfred KALONJI
-    String nomComplet = [prenom, nom.toUpperCase()]
-        .where((e) => e.isNotEmpty)
-        .join(' ');
+    final unreadMsgs =
+        int.tryParse(_counts?['messages']?.toString() ?? '0') ?? 0;
+    final unreadNotifs =
+        int.tryParse(_counts?['notifications']?.toString() ?? '0') ?? 0;
+
+    String nomComplet = [
+      prenom,
+      nom.toUpperCase(),
+    ].where((e) => e.isNotEmpty).join(' ');
     if (nomComplet.isEmpty) {
-      nomComplet = 'Alfred KALONJI';
+      nomComplet = 'Étudiant';
     }
 
     return AppBar(
       automaticallyImplyLeading: false,
-      toolbarHeight: preferredSize.height,
+      toolbarHeight: widget.preferredSize.height,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
@@ -45,17 +93,14 @@ class EnTeteAccueil extends StatelessWidget implements PreferredSizeWidget {
               return CircleAvatar(
                 radius: 23,
                 backgroundColor: const Color(0xFFE2E8F0),
-                backgroundImage: photoValide
-                    ? FileImage(File(photo))
-                    : const AssetImage('assets/images/avatar_etudiant.jpg')
-                        as ImageProvider,
-                child: !photoValide && !File('assets/images/avatar_etudiant.jpg').existsSync()
-                    ? const Icon(
+                backgroundImage: photoValide ? FileImage(File(photo)) : null,
+                child: photoValide
+                    ? null
+                    : const Icon(
                         Icons.person_rounded,
                         color: Color(0xFF64748B),
                         size: 26,
-                      )
-                    : null,
+                      ),
               );
             },
           ),
@@ -97,17 +142,20 @@ class EnTeteAccueil extends StatelessWidget implements PreferredSizeWidget {
             ),
           ),
 
-          // Icône Messagerie / Chat avec badge 3
+          // Icône Messagerie / Chat avec badge réel
           Stack(
             clipBehavior: Clip.none,
             children: [
               IconButton(
                 tooltip: 'Discussions',
-                onPressed: () => Navigator.of(context, rootNavigator: true).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const MessageriePage(),
-                  ),
-                ),
+                onPressed: () async {
+                  await Navigator.of(context, rootNavigator: true).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const MessageriePage(),
+                    ),
+                  );
+                  _chargerCounts();
+                },
                 icon: Icon(
                   CupertinoIcons.chat_bubble_2,
                   color: modeSombre ? Colors.white : const Color(0xFF0F172A),
@@ -115,43 +163,50 @@ class EnTeteAccueil extends StatelessWidget implements PreferredSizeWidget {
                 ),
                 visualDensity: VisualDensity.compact,
               ),
-              Positioned(
-                top: 4,
-                right: 4,
-                child: Container(
-                  padding: const EdgeInsets.all(3),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFEF4444),
-                    shape: BoxShape.circle,
-                  ),
-                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                  child: const Text(
-                    '3',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.w800,
-                      height: 1,
+              if (unreadMsgs > 0)
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFEF4444),
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Text(
+                      '$unreadMsgs',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w800,
+                        height: 1,
+                      ),
                     ),
                   ),
                 ),
-              ),
             ],
           ),
           const SizedBox(width: 4),
 
-          // Icône Notifications avec badge 5
+          // Icône Notifications avec badge réel
           Stack(
             clipBehavior: Clip.none,
             children: [
               IconButton(
                 tooltip: 'Notifications',
-                onPressed: () => Navigator.of(context, rootNavigator: true).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const NotificationsPage(),
-                  ),
-                ),
+                onPressed: () async {
+                  await Navigator.of(context, rootNavigator: true).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const NotificationsPage(),
+                    ),
+                  );
+                  _chargerCounts();
+                },
                 icon: Icon(
                   CupertinoIcons.bell,
                   color: modeSombre ? Colors.white : const Color(0xFF0F172A),
@@ -159,30 +214,35 @@ class EnTeteAccueil extends StatelessWidget implements PreferredSizeWidget {
                 ),
                 visualDensity: VisualDensity.compact,
               ),
-              Positioned(
-                top: 4,
-                right: 4,
-                child: Container(
-                  padding: const EdgeInsets.all(3),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFEF4444),
-                    shape: BoxShape.circle,
-                  ),
-                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                  child: const Text(
-                    '5',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.w800,
-                      height: 1,
+              if (unreadNotifs > 0)
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFEF4444),
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Text(
+                      '$unreadNotifs',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w800,
+                        height: 1,
+                      ),
                     ),
                   ),
                 ),
-              ),
             ],
           ),
+          const SizedBox(width: 4),
         ],
       ),
     );
@@ -242,7 +302,10 @@ class IndicateurStatistiqueAccueil extends StatelessWidget {
     decoration: BoxDecoration(
       color: Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: const Color(0xFFFF7417).withValues(alpha: 0.5), width: 1.2),
+      border: Border.all(
+        color: const Color(0xFFFF7417).withValues(alpha: 0.5),
+        width: 1.2,
+      ),
       boxShadow: const [
         BoxShadow(
           color: Color(0x0A000000),

@@ -122,4 +122,95 @@ class NotificationItem {
       lue: lue ?? this.lue,
     );
   }
+
+  factory NotificationItem.fromJson(Map<String, dynamic> json) {
+    final rawType = json['type']?.toString().toLowerCase() ?? '';
+    TypeNotification notifType;
+    IconData icone;
+    Color couleur;
+
+    switch (rawType) {
+      case 'internship':
+        notifType = TypeNotification.stage;
+        icone = Icons.local_hospital_rounded;
+        couleur = const Color(0xFF1D61F2);
+        break;
+      case 'message':
+        notifType = TypeNotification.message;
+        icone = Icons.chat_bubble_outline_rounded;
+        couleur = const Color(0xFFFF7417);
+        break;
+      case 'logbook':
+        notifType = TypeNotification.journal;
+        icone = Icons.verified_rounded;
+        couleur = const Color(0xFF8B5CF6);
+        break;
+      case 'urgent':
+        notifType = TypeNotification.urgence;
+        icone = Icons.warning_amber_rounded;
+        couleur = const Color(0xFFEF4444);
+        break;
+      case 'academic':
+      default:
+        notifType = TypeNotification.academique;
+        icone = Icons.campaign_rounded;
+        couleur = const Color(0xFFF59E0B);
+        break;
+    }
+
+    final actionMap = json['action'] is Map ? json['action'] as Map<String, dynamic> : null;
+    final actionTypeRaw = actionMap?['type']?.toString().toLowerCase() ?? '';
+    final targetId = actionMap?['target_id']?.toString();
+    final actionLabel = actionMap?['label']?.toString() ?? 'Voir';
+    final actionTitle = actionMap?['title']?.toString();
+    final metadata = actionMap?['metadata'] is Map
+        ? Map<String, dynamic>.from(actionMap!['metadata'] as Map)
+        : <String, dynamic>{};
+
+    TypeCibleNotification cibleType;
+    switch (actionTypeRaw) {
+      case 'internship_assignment':
+        cibleType = TypeCibleNotification.affectationStage;
+        break;
+      case 'campaign':
+        cibleType = TypeCibleNotification.detailCampagne;
+        break;
+      case 'conversation':
+        cibleType = TypeCibleNotification.discussionChat;
+        break;
+      case 'logbook':
+      case 'task':
+        cibleType = TypeCibleNotification.journalTaches;
+        break;
+      default:
+        cibleType = TypeCibleNotification.generique;
+        break;
+    }
+
+    DateTime parsedDate;
+    try {
+      parsedDate = DateTime.parse(json['created_at']?.toString() ?? '');
+    } catch (_) {
+      parsedDate = DateTime.now();
+    }
+
+    return NotificationItem(
+      id: json['id']?.toString() ?? '',
+      sujet: json['subject']?.toString() ?? '',
+      description: json['description']?.toString() ?? '',
+      date: parsedDate,
+      type: notifType,
+      icone: icone,
+      couleur: couleur,
+      actionLabel: actionLabel,
+      cible: CibleNotification(
+        type: cibleType,
+        identifiant: targetId,
+        titre: actionTitle,
+        donneesSupplementaires: metadata,
+      ),
+      lue: json['read_at'] != null,
+    );
+  }
 }
+

@@ -7,6 +7,9 @@ enum StatutCandidatureType {
   entretien,
   refusee,
   acceptee,
+  paiementRequis,
+  confirme,
+  admis,
 }
 
 class CarteCandidatureModerne extends StatelessWidget {
@@ -18,6 +21,7 @@ class CarteCandidatureModerne extends StatelessWidget {
     required this.titrePoste,
     required this.dateTexte,
     required this.statutType,
+    this.libelleStatutCustom,
     this.onTap,
     super.key,
   });
@@ -29,6 +33,7 @@ class CarteCandidatureModerne extends StatelessWidget {
   final String titrePoste;
   final String dateTexte;
   final StatutCandidatureType statutType;
+  final String? libelleStatutCustom;
   final VoidCallback? onTap;
 
   @override
@@ -144,21 +149,33 @@ class CarteCandidatureModerne extends StatelessWidget {
 
     switch (statutType) {
       case StatutCandidatureType.enAttente:
-        texte = 'En attente';
+        texte = libelleStatutCustom ?? 'En attente';
         fond = const Color(0xFFFEF3C7);
         texteCouleur = const Color(0xFFD97706);
       case StatutCandidatureType.entretien:
-        texte = 'Entretien';
+        texte = libelleStatutCustom ?? 'Entretien';
         fond = const Color(0xFFE0F2FE);
         texteCouleur = const Color(0xFF0284C7);
       case StatutCandidatureType.refusee:
-        texte = 'Refusée';
+        texte = libelleStatutCustom ?? 'Refusée';
         fond = const Color(0xFFFEE2E2);
         texteCouleur = const Color(0xFFDC2626);
       case StatutCandidatureType.acceptee:
-        texte = 'Acceptée';
+        texte = libelleStatutCustom ?? 'Acceptée';
         fond = const Color(0xFFDCFCE7);
         texteCouleur = const Color(0xFF16A34A);
+      case StatutCandidatureType.paiementRequis:
+        texte = libelleStatutCustom ?? 'Paiement requis';
+        fond = const Color(0xFFFFEDD5);
+        texteCouleur = const Color(0xFFEA580C);
+      case StatutCandidatureType.confirme:
+        texte = libelleStatutCustom ?? 'Confirmée';
+        fond = const Color(0xFFE0E7FF);
+        texteCouleur = const Color(0xFF4338CA);
+      case StatutCandidatureType.admis:
+        texte = libelleStatutCustom ?? 'Admis';
+        fond = const Color(0xFFD1FAE5);
+        texteCouleur = const Color(0xFF059669);
     }
 
     return Container(

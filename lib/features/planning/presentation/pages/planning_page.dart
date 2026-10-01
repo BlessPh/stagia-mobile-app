@@ -1,15 +1,17 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../../core/network/client_api_http.dart';
+import '../../../../core/network/configuration_api.dart';
+import '../../../../core/network/source_etudiant_distante.dart';
+import '../../../../core/services/sse_notifications_service.dart';
 import '../../data/datasources/source_planning_mock.dart';
 import '../../domain/entities/tache_planning.dart';
 import '../widgets/ajouter_tache_modal.dart';
 import 'detail_tache_page.dart';
 
 class PlanningPage extends StatefulWidget {
-  const PlanningPage({
-    this.dateInitiale,
-    super.key,
-  });
+  const PlanningPage({this.dateInitiale, super.key});
 
   final DateTime? dateInitiale;
 
@@ -18,9 +20,12 @@ class PlanningPage extends StatefulWidget {
 }
 
 class _PlanningPageState extends State<PlanningPage> {
+  final _source = SourceEtudiantDistante(ClientApiHttp());
   late DateTime _dateSelectionnee;
   late DateTime _moisAffiche;
   bool _voirToutesLesTaches = false;
+  List<TachePlanning> _evenementsDistants = [];
+  StreamSubscription? _sseSubscription;
 
   final List<String> _joursSemaine = const [
     'Lun',
@@ -35,9 +40,48 @@ class _PlanningPageState extends State<PlanningPage> {
   @override
   void initState() {
     super.initState();
-    // Par défaut, on initialise sur le 16 septembre 2026 ou la date demandée
-    _dateSelectionnee = widget.dateInitiale ?? DateTime(2026, 9, 16);
+    _dateSelectionnee =
+        widget.dateInitiale ??
+        (ConfigurationApi.utiliserDonneesMockees
+            ? DateTime(2026, 9, 16)
+            : DateTime.now());
     _moisAffiche = DateTime(_dateSelectionnee.year, _dateSelectionnee.month);
+    _chargerEvenements();
+
+    // Écoute SSE des invitations de calendrier en direct
+    _sseSubscription = SseNotificationsService.instance.fluxCalendrier.listen((
+      evtMap,
+    ) {
+      final evt = TachePlanning.fromJson(evtMap);
+      if (mounted && !_evenementsDistants.any((e) => e.id == evt.id)) {
+        setState(() {
+          _evenementsDistants.add(evt);
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _sseSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _chargerEvenements() async {
+    try {
+      final res = await _source.calendrier();
+      final items =
+          (res['items'] as List?)
+              ?.whereType<Map>()
+              .map((m) => TachePlanning.fromJson(Map<String, dynamic>.from(m)))
+              .toList() ??
+          <TachePlanning>[];
+      if (mounted) {
+        setState(() {
+          _evenementsDistants = items;
+        });
+      }
+    } catch (_) {}
   }
 
   void _selectionnerDate(DateTime date) {
@@ -71,11 +115,36 @@ class _PlanningPageState extends State<PlanningPage> {
     return moisNoms[mois - 1];
   }
 
+  List<TachePlanning> get _toutesLesTachesCombine {
+    if (!ConfigurationApi.utiliserDonneesMockees) {
+      return _evenementsDistants;
+    }
+    return _evenementsDistants.isNotEmpty
+        ? _evenementsDistants
+        : SourcePlanningMock.toutesLesTaches();
+  }
+
+  List<TachePlanning> _tachesPourDate(DateTime date) {
+    return _toutesLesTachesCombine.where((t) {
+      return t.date.year == date.year &&
+          t.date.month == date.month &&
+          t.date.day == date.day;
+    }).toList();
+  }
+
+  bool _dateContientTaches(DateTime date) {
+    return _toutesLesTachesCombine.any((t) {
+      return t.date.year == date.year &&
+          t.date.month == date.month &&
+          t.date.day == date.day;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final taches = _voirToutesLesTaches
-        ? SourcePlanningMock.toutesLesTaches()
-        : SourcePlanningMock.obtenirTachesPourDate(_dateSelectionnee);
+        ? _toutesLesTachesCombine
+        : _tachesPourDate(_dateSelectionnee);
 
     return Scaffold(
       backgroundColor: const Color(0xFF2563EB),
@@ -84,10 +153,26 @@ class _PlanningPageState extends State<PlanningPage> {
           AjouterTacheModal.afficher(
             context,
             date: _dateSelectionnee,
-            onAjouter: (nouvelleTache) {
+            onAjouter: (nouvelleTache) async {
               setState(() {
-                SourcePlanningMock.ajouterTache(nouvelleTache);
+                _evenementsDistants.add(nouvelleTache);
+                if (ConfigurationApi.utiliserDonneesMockees) {
+                  SourcePlanningMock.ajouterTache(nouvelleTache);
+                }
               });
+              try {
+                await _source.creerEvenementCalendrier(
+                  title: nouvelleTache.titre,
+                  startsAt: nouvelleTache.date,
+                  endsAt: nouvelleTache.date.add(const Duration(minutes: 60)),
+                  participantUserIds: ConfigurationApi.utiliserDonneesMockees
+                      ? [101]
+                      : const [],
+                  type: 'reunion',
+                  description: nouvelleTache.description,
+                  location: nouvelleTache.lieu,
+                );
+              } catch (_) {}
             },
           );
         },
@@ -97,6 +182,7 @@ class _PlanningPageState extends State<PlanningPage> {
         shape: const CircleBorder(),
         child: const Icon(Icons.add_rounded, size: 28),
       ),
+
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -176,13 +262,13 @@ class _PlanningPageState extends State<PlanningPage> {
                       SliverPadding(
                         padding: const EdgeInsets.fromLTRB(20, 0, 20, 90),
                         sliver: SliverList(
-                          delegate: SliverChildBuilderDelegate(
-                            (context, index) {
-                              final tache = taches[index];
-                              return _buildCarteTache(tache);
-                            },
-                            childCount: taches.length,
-                          ),
+                          delegate: SliverChildBuilderDelegate((
+                            context,
+                            index,
+                          ) {
+                            final tache = taches[index];
+                            return _buildCarteTache(tache);
+                          }, childCount: taches.length),
                         ),
                       ),
                   ],
@@ -280,8 +366,16 @@ class _PlanningPageState extends State<PlanningPage> {
 
   Widget _buildCalendrier() {
     // Calculer les jours du mois affiché
-    final premierJourDuMois = DateTime(_moisAffiche.year, _moisAffiche.month, 1);
-    final dernierJourDuMois = DateTime(_moisAffiche.year, _moisAffiche.month + 1, 0);
+    final premierJourDuMois = DateTime(
+      _moisAffiche.year,
+      _moisAffiche.month,
+      1,
+    );
+    final dernierJourDuMois = DateTime(
+      _moisAffiche.year,
+      _moisAffiche.month + 1,
+      0,
+    );
 
     // Ajustement pour aligner le premier jour (1 = Lundi, 7 = Dimanche)
     final decallage = (premierJourDuMois.weekday - 1);
@@ -331,10 +425,11 @@ class _PlanningPageState extends State<PlanningPage> {
 
     for (var jour = 1; jour <= totalJours; jour++) {
       final date = DateTime(_moisAffiche.year, _moisAffiche.month, jour);
-      final estSelectionne = _dateSelectionnee.year == date.year &&
+      final estSelectionne =
+          _dateSelectionnee.year == date.year &&
           _dateSelectionnee.month == date.month &&
           _dateSelectionnee.day == date.day;
-      final aDesTaches = SourcePlanningMock.dateContientTaches(date);
+      final aDesTaches = _dateContientTaches(date);
 
       cellules.add(
         _buildCelluleJour(
@@ -492,7 +587,8 @@ class _PlanningPageState extends State<PlanningPage> {
         break;
     }
 
-    final sousTitreLieu = tache.lieu ?? '${tache.service} • ${tache.departement}';
+    final sousTitreLieu =
+        tache.lieu ?? '${tache.service} • ${tache.departement}';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),

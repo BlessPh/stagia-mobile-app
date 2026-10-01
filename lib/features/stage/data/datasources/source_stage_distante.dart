@@ -24,13 +24,11 @@ class SourceStageDistante {
         details: reponse['data'],
       );
     }
-    return _normaliserCampagnes(reponse['data']);
+    return normaliserCampagnes(reponse['data']);
   }
 
-  Future<Map<String, dynamic>> campagnes({
-    int page = 1,
-    String? recherche,
-  }) => optionsStage();
+  Future<Map<String, dynamic>> campagnes({int page = 1, String? recherche}) =>
+      optionsStage();
 
   Future<Map<String, dynamic>> opportunites(
     String campagneId, {
@@ -104,9 +102,7 @@ class SourceStageDistante {
 
   Future<Map<String, dynamic>> stages() async {
     if (ConfigurationApi.utiliserDonneesMockees) {
-      return DonneesEtudiantMockees.pourEndpoint(
-        EndpointsApi.stagesEtudiant,
-      );
+      return DonneesEtudiantMockees.pourEndpoint(EndpointsApi.stagesEtudiant);
     }
 
     final reponse = await _client.get(EndpointsApi.stagesEtudiant);
@@ -174,52 +170,68 @@ class SourceStageDistante {
 
   Future<Map<String, dynamic>> creerCandidature({
     required String campagneId,
-    String? participationId,
-    String? uniteAccueilId,
+    required String academicEnrollmentId,
+    required String participationId,
     required String motivation,
   }) {
-    final cId = int.tryParse(campagneId.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1;
-    final pId = participationId != null
-        ? (int.tryParse(participationId.replaceAll(RegExp(r'[^0-9]'), '')) ?? 101)
-        : 101;
+    final cId = int.tryParse(campagneId);
+    final academicId = int.tryParse(academicEnrollmentId);
+    final pId = int.tryParse(participationId);
+    if (cId == null || academicId == null || pId == null) {
+      throw const ErreurApi(
+        code: 'IDENTIFIANTS_STAGE_INVALIDES',
+        message:
+            'Cette option de stage ne contient pas les identifiants requis.',
+      );
+    }
     return reserver(
       campaignId: cId,
-      academicEnrollmentId: 1,
+      academicEnrollmentId: academicId,
       participationId: pId,
       motivation: motivation,
     );
   }
 
-  Future<Map<String, dynamic>> confirmerReservation(String reservationId) {
-    if (ConfigurationApi.utiliserDonneesMockees) {
-      return Future.value(
-        DonneesEtudiantMockees.pourEndpoint(EndpointsApi.paiementCheckout),
-      );
-    }
-    return _client.post(
-      EndpointsApi.paiementCheckout,
-      corps: {'reservation_uuid': reservationId},
-    );
-  }
+  Future<Map<String, dynamic>> confirmerReservation(String reservationUuid) =>
+      _client.post(EndpointsApi.confirmerReservationEtudiant(reservationUuid));
 
-  Future<Map<String, dynamic>> annulerReservation(String reservationId) =>
-      _client.post(EndpointsApi.annulerReservation(reservationId));
+  Future<Map<String, dynamic>> annulerReservation(String reservationUuid) =>
+      _client.post(EndpointsApi.annulerReservationEtudiant(reservationUuid));
 
-  static Map<String, dynamic> _normaliserCampagnes(Object? donnees) {
+  /// Construit la liste canonique consommée par l'application mobile.
+  ///
+  /// L'API sépare les campagnes où l'étudiant choisit lui-même un hôpital
+  /// (`campaigns`) de celles dont le placement est géré par l'université
+  /// (`university_managed_campaigns`). Les écrans mobiles consomment la clé
+  /// `campaigns`, qui doit donc contenir les deux collections.
+  static Map<String, dynamic> normaliserCampagnes(Object? donnees) {
     if (donnees is List) {
-      return {'campaigns': _liste(donnees)};
+      final campagnes = _liste(donnees);
+      return {
+        'campaigns': campagnes,
+        'self_reservation_campaigns': campagnes,
+        'university_managed_campaigns': <Map<String, dynamic>>[],
+      };
     }
     if (donnees is Map) {
       final map = Map<String, dynamic>.from(donnees);
-      final campagnes = map['campaigns'] ?? map['items'] ?? map['data'];
-      if (campagnes is List) {
-        return {...map, 'campaigns': _liste(campagnes)};
-      }
-      if (campagnes is Map) {
-        final imbriquees = campagnes['items'] ?? campagnes['data'];
-        if (imbriquees is List) {
-          return {...map, 'campaigns': _liste(imbriquees)};
-        }
+      final campagnesReservation = _extraireListeCampagnes(
+        map['campaigns'] ?? map['items'] ?? map['data'],
+      );
+      final campagnesUniversitaires = _extraireListeCampagnes(
+        map['university_managed_campaigns'],
+      );
+
+      if (campagnesReservation != null || campagnesUniversitaires != null) {
+        final reservations = campagnesReservation ?? <Map<String, dynamic>>[];
+        final universitaires =
+            campagnesUniversitaires ?? <Map<String, dynamic>>[];
+        return {
+          ...map,
+          'self_reservation_campaigns': reservations,
+          'university_managed_campaigns': universitaires,
+          'campaigns': _fusionnerCampagnes(reservations, universitaires),
+        };
       }
     }
     throw const ErreurApi(
@@ -231,6 +243,36 @@ class SourceStageDistante {
   static List<Map<String, dynamic>> _liste(Object? valeur) => valeur is List
       ? valeur.whereType<Map>().map(Map<String, dynamic>.from).toList()
       : <Map<String, dynamic>>[];
+
+  static List<Map<String, dynamic>>? _extraireListeCampagnes(Object? valeur) {
+    if (valeur is List) return _liste(valeur);
+    if (valeur is Map) {
+      final imbriquees = valeur['items'] ?? valeur['data'];
+      if (imbriquees is List) return _liste(imbriquees);
+    }
+    return null;
+  }
+
+  static List<Map<String, dynamic>> _fusionnerCampagnes(
+    List<Map<String, dynamic>> campagnesReservation,
+    List<Map<String, dynamic>> campagnesUniversitaires,
+  ) {
+    final resultat = <Map<String, dynamic>>[];
+    final identifiants = <String>{};
+
+    for (final campagne in [
+      ...campagnesReservation,
+      ...campagnesUniversitaires,
+    ]) {
+      final identifiant =
+          campagne['campaign_id'] ?? campagne['id'] ?? campagne['code'];
+      final cle = identifiant?.toString().trim();
+      if (cle == null || cle.isEmpty || identifiants.add(cle)) {
+        resultat.add(campagne);
+      }
+    }
+    return resultat;
+  }
 
   static Map<String, dynamic> _normaliserListe(Object? donnees) {
     if (donnees is Map) {

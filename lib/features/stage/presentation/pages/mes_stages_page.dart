@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/mocks/depot_mock_etudiant.dart';
 import '../../../../core/network/client_api_http.dart';
+import '../../../../core/network/configuration_api.dart';
 import '../../../../core/network/source_etudiant_distante.dart';
 import '../../../journal/presentation/pages/journal_page.dart';
 import '../../../messagerie/presentation/pages/messagerie_page.dart';
 import '../../../notifications/presentation/pages/notifications_page.dart';
 import '../../data/datasources/source_stage_distante.dart';
+import '../../data/mappers/mappeur_campagne_stage_api.dart';
 import '../routes/routes_stage.dart';
 import '../widgets/barre_recherche_stages.dart';
 import '../widgets/carte_candidature_moderne.dart';
@@ -36,12 +38,16 @@ class _MesStagesPageState extends State<MesStagesPage> {
   void initState() {
     super.initState();
     _chargement = _charger();
-    DepotMockEtudiant.changements.addListener(_onChangementDonnees);
+    if (ConfigurationApi.utiliserDonneesMockees) {
+      DepotMockEtudiant.changements.addListener(_onChangementDonnees);
+    }
   }
 
   @override
   void dispose() {
-    DepotMockEtudiant.changements.removeListener(_onChangementDonnees);
+    if (ConfigurationApi.utiliserDonneesMockees) {
+      DepotMockEtudiant.changements.removeListener(_onChangementDonnees);
+    }
     _rechercheController.dispose();
     super.dispose();
   }
@@ -55,10 +61,10 @@ class _MesStagesPageState extends State<MesStagesPage> {
   }
 
   Future<List<Map<String, dynamic>>> _charger() => Future.wait([
-        _sourceEtudiant.stages(),
-        _sourceStages.campagnes(),
-        _sourceEtudiant.candidatures(),
-      ]);
+    _sourceEtudiant.stages(),
+    _sourceStages.campagnes(),
+    _sourceEtudiant.candidatures(),
+  ]);
 
   Future<void> _actualiser() async {
     final futur = _charger();
@@ -103,19 +109,32 @@ class _MesStagesPageState extends State<MesStagesPage> {
                   final donneesStages = snapshot.data?.isNotEmpty == true
                       ? snapshot.data![0]
                       : const <String, dynamic>{};
-                  final donneesCampagnes = snapshot.data != null && snapshot.data!.length > 1
+                  final donneesCampagnes =
+                      snapshot.data != null && snapshot.data!.length > 1
                       ? snapshot.data![1]
                       : const <String, dynamic>{};
-                  final donneesCandidatures = snapshot.data != null && snapshot.data!.length > 2
+                  final donneesCandidatures =
+                      snapshot.data != null && snapshot.data!.length > 2
                       ? snapshot.data![2]
                       : const <String, dynamic>{};
 
-                  final stagesListe = (donneesStages['items'] as List?)
+                  final stagesListe =
+                      (donneesStages['items'] as List?)
                           ?.whereType<Map>()
                           .map(Map<String, dynamic>.from)
                           .toList() ??
                       [];
-                  final stageActif = stagesListe.isNotEmpty ? stagesListe.first : null;
+                  Map<String, dynamic>? stageActif;
+                  for (final stage in stagesListe) {
+                    final statut =
+                        (stage['assignment_status'] ?? stage['statut'])
+                            ?.toString()
+                            .toUpperCase();
+                    if (statut == 'ACTIVE' || statut == 'EN_COURS') {
+                      stageActif = stage;
+                      break;
+                    }
+                  }
 
                   return RefreshIndicator(
                     color: const Color(0xFF1D61F2),
@@ -159,9 +178,7 @@ class _MesStagesPageState extends State<MesStagesPage> {
             IconButton(
               tooltip: 'Messages',
               onPressed: () => Navigator.of(context, rootNavigator: true).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const MessageriePage(),
-                ),
+                MaterialPageRoute<void>(builder: (_) => const MessageriePage()),
               ),
               icon: const Icon(
                 CupertinoIcons.chat_bubble_2,
@@ -169,28 +186,32 @@ class _MesStagesPageState extends State<MesStagesPage> {
                 size: 24,
               ),
             ),
-            Positioned(
-              top: 8,
-              right: 6,
-              child: Container(
-                padding: const EdgeInsets.all(3),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFEF4444),
-                  shape: BoxShape.circle,
-                ),
-                constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                child: const Text(
-                  '3',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.w800,
-                    height: 1,
+            if (ConfigurationApi.utiliserDonneesMockees)
+              Positioned(
+                top: 8,
+                right: 6,
+                child: Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFEF4444),
+                    shape: BoxShape.circle,
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 16,
+                    minHeight: 16,
+                  ),
+                  child: const Text(
+                    '3',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w800,
+                      height: 1,
+                    ),
                   ),
                 ),
               ),
-            ),
           ],
         ),
         const SizedBox(width: 4),
@@ -212,28 +233,32 @@ class _MesStagesPageState extends State<MesStagesPage> {
                 size: 25,
               ),
             ),
-            Positioned(
-              top: 8,
-              right: 6,
-              child: Container(
-                padding: const EdgeInsets.all(3),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFEF4444),
-                  shape: BoxShape.circle,
-                ),
-                constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                child: const Text(
-                  '5',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.w800,
-                    height: 1,
+            if (ConfigurationApi.utiliserDonneesMockees)
+              Positioned(
+                top: 8,
+                right: 6,
+                child: Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFEF4444),
+                    shape: BoxShape.circle,
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 16,
+                    minHeight: 16,
+                  ),
+                  child: const Text(
+                    '5',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w800,
+                      height: 1,
+                    ),
                   ),
                 ),
               ),
-            ),
           ],
         ),
         const SizedBox(width: 8),
@@ -245,13 +270,48 @@ class _MesStagesPageState extends State<MesStagesPage> {
   // ONGLET 1 : EN COURS (Fidèle à l'Image 2)
   // ==========================================
   Widget _buildOngletEnCours(Map<String, dynamic>? stage) {
-    final entreprise = stage?['hospital_name']?.toString() ?? 'TechVision Labs';
-    final role = stage?['unit_name']?.toString() ?? 'Développeur Full Stack — Stage';
-    final superviseur = (stage?['rotations'] as List?)?.isNotEmpty == true
-        ? (stage!['rotations'][0]['supervisor_name']?.toString() ?? 'Dr. Marie Dupont')
-        : 'Dr. Marie Dupont';
-    final ville = stage?['ville']?.toString() ?? 'Kinshasa, RDC';
-    final departement = stage?['unit_name']?.toString() ?? 'Ingénierie Logicielle';
+    if (stage == null) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(32),
+        children: [
+          Center(
+            child: Text(
+              "Vous n'avez aucun stage en cours.",
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(color: const Color(0xFF64748B)),
+            ),
+          ),
+        ],
+      );
+    }
+
+    final entreprise = stage['hospital_name']?.toString() ?? 'Non renseigné';
+    final role = stage['unit_name']?.toString() ?? '';
+    final superviseur = (stage['rotations'] as List?)?.isNotEmpty == true
+        ? (stage['rotations'][0]['supervisor_name']?.toString() ??
+              'Non renseigné')
+        : 'Non renseigné';
+    final ville = stage['ville']?.toString() ?? 'Non renseigné';
+    final departement = stage['unit_name']?.toString() ?? 'Non renseigné';
+    final initiales = entreprise
+        .split(RegExp(r'\s+'))
+        .where((mot) => mot.isNotEmpty)
+        .take(2)
+        .map((mot) => mot[0].toUpperCase())
+        .join();
+    final dateDebut = DateTime.tryParse(stage['date_debut']?.toString() ?? '');
+    final dateFin = DateTime.tryParse(stage['date_fin']?.toString() ?? '');
+    final totalJours = dateDebut != null && dateFin != null
+        ? dateFin.difference(dateDebut).inDays.abs() + 1
+        : 0;
+    final joursEffectues = dateDebut != null
+        ? DateTime.now().difference(dateDebut).inDays.clamp(0, totalJours)
+        : 0;
+    final progression = totalJours > 0 ? joursEffectues / totalJours : 0.0;
+    final periode = dateDebut != null && dateFin != null
+        ? '${_formaterDateStage(dateDebut)} — ${_formaterDateStage(dateFin)}'
+        : 'Non renseignée';
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -289,7 +349,7 @@ class _MesStagesPageState extends State<MesStagesPage> {
                     ),
                     alignment: Alignment.center,
                     child: Text(
-                      'TV',
+                      initiales.isEmpty ? '?' : initiales,
                       style: GoogleFonts.inter(
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
@@ -323,7 +383,10 @@ class _MesStagesPageState extends State<MesStagesPage> {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4.5,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFDCFCE7),
                       borderRadius: BorderRadius.circular(6),
@@ -355,7 +418,7 @@ class _MesStagesPageState extends State<MesStagesPage> {
                     ),
                   ),
                   Text(
-                    '3 mois / 6 mois',
+                    '$joursEffectues jours / $totalJours jours',
                     style: GoogleFonts.inter(
                       fontSize: 13,
                       fontWeight: FontWeight.w800,
@@ -369,18 +432,20 @@ class _MesStagesPageState extends State<MesStagesPage> {
               // Barre de progression
               ClipRRect(
                 borderRadius: BorderRadius.circular(6),
-                child: const LinearProgressIndicator(
-                  value: 0.5,
+                child: LinearProgressIndicator(
+                  value: progression,
                   minHeight: 7,
-                  backgroundColor: Color(0xFFE2E8F0),
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF1D61F2)),
+                  backgroundColor: const Color(0xFFE2E8F0),
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                    Color(0xFF1D61F2),
+                  ),
                 ),
               ),
 
               const SizedBox(height: 6),
 
               Text(
-                '50% du stage effectué',
+                '${(progression * 100).round()}% du stage effectué',
                 style: GoogleFonts.inter(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
@@ -410,7 +475,7 @@ class _MesStagesPageState extends State<MesStagesPage> {
                     ),
                   ),
                   Text(
-                    'Mars 2026 — Août 2026',
+                    periode,
                     style: GoogleFonts.inter(
                       fontSize: 13.5,
                       fontWeight: FontWeight.w700,
@@ -430,7 +495,10 @@ class _MesStagesPageState extends State<MesStagesPage> {
           children: [
             Expanded(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
@@ -463,7 +531,10 @@ class _MesStagesPageState extends State<MesStagesPage> {
             const SizedBox(width: 12),
             Expanded(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
@@ -566,7 +637,9 @@ class _MesStagesPageState extends State<MesStagesPage> {
                 titre: 'Rapport',
                 onTap: () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Module Rapports disponible prochainement')),
+                    const SnackBar(
+                      content: Text('Module Rapports disponible prochainement'),
+                    ),
                   );
                 },
               ),
@@ -579,7 +652,11 @@ class _MesStagesPageState extends State<MesStagesPage> {
                 titre: 'Évaluations',
                 onTap: () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Module Évaluations disponible prochainement')),
+                    const SnackBar(
+                      content: Text(
+                        'Module Évaluations disponible prochainement',
+                      ),
+                    ),
                   );
                 },
               ),
@@ -589,66 +666,85 @@ class _MesStagesPageState extends State<MesStagesPage> {
 
         const SizedBox(height: 14),
 
-        // Carte Alerte Rapport mi-parcours
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFF7ED),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFFFFEDD5)),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF97316),
-                  shape: BoxShape.circle,
+        // Carte Alerte Rapport mi-parcours (information encore mockée)
+        if (ConfigurationApi.utiliserDonneesMockees)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF7ED),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFFFEDD5)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF97316),
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: const Icon(
+                    CupertinoIcons.time,
+                    color: Colors.white,
+                    size: 22,
+                  ),
                 ),
-                alignment: Alignment.center,
-                child: const Icon(
-                  CupertinoIcons.time,
-                  color: Colors.white,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Rapport mi-parcours',
-                      style: GoogleFonts.inter(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w800,
-                        color: const Color(0xFF0F172A),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Rapport mi-parcours',
+                        style: GoogleFonts.inter(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF0F172A),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Rendu attendu dans 12 jours',
-                      style: GoogleFonts.inter(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w500,
-                        color: const Color(0xFF64748B),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Rendu attendu dans 12 jours',
+                        style: GoogleFonts.inter(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF64748B),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const Icon(
-                CupertinoIcons.chevron_right,
-                color: Color(0xFF94A3B8),
-                size: 18,
-              ),
-            ],
+                const Icon(
+                  CupertinoIcons.chevron_right,
+                  color: Color(0xFF94A3B8),
+                  size: 18,
+                ),
+              ],
+            ),
           ),
-        ),
       ],
     );
+  }
+
+  String _formaterDateStage(DateTime date) {
+    const mois = [
+      'janv.',
+      'févr.',
+      'mars',
+      'avr.',
+      'mai',
+      'juin',
+      'juil.',
+      'août',
+      'sept.',
+      'oct.',
+      'nov.',
+      'déc.',
+    ];
+    return '${date.day} ${mois[date.month - 1]} ${date.year}';
   }
 
   Widget _buildCarteOutilSuivi({
@@ -694,74 +790,147 @@ class _MesStagesPageState extends State<MesStagesPage> {
   // ONGLET 2 : EXPLORER (Fidèle à l'Image 3)
   // ==========================================
   Widget _buildOngletExplorer(Map<String, dynamic> campagnesData) {
-    // Opportunités de stages basées sur la maquette et les campagnes
-    final listeStagesExplorer = [
-      {
-        'initiale': 'V',
-        'bg': const Color(0xFFE0F2FE),
-        'textColor': const Color(0xFF0284C7),
-        'entreprise': 'Vodacom RDC',
-        'ville': 'Lubumbashi',
-        'titre': 'Stage en Analyse de Données',
-        'domaine': 'Data Science',
-        'duree': '3 mois',
-        'dateLimite': '15 Oct 2026',
-        'categorie': 'Informatique',
-      },
-      {
-        'initiale': 'R',
-        'bg': const Color(0xFFF3E8FF),
-        'textColor': const Color(0xFF7E22CE),
-        'entreprise': 'Rawbank',
-        'ville': 'Kinshasa',
-        'titre': 'Stage en Développement Mobile',
-        'domaine': 'Dév Mobile',
-        'duree': '6 mois',
-        'dateLimite': '30 Oct 2026',
-        'categorie': 'Informatique',
-      },
-      {
-        'initiale': 'G',
-        'bg': const Color(0xFFFFE4E6),
-        'textColor': const Color(0xFFE11D48),
-        'entreprise': 'Glencore Kamoto',
-        'ville': 'Kolwezi',
-        'titre': 'Stage en Ingénierie Réseau',
-        'domaine': 'Réseaux',
-        'duree': '4 mois',
-        'dateLimite': '20 Nov 2026',
-        'categorie': 'Informatique',
-      },
-      {
-        'initiale': 'C',
-        'bg': const Color(0xFFDCFCE7),
-        'textColor': const Color(0xFF16A34A),
-        'entreprise': 'Cliniques Universitaires',
-        'ville': 'Kinshasa',
-        'titre': 'Stage Clinique en Chirurgie',
-        'domaine': 'Santé',
-        'duree': '3 mois',
-        'dateLimite': '01 Nov 2026',
-        'categorie': 'Santé',
-      },
-      {
-        'initiale': 'E',
-        'bg': const Color(0xFFE0E7FF),
-        'textColor': const Color(0xFF4338CA),
-        'entreprise': 'Equity BCDC',
-        'ville': 'Kinshasa',
-        'titre': 'Stage en Analyse Financière',
-        'domaine': 'Finance',
-        'duree': '6 mois',
-        'dateLimite': '15 Nov 2026',
-        'categorie': 'Finance',
-      },
-    ];
+    final campaignsApi =
+        (campagnesData['campaigns'] as List?)
+            ?.whereType<Map>()
+            .map(Map<String, dynamic>.from)
+            .toList() ??
+        [];
+
+    if (campaignsApi.isEmpty && !ConfigurationApi.utiliserDonneesMockees) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(32),
+        children: [
+          Center(
+            child: Text(
+              'Aucune campagne de stage disponible.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(color: const Color(0xFF64748B)),
+            ),
+          ),
+        ],
+      );
+    }
+
+    final List<Map<String, dynamic>> listeStagesExplorer =
+        campaignsApi.isNotEmpty
+        ? campaignsApi.map((c) {
+            final titre = c['title']?.toString() ?? '';
+            final programme = c['program']?.toString() ?? '';
+            final stageType = c['stage_type'] is Map
+                ? Map<String, dynamic>.from(c['stage_type'] as Map)
+                : const <String, dynamic>{};
+            final dateFin = c['end_date']?.toString() ?? '';
+            final hopitaux =
+                (c['hospitals'] as List?)?.whereType<Map>().toList() ?? [];
+            final mode = c['mode'] is Map
+                ? Map<String, dynamic>.from(c['mode'] as Map)
+                : const <String, dynamic>{};
+            final autoriseReservationAutonome =
+                mode['self_reservation_allowed'] != false;
+            final nbPlaces =
+                c['available_places']?.toString() ??
+                (hopitaux.isNotEmpty ? '${hopitaux.length} hôpitaux' : '');
+            final premierHopital = hopitaux.isNotEmpty
+                ? (hopitaux.first['hospital'] is Map
+                      ? hopitaux.first['hospital']['name']?.toString()
+                      : null)
+                : null;
+            final entreprise = premierHopital ?? '';
+            final ville =
+                hopitaux.isNotEmpty && hopitaux.first['hospital'] is Map
+                ? (hopitaux.first['hospital']['city']?.toString() ?? '')
+                : '';
+
+            return {
+              'initiale': entreprise.isNotEmpty
+                  ? entreprise[0].toUpperCase()
+                  : '?',
+              'bg': const Color(0xFFDCFCE7),
+              'textColor': const Color(0xFF16A34A),
+              'entreprise': entreprise,
+              'ville': ville,
+              'titre': titre,
+              'domaine': programme,
+              'duree': nbPlaces,
+              'dateLimite': dateFin,
+              'categorie': stageType['label']?.toString() ?? programme,
+              'libelleAction': autoriseReservationAutonome
+                  ? 'Postuler'
+                  : 'Voir détails',
+              'campagneJson': c,
+            };
+          }).toList()
+        : [
+            {
+              'initiale': 'V',
+              'bg': const Color(0xFFE0F2FE),
+              'textColor': const Color(0xFF0284C7),
+              'entreprise': 'Vodacom RDC',
+              'ville': 'Lubumbashi',
+              'titre': 'Stage en Analyse de Données',
+              'domaine': 'Data Science',
+              'duree': '3 mois',
+              'dateLimite': '15 Oct 2026',
+              'categorie': 'Informatique',
+            },
+            {
+              'initiale': 'R',
+              'bg': const Color(0xFFF3E8FF),
+              'textColor': const Color(0xFF7E22CE),
+              'entreprise': 'Rawbank',
+              'ville': 'Kinshasa',
+              'titre': 'Stage en Développement Mobile',
+              'domaine': 'Dév Mobile',
+              'duree': '6 mois',
+              'dateLimite': '30 Oct 2026',
+              'categorie': 'Informatique',
+            },
+            {
+              'initiale': 'G',
+              'bg': const Color(0xFFFFE4E6),
+              'textColor': const Color(0xFFE11D48),
+              'entreprise': 'Glencore Kamoto',
+              'ville': 'Kolwezi',
+              'titre': 'Stage en Ingénierie Réseau',
+              'domaine': 'Réseaux',
+              'duree': '4 mois',
+              'dateLimite': '20 Nov 2026',
+              'categorie': 'Informatique',
+            },
+            {
+              'initiale': 'C',
+              'bg': const Color(0xFFDCFCE7),
+              'textColor': const Color(0xFF16A34A),
+              'entreprise': 'Cliniques Universitaires',
+              'ville': 'Kinshasa',
+              'titre': 'Stage Clinique en Chirurgie',
+              'domaine': 'Santé',
+              'duree': '3 mois',
+              'dateLimite': '01 Nov 2026',
+              'categorie': 'Santé',
+            },
+            {
+              'initiale': 'E',
+              'bg': const Color(0xFFE0E7FF),
+              'textColor': const Color(0xFF4338CA),
+              'entreprise': 'Equity BCDC',
+              'ville': 'Kinshasa',
+              'titre': 'Stage en Analyse Financière',
+              'domaine': 'Finance',
+              'duree': '6 mois',
+              'dateLimite': '15 Nov 2026',
+              'categorie': 'Finance',
+            },
+          ];
 
     final query = _rechercheController.text.trim().toLowerCase();
     final filtres = listeStagesExplorer.where((item) {
-      final matchFiltre = _filtreCategorie == 'Tous' || item['categorie'] == _filtreCategorie;
-      final matchRecherche = query.isEmpty ||
+      final matchFiltre =
+          _filtreCategorie == 'Tous' || item['categorie'] == _filtreCategorie;
+      final matchRecherche =
+          query.isEmpty ||
           (item['entreprise'] as String).toLowerCase().contains(query) ||
           (item['titre'] as String).toLowerCase().contains(query) ||
           (item['ville'] as String).toLowerCase().contains(query);
@@ -777,13 +946,25 @@ class _MesStagesPageState extends State<MesStagesPage> {
           scrollDirection: Axis.horizontal,
           child: Row(
             children: [
-              _buildFiltreChip(titre: 'Tous', actif: _filtreCategorie == 'Tous'),
+              _buildFiltreChip(
+                titre: 'Tous',
+                actif: _filtreCategorie == 'Tous',
+              ),
               const SizedBox(width: 8),
-              _buildFiltreChip(titre: 'Informatique', actif: _filtreCategorie == 'Informatique'),
+              _buildFiltreChip(
+                titre: 'Informatique',
+                actif: _filtreCategorie == 'Informatique',
+              ),
               const SizedBox(width: 8),
-              _buildFiltreChip(titre: 'Finance', actif: _filtreCategorie == 'Finance'),
+              _buildFiltreChip(
+                titre: 'Finance',
+                actif: _filtreCategorie == 'Finance',
+              ),
               const SizedBox(width: 8),
-              _buildFiltreChip(titre: 'Santé', actif: _filtreCategorie == 'Santé'),
+              _buildFiltreChip(
+                titre: 'Santé',
+                actif: _filtreCategorie == 'Santé',
+              ),
               const SizedBox(width: 8),
               // Bouton sliders / réglages
               Container(
@@ -832,8 +1013,16 @@ class _MesStagesPageState extends State<MesStagesPage> {
                 domaineTag: item['domaine'] as String,
                 dureeTag: item['duree'] as String,
                 dateLimite: item['dateLimite'] as String,
+                libelleAction: item['libelleAction']?.toString() ?? 'Postuler',
                 onPostuler: () {
-                  Navigator.of(context).pushNamed(RoutesStage.detailCampagne);
+                  final jsonCampagne = item['campagneJson'];
+                  final campagneObj = jsonCampagne is Map<String, dynamic>
+                      ? MappeurCampagneStageApi.depuisJson(jsonCampagne)
+                      : null;
+                  Navigator.of(context).pushNamed(
+                    RoutesStage.detailCampagne,
+                    arguments: campagneObj,
+                  );
                 },
               ),
             ),
@@ -869,58 +1058,140 @@ class _MesStagesPageState extends State<MesStagesPage> {
   // ONGLET 3 : CANDIDATURES (Fidèle à l'Image 4)
   // ==========================================
   Widget _buildOngletCandidatures(Map<String, dynamic> candidaturesData) {
-    final candidaturesListes = [
-      {
-        'initiale': 'V',
-        'bg': const Color(0xFFE0F2FE),
-        'textColor': const Color(0xFF0284C7),
-        'entreprise': 'Vodacom RDC',
-        'titre': 'Analyse de Données',
-        'dateTexte': 'Postulé le 2 Sept 2026',
-        'statutType': StatutCandidatureType.enAttente,
-      },
-      {
-        'initiale': 'E',
-        'bg': const Color(0xFFE0F2FE),
-        'textColor': const Color(0xFF0284C7),
-        'entreprise': 'Equity BCDC',
-        'titre': 'Stage en Finance',
-        'dateTexte': 'Le 25 Sept 2026',
-        'statutType': StatutCandidatureType.entretien,
-      },
-      {
-        'initiale': 'O',
-        'bg': const Color(0xFFFFE4E6),
-        'textColor': const Color(0xFFE11D48),
-        'entreprise': 'Orange RDC',
-        'titre': 'Marketing Digital',
-        'dateTexte': 'Postulé le 15 Août 2026',
-        'statutType': StatutCandidatureType.refusee,
-      },
-      {
-        'initiale': 'R',
-        'bg': const Color(0xFFF3E8FF),
-        'textColor': const Color(0xFF7E22CE),
-        'entreprise': 'Rawbank',
-        'titre': 'Développement Mobile',
-        'dateTexte': 'Postulé le 10 Août 2026',
-        'statutType': StatutCandidatureType.acceptee,
-      },
-    ];
+    final itemsRaw =
+        (candidaturesData['items'] as List?)
+            ?.whereType<Map>()
+            .map(Map<String, dynamic>.from)
+            .toList() ??
+        [];
+
+    if (itemsRaw.isEmpty && !ConfigurationApi.utiliserDonneesMockees) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(32),
+        children: [
+          Center(
+            child: Text(
+              "Vous n'avez aucune candidature.",
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(color: const Color(0xFF64748B)),
+            ),
+          ),
+        ],
+      );
+    }
+
+    final List<Map<String, dynamic>> candidaturesListes = itemsRaw.isNotEmpty
+        ? itemsRaw.map((item) {
+            final workflowStatus =
+                item['workflow_status']?.toString().toUpperCase() ??
+                item['statut']?.toString().toUpperCase() ??
+                '';
+            final nomHopital =
+                item['hospital_name']?.toString() ??
+                item['entreprise']?.toString() ??
+                '';
+            final titreCampagne =
+                item['campaign_title']?.toString() ??
+                item['titre']?.toString() ??
+                '';
+            final dateSoumission =
+                item['submitted_at']?.toString() ??
+                item['date']?.toString() ??
+                '';
+
+            final (statutType, label) = switch (workflowStatus) {
+              'DECISION_UNIVERSITAIRE_EN_ATTENTE' ||
+              'SOUMISE' ||
+              'EN_ATTENTE' => (
+                StatutCandidatureType.enAttente,
+                'Décision en attente',
+              ),
+              'EN_ATTENTE_PAIEMENT' => (
+                StatutCandidatureType.paiementRequis,
+                'Paiement requis',
+              ),
+              'ACCEPTEE' ||
+              'CONFIRMEE' ||
+              'PLACEMENT_UNIVERSITAIRE_EN_ATTENTE' => (
+                StatutCandidatureType.acceptee,
+                'Acceptée',
+              ),
+              'ADMISSION_HOSPITALIERE_EN_ATTENTE' || 'AFFECTATION_EN_ATTENTE' =>
+                (StatutCandidatureType.confirme, 'Placement confirmé'),
+              'STAGE_EN_COURS' || 'STAGE_PLANIFIE' => (
+                StatutCandidatureType.admis,
+                'Admis en stage',
+              ),
+              'CANDIDATURE_REFUSEE' ||
+              'REFUSEE' => (StatutCandidatureType.refusee, 'Refusée'),
+              'RESERVATION_EXPIREE' => (
+                StatutCandidatureType.refusee,
+                'Expirée',
+              ),
+              'ANNULEE' => (StatutCandidatureType.refusee, 'Annulée'),
+              _ => (StatutCandidatureType.enAttente, workflowStatus),
+            };
+
+            final initiale = nomHopital.isNotEmpty
+                ? nomHopital[0].toUpperCase()
+                : '?';
+            return {
+              'initiale': initiale,
+              'bg': const Color(0xFFE0F2FE),
+              'textColor': const Color(0xFF0284C7),
+              'entreprise': nomHopital,
+              'titre': titreCampagne,
+              'dateTexte': dateSoumission.isEmpty
+                  ? ''
+                  : 'Soumis le $dateSoumission',
+              'statutType': statutType,
+              'statutLabel': label,
+            };
+          }).toList()
+        : [
+            {
+              'initiale': 'H',
+              'bg': const Color(0xFFE0F2FE),
+              'textColor': const Color(0xFF0284C7),
+              'entreprise': 'Hôpital Général de Référence',
+              'titre': 'Stage médical D4',
+              'dateTexte': 'Soumis le 26 Sept 2026',
+              'statutType': StatutCandidatureType.enAttente,
+              'statutLabel': 'Décision en attente',
+            },
+          ];
 
     final query = _rechercheController.text.trim().toLowerCase();
     final filtrer = candidaturesListes.where((c) {
       final statut = c['statutType'] as StatutCandidatureType;
       final matchStatut = switch (_filtreCandidature) {
         'En attente' => statut == StatutCandidatureType.enAttente,
-        'Acceptée' => statut == StatutCandidatureType.acceptee,
+        'Acceptée' =>
+          statut == StatutCandidatureType.acceptee ||
+              statut == StatutCandidatureType.confirme ||
+              statut == StatutCandidatureType.admis,
         _ => true,
       };
-      final matchRecherche = query.isEmpty ||
+      final matchRecherche =
+          query.isEmpty ||
           (c['entreprise'] as String).toLowerCase().contains(query) ||
           (c['titre'] as String).toLowerCase().contains(query);
       return matchStatut && matchRecherche;
     }).toList();
+
+    final nbTotal = candidaturesListes.length;
+    final nbAcceptees = candidaturesListes
+        .where(
+          (c) =>
+              c['statutType'] == StatutCandidatureType.acceptee ||
+              c['statutType'] == StatutCandidatureType.confirme ||
+              c['statutType'] == StatutCandidatureType.admis,
+        )
+        .length;
+    final nbEnAttente = candidaturesListes
+        .where((c) => c['statutType'] == StatutCandidatureType.enAttente)
+        .length;
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -939,7 +1210,7 @@ class _MesStagesPageState extends State<MesStagesPage> {
             TextSpan(
               children: [
                 TextSpan(
-                  text: '4 candidatures ',
+                  text: '$nbTotal candidature${nbTotal > 1 ? 's' : ''} ',
                   style: GoogleFonts.inter(
                     fontWeight: FontWeight.w600,
                     color: const Color(0xFF64748B),
@@ -951,7 +1222,7 @@ class _MesStagesPageState extends State<MesStagesPage> {
                   style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 13),
                 ),
                 TextSpan(
-                  text: '1 acceptée ',
+                  text: '$nbAcceptees acceptée${nbAcceptees > 1 ? 's' : ''} ',
                   style: GoogleFonts.inter(
                     fontWeight: FontWeight.w700,
                     color: const Color(0xFF16A34A),
@@ -963,7 +1234,7 @@ class _MesStagesPageState extends State<MesStagesPage> {
                   style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 13),
                 ),
                 TextSpan(
-                  text: '1 entretien',
+                  text: '$nbEnAttente en attente',
                   style: GoogleFonts.inter(
                     fontWeight: FontWeight.w700,
                     color: const Color(0xFF2563EB),
@@ -991,23 +1262,34 @@ class _MesStagesPageState extends State<MesStagesPage> {
         const SizedBox(height: 16),
 
         // Liste des cartes de candidatures
-        for (final item in filtrer)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: CarteCandidatureModerne(
-              initiale: item['initiale'] as String,
-              couleurFondInitiale: item['bg'] as Color,
-              couleurTexteInitiale: item['textColor'] as Color,
-              nomEntreprise: item['entreprise'] as String,
-              titrePoste: item['titre'] as String,
-              dateTexte: item['dateTexte'] as String,
-              statutType: item['statutType'] as StatutCandidatureType,
-              onTap: () {
-                // Navigation vers détail de candidature ou parcours
-                Navigator.of(context).pushNamed(RoutesStage.candidatures);
-              },
+        if (filtrer.isEmpty)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32.0),
+              child: Text(
+                'Aucune candidature ne correspond à vos filtres.',
+                style: GoogleFonts.inter(color: const Color(0xFF64748B)),
+              ),
             ),
-          ),
+          )
+        else
+          for (final item in filtrer)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: CarteCandidatureModerne(
+                initiale: item['initiale'] as String,
+                couleurFondInitiale: item['bg'] as Color,
+                couleurTexteInitiale: item['textColor'] as Color,
+                nomEntreprise: item['entreprise'] as String,
+                titrePoste: item['titre'] as String,
+                dateTexte: item['dateTexte'] as String,
+                statutType: item['statutType'] as StatutCandidatureType,
+                libelleStatutCustom: item['statutLabel'] as String?,
+                onTap: () {
+                  Navigator.of(context).pushNamed(RoutesStage.candidatures);
+                },
+              ),
+            ),
       ],
     );
   }

@@ -1,0 +1,745 @@
+{
+  "openapi": "3.1.0",
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "info": {
+    "title": "STAGIA - API mobile de communication et notifications",
+    "version": "1.0.0",
+    "description": "Contrat de la tâche 8 pour l'étudiant : notifications actionnables, temps réel SSE, appareils push, préférences, messagerie, communications officielles et calendrier. Toutes les routes exigent un Bearer token étudiant."
+  },
+  "servers": [
+    { "url": "http://localhost/stagia/api/v1", "description": "Wamp local" },
+    { "url": "http://{host}/stagia/api/v1", "variables": { "host": { "default": "192.168.1.20" } } }
+  ],
+  "security": [{ "bearerAuth": [] }],
+  "tags": [
+    { "name": "Notifications" },
+    { "name": "Temps réel" },
+    { "name": "Appareils push" },
+    { "name": "Préférences" },
+    { "name": "Contacts" },
+    { "name": "Conversations" },
+    { "name": "Communications officielles" },
+    { "name": "Calendrier" }
+  ],
+  "paths": {
+    "/student/communication/contacts": {
+      "get": {
+        "tags": ["Contacts"],
+        "operationId": "getStudentCommunicationContacts",
+        "summary": "Lister les destinataires que l'étudiant est autorisé à contacter",
+        "responses": {
+          "200": { "$ref": "#/components/responses/Contacts" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/student/notifications": {
+      "get": {
+        "tags": ["Notifications"],
+        "operationId": "getStudentNotifications",
+        "summary": "Lister les notifications privées actionnables",
+        "parameters": [
+          { "$ref": "#/components/parameters/Limit" },
+          { "name": "before_id", "in": "query", "description": "Valeur next_before_id du lot précédent.", "schema": { "type": "integer", "minimum": 1 } },
+          { "name": "unread", "in": "query", "schema": { "type": "boolean", "default": false } },
+          { "name": "type", "in": "query", "description": "Type d'événement serveur exact.", "schema": { "type": "string", "maxLength": 100 } }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/Notifications" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/student/notifications/counts": {
+      "get": {
+        "tags": ["Notifications"],
+        "operationId": "getStudentNotificationCounts",
+        "summary": "Obtenir les compteurs de notifications et messages non lus",
+        "responses": {
+          "200": { "$ref": "#/components/responses/NotificationCounts" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/student/notifications/{uuid}/read": {
+      "post": {
+        "tags": ["Notifications"],
+        "operationId": "readStudentNotification",
+        "summary": "Marquer une notification comme lue",
+        "parameters": [{ "$ref": "#/components/parameters/UlidPath" }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/NotificationMutation" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" }
+        }
+      }
+    },
+    "/student/notifications/{uuid}/archive": {
+      "post": {
+        "tags": ["Notifications"],
+        "operationId": "archiveStudentNotification",
+        "summary": "Archiver une notification",
+        "parameters": [{ "$ref": "#/components/parameters/UlidPath" }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/NotificationMutation" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" }
+        }
+      }
+    },
+    "/student/notifications/stream": {
+      "get": {
+        "tags": ["Temps réel"],
+        "operationId": "streamStudentNotifications",
+        "summary": "Ouvrir le flux SSE étudiant",
+        "description": "Connexion d'environ 25 secondes. Reconnexion recommandée après 3 secondes. Les événements possibles sont ready, notification, message, communication, calendar, counts et error.",
+        "parameters": [
+          { "name": "Last-Event-ID", "in": "header", "schema": { "$ref": "#/components/schemas/RealtimeCursor" } },
+          { "name": "cursor", "in": "query", "description": "Alternative à Last-Event-ID.", "schema": { "$ref": "#/components/schemas/RealtimeCursor" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Flux Server-Sent Events.",
+            "headers": { "X-Accel-Buffering": { "schema": { "type": "string", "const": "no" } } },
+            "content": {
+              "text/event-stream": {
+                "schema": { "type": "string" },
+                "example": "retry: 3000\n\nid: 184.926.51.73\nevent: notification\ndata: {\"id\":\"01JQ0G8K9M5H2T7B4P6S3N1R8C\",\"type\":\"message\",\"action\":{\"type\":\"conversation\",\"target_id\":\"01JQ0CONVERSATIONUUID000001\"}}\n\n"
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" }
+        }
+      }
+    },
+    "/student/notifications/preferences": {
+      "get": {
+        "tags": ["Préférences"],
+        "operationId": "getStudentNotificationPreferences",
+        "summary": "Consulter les préférences externes",
+        "responses": {
+          "200": { "$ref": "#/components/responses/Preferences" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      },
+      "patch": {
+        "tags": ["Préférences"],
+        "operationId": "patchStudentNotificationPreferences",
+        "summary": "Modifier une préférence globale ou par événement",
+        "requestBody": { "$ref": "#/components/requestBodies/PreferenceUpdate" },
+        "responses": {
+          "200": { "$ref": "#/components/responses/PreferenceUpdated" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "422": { "$ref": "#/components/responses/ValidationError" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      },
+      "put": {
+        "tags": ["Préférences"],
+        "operationId": "putStudentNotificationPreferences",
+        "summary": "Remplacer les canaux d'une préférence",
+        "requestBody": { "$ref": "#/components/requestBodies/PreferenceUpdate" },
+        "responses": {
+          "200": { "$ref": "#/components/responses/PreferenceUpdated" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "422": { "$ref": "#/components/responses/ValidationError" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/student/notifications/devices": {
+      "get": {
+        "tags": ["Appareils push"],
+        "operationId": "getStudentNotificationDevices",
+        "summary": "Lister les appareils du compte sans exposer leurs jetons",
+        "responses": {
+          "200": { "$ref": "#/components/responses/Devices" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      },
+      "post": {
+        "tags": ["Appareils push"],
+        "operationId": "registerStudentNotificationDevice",
+        "summary": "Enregistrer ou réactiver un jeton push",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DeviceRegistrationRequest" } } }
+        },
+        "responses": {
+          "201": { "$ref": "#/components/responses/DeviceRegistered" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "422": { "$ref": "#/components/responses/ValidationError" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/student/notifications/devices/{uuid}": {
+      "delete": {
+        "tags": ["Appareils push"],
+        "operationId": "disableStudentNotificationDevice",
+        "summary": "Désactiver un appareil push",
+        "parameters": [{ "$ref": "#/components/parameters/UlidPath" }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/SimpleSuccess" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" }
+        }
+      }
+    },
+    "/student/conversations": {
+      "get": {
+        "tags": ["Conversations"],
+        "operationId": "getStudentConversations",
+        "summary": "Lister les conversations privées et de groupe",
+        "parameters": [{ "$ref": "#/components/parameters/Limit" }, { "$ref": "#/components/parameters/Offset" }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/Conversations" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      },
+      "post": {
+        "tags": ["Conversations"],
+        "operationId": "createStudentConversation",
+        "summary": "Créer une conversation avec des destinataires autorisés",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ConversationCreateRequest" } } }
+        },
+        "responses": {
+          "201": { "$ref": "#/components/responses/ConversationCreated" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "422": { "$ref": "#/components/responses/ValidationError" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/student/conversations/{uuid}/messages": {
+      "get": {
+        "tags": ["Conversations"],
+        "operationId": "getStudentConversationMessages",
+        "summary": "Obtenir les messages et participants d'une conversation",
+        "parameters": [
+          { "$ref": "#/components/parameters/UlidPath" },
+          { "name": "after_id", "in": "query", "schema": { "type": "integer", "minimum": 0, "default": 0 } },
+          { "$ref": "#/components/parameters/Limit" }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/Messages" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      },
+      "post": {
+        "tags": ["Conversations"],
+        "operationId": "sendStudentConversationMessage",
+        "summary": "Envoyer un message texte et/ou une pièce jointe",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/MessageCreateRequest" } },
+            "multipart/form-data": { "schema": { "$ref": "#/components/schemas/MessageUploadRequest" } }
+          }
+        },
+        "responses": {
+          "201": { "$ref": "#/components/responses/MessageCreated" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "422": { "$ref": "#/components/responses/ValidationError" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/student/conversations/{uuid}/messages/read": {
+      "post": {
+        "tags": ["Conversations"],
+        "operationId": "readStudentConversationMessages",
+        "summary": "Avancer le pointeur de lecture d'une conversation",
+        "parameters": [{ "$ref": "#/components/parameters/UlidPath" }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MessageReadRequest" } } }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/NotificationMutation" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/student/conversations/{uuid}/draft": {
+      "put": {
+        "tags": ["Conversations"],
+        "operationId": "saveStudentConversationDraft",
+        "summary": "Créer ou remplacer le brouillon personnel",
+        "parameters": [{ "$ref": "#/components/parameters/UlidPath" }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DraftRequest" } } }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/SimpleSuccess" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      },
+      "delete": {
+        "tags": ["Conversations"],
+        "operationId": "deleteStudentConversationDraft",
+        "summary": "Supprimer le brouillon personnel",
+        "parameters": [{ "$ref": "#/components/parameters/UlidPath" }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/SimpleSuccess" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/student/conversations/{conversationUuid}/messages/{messageUuid}/attachments/{fileUuid}": {
+      "get": {
+        "tags": ["Conversations"],
+        "operationId": "getStudentMessageAttachment",
+        "summary": "Afficher ou télécharger une pièce jointe autorisée",
+        "parameters": [
+          { "$ref": "#/components/parameters/ConversationUlidPath" },
+          { "$ref": "#/components/parameters/MessageUlidPath" },
+          { "$ref": "#/components/parameters/FileUlidPath" },
+          { "$ref": "#/components/parameters/Download" }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/GenericBinary" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/student/communications": {
+      "get": {
+        "tags": ["Communications officielles"],
+        "operationId": "getStudentOfficialCommunications",
+        "summary": "Lister les communications officielles visibles",
+        "parameters": [{ "$ref": "#/components/parameters/Limit" }, { "$ref": "#/components/parameters/Offset" }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/OfficialCommunications" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/student/communications/{uuid}/read": {
+      "post": {
+        "tags": ["Communications officielles"],
+        "operationId": "readStudentOfficialCommunication",
+        "summary": "Enregistrer lecture et accusé éventuellement requis",
+        "parameters": [{ "$ref": "#/components/parameters/UlidPath" }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/SimpleSuccess" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/student/calendar": {
+      "get": {
+        "tags": ["Calendrier"],
+        "operationId": "getStudentCalendar",
+        "summary": "Lister les événements auxquels l'étudiant participe",
+        "parameters": [
+          { "name": "from", "in": "query", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "to", "in": "query", "schema": { "type": "string", "format": "date-time" } }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/CalendarEvents" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      },
+      "post": {
+        "tags": ["Calendrier"],
+        "operationId": "createStudentCalendarEvent",
+        "summary": "Créer un événement avec des participants autorisés",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CalendarCreateRequest" } } }
+        },
+        "responses": {
+          "201": { "$ref": "#/components/responses/CalendarCreated" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "422": { "$ref": "#/components/responses/ValidationError" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/student/calendar/{uuid}/response": {
+      "post": {
+        "tags": ["Calendrier"],
+        "operationId": "respondStudentCalendarEvent",
+        "summary": "Accepter, refuser ou marquer une invitation comme incertaine",
+        "parameters": [{ "$ref": "#/components/parameters/UlidPath" }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CalendarResponseRequest" } } }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/CalendarResponded" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "Opaque access token" }
+    },
+    "parameters": {
+      "UlidPath": { "name": "uuid", "in": "path", "required": true, "schema": { "$ref": "#/components/schemas/Ulid" } },
+      "ConversationUlidPath": { "name": "conversationUuid", "in": "path", "required": true, "schema": { "$ref": "#/components/schemas/Ulid" } },
+      "MessageUlidPath": { "name": "messageUuid", "in": "path", "required": true, "schema": { "$ref": "#/components/schemas/Ulid" } },
+      "FileUlidPath": { "name": "fileUuid", "in": "path", "required": true, "schema": { "$ref": "#/components/schemas/Ulid" } },
+      "Limit": { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 30 } },
+      "Offset": { "name": "offset", "in": "query", "schema": { "type": "integer", "minimum": 0, "default": 0 } },
+      "Download": { "name": "download", "in": "query", "description": "1 force le téléchargement.", "schema": { "type": "string", "enum": ["0", "1"] } }
+    },
+    "requestBodies": {
+      "PreferenceUpdate": {
+        "required": true,
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PreferenceUpdateRequest" } } }
+      }
+    },
+    "schemas": {
+      "Ulid": { "type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$", "example": "01JQ0G8K9M5H2T7B4P6S3N1R8C" },
+      "Uuid": { "type": "string", "format": "uuid", "example": "11111111-1111-4111-8111-111111111111" },
+      "RealtimeCursor": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+\\.\\d+$", "example": "184.926.51.73" },
+      "NotificationCategory": { "type": "string", "enum": ["internship", "message", "logbook", "urgent", "academic"] },
+      "NotificationActionType": { "type": "string", "enum": ["internship_assignment", "conversation", "official_communication", "calendar_event", "campaign", "logbook", "task", "payment", "academic_document", "generic"] },
+      "NotificationAction": {
+        "type": "object",
+        "required": ["type", "target_id", "label", "title", "metadata"],
+        "properties": {
+          "type": { "$ref": "#/components/schemas/NotificationActionType" },
+          "target_id": { "type": ["string", "null"], "description": "Identifiant opaque de la ressource métier." },
+          "label": { "type": "string", "example": "Voir mon affectation" },
+          "title": { "type": ["string", "null"] },
+          "metadata": { "type": "object", "additionalProperties": true }
+        }
+      },
+      "Notification": {
+        "type": "object",
+        "required": ["sequence", "id", "event_type", "type", "subject", "description", "priority", "read_at", "archived_at", "created_at", "action"],
+        "properties": {
+          "sequence": { "type": "integer", "minimum": 1, "description": "Curseur interne de pagination." },
+          "id": { "$ref": "#/components/schemas/Ulid" },
+          "event_type": { "type": "string", "example": "stage.assignment.updated" },
+          "type": { "$ref": "#/components/schemas/NotificationCategory" },
+          "subject": { "type": "string" },
+          "description": { "type": "string" },
+          "priority": { "type": "string", "enum": ["basse", "normale", "haute", "urgente"] },
+          "read_at": { "type": ["string", "null"], "format": "date-time" },
+          "archived_at": { "type": ["string", "null"], "format": "date-time" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "action": { "$ref": "#/components/schemas/NotificationAction" }
+        }
+      },
+      "NotificationCounts": {
+        "type": "object",
+        "required": ["notifications", "messages", "total"],
+        "properties": {
+          "notifications": { "type": "integer", "minimum": 0 },
+          "messages": { "type": "integer", "minimum": 0 },
+          "total": { "type": "integer", "minimum": 0, "description": "Maximum de notifications et messages pour éviter le double comptage." }
+        }
+      },
+      "Contact": {
+        "type": "object",
+        "required": ["id", "display_name", "is_student"],
+        "properties": {
+          "id": { "type": "integer" },
+          "identifiant": { "type": ["string", "null"] },
+          "display_name": { "type": "string" },
+          "email": { "type": ["string", "null"], "format": "email" },
+          "organisation": { "type": ["string", "null"] },
+          "organisation_id": { "type": ["integer", "null"] },
+          "is_student": { "type": "boolean" }
+        }
+      },
+      "Preference": {
+        "type": "object",
+        "required": ["type", "channel", "active"],
+        "properties": {
+          "type": { "type": "string", "example": "*" },
+          "channel": { "type": "string", "enum": ["email", "sms", "push"] },
+          "active": { "type": "boolean" }
+        }
+      },
+      "PreferenceUpdateRequest": {
+        "type": "object",
+        "required": ["type", "channels"],
+        "properties": {
+          "type": { "type": "string", "pattern": "^(\\*|[a-zA-Z0-9_.-]{1,100})$", "example": "*" },
+          "channels": {
+            "type": "object",
+            "minProperties": 1,
+            "properties": { "email": { "type": "boolean" }, "sms": { "type": "boolean" }, "push": { "type": "boolean" } },
+            "additionalProperties": false
+          }
+        }
+      },
+      "DeviceRegistrationRequest": {
+        "type": "object",
+        "required": ["platform", "token"],
+        "properties": {
+          "platform": { "type": "string", "enum": ["android", "ios", "web"] },
+          "token": { "type": "string", "minLength": 20, "maxLength": 512, "writeOnly": true },
+          "device_name": { "type": ["string", "null"], "maxLength": 150 },
+          "app_version": { "type": ["string", "null"], "maxLength": 50 }
+        }
+      },
+      "Device": {
+        "type": "object",
+        "required": ["uuid", "platform", "active", "last_seen_at"],
+        "properties": {
+          "uuid": { "$ref": "#/components/schemas/Ulid" },
+          "platform": { "type": "string", "enum": ["android", "ios", "web"] },
+          "device_name": { "type": ["string", "null"] },
+          "app_version": { "type": ["string", "null"] },
+          "active": { "type": "boolean" },
+          "last_seen_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "ConversationCreateRequest": {
+        "type": "object",
+        "required": ["subject", "recipient_user_ids"],
+        "properties": {
+          "subject": { "type": "string", "minLength": 1, "maxLength": 255 },
+          "recipient_user_ids": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "integer", "minimum": 1 } }
+        }
+      },
+      "Conversation": {
+        "type": "object",
+        "required": ["uuid", "objet", "type_conversation", "statut", "participant_count", "unread_count"],
+        "properties": {
+          "uuid": { "$ref": "#/components/schemas/Ulid" },
+          "objet": { "type": "string" },
+          "type_conversation": { "type": "string", "enum": ["privee", "groupe", "institutionnelle", "support"] },
+          "statut": { "type": "string", "enum": ["active", "fermee", "archivee"] },
+          "cree_le": { "type": "string", "format": "date-time" },
+          "participant_count": { "type": "integer", "minimum": 1 },
+          "last_message": { "type": ["string", "null"] },
+          "last_activity_at": { "type": ["string", "null"], "format": "date-time" },
+          "unread_count": { "type": "integer", "minimum": 0 },
+          "draft": { "type": ["string", "null"] },
+          "draft_updated_at": { "type": ["string", "null"], "format": "date-time" }
+        }
+      },
+      "Participant": {
+        "type": "object",
+        "properties": {
+          "user_id": { "type": "integer" },
+          "identifiant": { "type": ["string", "null"] },
+          "display_name": { "type": "string" },
+          "joined_at": { "type": "string", "format": "date-time" },
+          "last_read_message_id": { "type": ["integer", "null"] }
+        }
+      },
+      "Attachment": {
+        "type": "object",
+        "required": ["uuid", "name", "mime_type", "size", "view_endpoint", "download_endpoint", "requires_bearer"],
+        "properties": {
+          "uuid": { "$ref": "#/components/schemas/Ulid" },
+          "name": { "type": "string" },
+          "mime_type": { "type": "string" },
+          "size": { "type": "integer", "minimum": 1, "maximum": 10485760 },
+          "view_endpoint": { "type": "string" },
+          "download_endpoint": { "type": "string" },
+          "requires_bearer": { "type": "boolean", "const": true }
+        }
+      },
+      "Message": {
+        "type": "object",
+        "required": ["id", "uuid", "contenu", "author", "author_user_id", "is_mine", "read_by_count", "attachments"],
+        "properties": {
+          "id": { "type": "integer", "minimum": 1 },
+          "uuid": { "$ref": "#/components/schemas/Ulid" },
+          "contenu": { "type": "string" },
+          "cree_le": { "type": "string", "format": "date-time" },
+          "modifie_le": { "type": ["string", "null"], "format": "date-time" },
+          "statut": { "type": "string", "enum": ["envoye", "modifie"] },
+          "author": { "type": "string" },
+          "author_user_id": { "type": "integer" },
+          "is_mine": { "type": "boolean" },
+          "read_by_count": { "type": "integer", "minimum": 0 },
+          "attachments": { "type": "array", "items": { "$ref": "#/components/schemas/Attachment" } }
+        }
+      },
+      "MessageCreateRequest": {
+        "type": "object",
+        "required": ["content"],
+        "properties": { "content": { "type": "string", "minLength": 1, "maxLength": 10000 } }
+      },
+      "MessageUploadRequest": {
+        "type": "object",
+        "properties": {
+          "content": { "type": "string", "maxLength": 10000 },
+          "attachment": { "type": "string", "format": "binary", "description": "10 Mo maximum. PDF, Office, texte, CSV, JPEG, PNG ou WebP." }
+        },
+        "anyOf": [{ "required": ["content"] }, { "required": ["attachment"] }]
+      },
+      "MessageReadRequest": {
+        "type": "object",
+        "required": ["message_uuid"],
+        "properties": { "message_uuid": { "$ref": "#/components/schemas/Ulid" } }
+      },
+      "DraftRequest": {
+        "type": "object",
+        "required": ["content"],
+        "properties": { "content": { "type": "string", "minLength": 1, "maxLength": 10000 } }
+      },
+      "OfficialCommunication": {
+        "type": "object",
+        "required": ["uuid", "type", "subject", "content", "priority", "acknowledgement_required", "published_at", "sender"],
+        "properties": {
+          "uuid": { "$ref": "#/components/schemas/Ulid" },
+          "reference": { "type": ["string", "null"] },
+          "type": { "type": "string", "enum": ["annonce", "circulaire", "directive", "note_service", "convocation", "enquete", "demande_information", "alerte"] },
+          "subject": { "type": "string" },
+          "content": { "type": "string" },
+          "priority": { "type": "string", "enum": ["normale", "haute", "urgente"] },
+          "acknowledgement_required": { "type": "boolean" },
+          "acknowledgement_due_at": { "type": ["string", "null"], "format": "date-time" },
+          "published_at": { "type": "string", "format": "date-time" },
+          "sender": { "type": "string" },
+          "read_at": { "type": ["string", "null"], "format": "date-time" },
+          "acknowledged_at": { "type": ["string", "null"], "format": "date-time" }
+        }
+      },
+      "CalendarCreateRequest": {
+        "type": "object",
+        "required": ["title", "starts_at", "ends_at", "participant_user_ids"],
+        "properties": {
+          "title": { "type": "string", "minLength": 1, "maxLength": 255 },
+          "description": { "type": ["string", "null"] },
+          "type": { "type": "string", "enum": ["reunion", "convocation", "visite", "evaluation", "echeance", "autre"], "default": "reunion" },
+          "starts_at": { "type": "string", "format": "date-time" },
+          "ends_at": { "type": "string", "format": "date-time" },
+          "location": { "type": ["string", "null"], "maxLength": 255 },
+          "participant_user_ids": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "integer", "minimum": 1 } }
+        }
+      },
+      "CalendarResponseRequest": {
+        "type": "object",
+        "required": ["response"],
+        "properties": { "response": { "type": "string", "enum": ["accepte", "refuse", "incertain"] } }
+      },
+      "CalendarEvent": {
+        "type": "object",
+        "required": ["uuid", "title", "type", "starts_at", "ends_at", "status", "response_status"],
+        "properties": {
+          "uuid": { "$ref": "#/components/schemas/Ulid" },
+          "title": { "type": "string" },
+          "description": { "type": ["string", "null"] },
+          "type": { "type": "string" },
+          "starts_at": { "type": "string", "format": "date-time" },
+          "ends_at": { "type": "string", "format": "date-time" },
+          "location": { "type": ["string", "null"] },
+          "external_url": { "type": ["string", "null"], "format": "uri" },
+          "status": { "type": "string", "enum": ["planifie", "confirme", "termine"] },
+          "creator_user_id": { "type": "integer" },
+          "response_status": { "type": "string", "enum": ["invite", "accepte", "refuse", "incertain", "present", "absent"] },
+          "responded_at": { "type": ["string", "null"], "format": "date-time" },
+          "meeting_provider": { "type": ["string", "null"] },
+          "meeting_code": { "type": ["string", "null"] }
+        }
+      },
+      "ApiError": {
+        "type": "object",
+        "required": ["success", "message", "data"],
+        "properties": {
+          "success": { "type": "boolean", "const": false },
+          "message": { "type": "string" },
+          "data": {
+            "oneOf": [
+              { "type": "object", "additionalProperties": true },
+              { "type": "array", "items": {} }
+            ]
+          }
+        }
+      }
+    },
+    "responses": {
+      "Contacts": { "description": "Contacts autorisés.", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "const": true }, "message": { "type": "string" }, "data": { "type": "object", "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/Contact" } }, "total": { "type": "integer" } } } } } } } },
+      "Notifications": { "description": "Notifications privées.", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "const": true }, "message": { "type": "string" }, "data": { "type": "object", "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/Notification" } }, "next_before_id": { "type": ["integer", "null"] }, "counts": { "$ref": "#/components/schemas/NotificationCounts" } } } } } } } },
+      "NotificationCounts": { "description": "Compteurs non lus.", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "const": true }, "message": { "type": "string" }, "data": { "$ref": "#/components/schemas/NotificationCounts" } } } } } },
+      "NotificationMutation": { "description": "Mutation enregistrée.", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "const": true }, "message": { "type": "string" }, "data": { "type": "object", "properties": { "counts": { "$ref": "#/components/schemas/NotificationCounts" } } } } } } } },
+      "Preferences": { "description": "Préférences et valeurs par défaut.", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "const": true }, "message": { "type": "string" }, "data": { "type": "object", "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/Preference" } }, "defaults": { "type": "object", "properties": { "email": { "type": "boolean" }, "sms": { "type": "boolean" }, "push": { "type": "boolean" } } }, "internal_notifications": { "type": "boolean", "const": true } } } } } } } },
+      "PreferenceUpdated": { "description": "Préférence enregistrée.", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "const": true }, "message": { "type": "string" }, "data": { "$ref": "#/components/schemas/PreferenceUpdateRequest" } } } } } },
+      "Devices": { "description": "Appareils sans jetons secrets.", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "const": true }, "message": { "type": "string" }, "data": { "type": "object", "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/Device" } } } } } } } } },
+      "DeviceRegistered": { "description": "Appareil créé ou réactivé.", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "const": true }, "message": { "type": "string" }, "data": { "type": "object", "properties": { "uuid": { "$ref": "#/components/schemas/Ulid" }, "platform": { "type": "string", "enum": ["android", "ios", "web"] } } } } } } } },
+      "Conversations": { "description": "Conversations dont l'étudiant est participant.", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "const": true }, "message": { "type": "string" }, "data": { "type": "object", "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/Conversation" } }, "limit": { "type": "integer" }, "offset": { "type": "integer" } } } } } } } },
+      "ConversationCreated": { "description": "Conversation créée.", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "const": true }, "message": { "type": "string" }, "data": { "type": "object", "properties": { "conversation": { "type": "object", "properties": { "uuid": { "$ref": "#/components/schemas/Ulid" }, "type": { "type": "string", "enum": ["privee", "groupe"] }, "subject": { "type": "string" }, "recipient_count": { "type": "integer" } } } } } } } } } },
+      "Messages": { "description": "Conversation, participants et messages.", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "const": true }, "message": { "type": "string" }, "data": { "type": "object", "properties": { "conversation": { "type": "object", "properties": { "uuid": { "$ref": "#/components/schemas/Ulid" }, "subject": { "type": "string" }, "type": { "type": "string" }, "status": { "type": "string" }, "participants": { "type": "array", "items": { "$ref": "#/components/schemas/Participant" } } } }, "items": { "type": "array", "items": { "$ref": "#/components/schemas/Message" } } } } } } } } },
+      "MessageCreated": { "description": "Message persisté.", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "const": true }, "message": { "type": "string" }, "data": { "type": "object", "properties": { "message": { "type": "object", "properties": { "id": { "type": "integer" }, "uuid": { "$ref": "#/components/schemas/Ulid" } } } } } } } } } },
+      "OfficialCommunications": { "description": "Communications visibles par destination directe ou rôle.", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "const": true }, "message": { "type": "string" }, "data": { "type": "object", "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/OfficialCommunication" } }, "limit": { "type": "integer" }, "offset": { "type": "integer" } } } } } } } },
+      "CalendarEvents": { "description": "Événements de l'étudiant.", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "const": true }, "message": { "type": "string" }, "data": { "type": "object", "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/CalendarEvent" } } } } } } } } },
+      "CalendarCreated": { "description": "Événement créé.", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "const": true }, "message": { "type": "string" }, "data": { "type": "object", "properties": { "event": { "type": "object", "properties": { "uuid": { "$ref": "#/components/schemas/Ulid" }, "participant_count": { "type": "integer" } } } } } } } } } },
+      "CalendarResponded": { "description": "Réponse enregistrée.", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "const": true }, "message": { "type": "string" }, "data": { "type": "object", "properties": { "response": { "type": "string", "enum": ["accepte", "refuse", "incertain"] } } } } } } } },
+      "GenericBinary": { "description": "Flux binaire protégé par Bearer.", "content": { "application/octet-stream": { "schema": { "type": "string", "format": "binary" } }, "application/pdf": { "schema": { "type": "string", "format": "binary" } }, "image/jpeg": { "schema": { "type": "string", "format": "binary" } }, "image/png": { "schema": { "type": "string", "format": "binary" } } } },
+      "SimpleSuccess": { "description": "Opération réussie.", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean", "const": true }, "message": { "type": "string" }, "data": { "oneOf": [{ "type": "object" }, { "type": "array", "items": {} }] } } } } } },
+      "BadRequest": { "description": "Corps JSON invalide.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } },
+      "Unauthorized": { "description": "Bearer token absent, invalide ou expiré.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } },
+      "Forbidden": { "description": "Étudiant non autorisé ou ressource hors périmètre.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } },
+      "NotFound": { "description": "Ressource inexistante ou non visible.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } },
+      "MethodNotAllowed": { "description": "Méthode HTTP incorrecte.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } },
+      "ValidationError": { "description": "Données invalides.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } },
+      "InternalError": { "description": "Erreur interne.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } }
+    }
+  }
+}

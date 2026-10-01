@@ -2,8 +2,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import '../../../../core/services/preference_onboarding.dart';
+import '../../../../core/services/session_authentification_service.dart';
+import '../../../../core/network/client_api_http.dart';
 import '../../../../core/widgets/auth_brand.dart';
 import '../../../../core/widgets/contenu_adaptatif.dart';
+import '../../../../app/navigation/main_shell.dart';
 import '../../../authentication/presentation/pages/connexion_page.dart';
 import '../../../onboarding/presentation/pages/onboarding_page.dart';
 
@@ -33,13 +36,28 @@ class _EcranDemarrageState extends State<EcranDemarrage> {
   Future<void> _ouvrirApplication() async {
     if (!mounted) return;
 
+    final sessionLocale = await SessionAuthentificationService.estConnecte();
+    if (sessionLocale) {
+      // La restauration locale ne dépend jamais du réseau. Le renouvellement
+      // éventuel s'effectue en arrière-plan et conserve la session hors ligne.
+      unawaited(ClientApiHttp().rafraichirSessionSiDisponible());
+      if (!mounted) return;
+      _remplacerPar(const MainShell());
+      return;
+    }
+
     final onboardingTermine = await const PreferenceOnboarding().estTerminee();
     if (!mounted) return;
 
+    _remplacerPar(
+      onboardingTermine ? const ConnexionPage() : const OnboardingPage(),
+    );
+  }
+
+  void _remplacerPar(Widget destination) {
     Navigator.of(context).pushReplacement(
       PageRouteBuilder<void>(
-        pageBuilder: (_, animation, secondaryAnimation) =>
-            onboardingTermine ? const ConnexionPage() : const OnboardingPage(),
+        pageBuilder: (_, animation, secondaryAnimation) => destination,
         transitionsBuilder: (_, animation, secondaryAnimation, child) {
           return FadeTransition(opacity: animation, child: child);
         },

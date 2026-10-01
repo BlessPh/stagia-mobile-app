@@ -1,6 +1,8 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../../core/network/configuration_api.dart';
 import '../../../notifications/presentation/pages/notifications_page.dart';
 import '../../data/datasources/source_campagne_mock.dart';
 import '../../domain/entities/campagne_stage.dart';
@@ -14,7 +16,18 @@ class DetailCampagnePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final infoCampagne = campagne ?? SourceCampagneMock.obtenirCampagneOuverte();
+    final infoCampagne =
+        campagne ??
+        (ConfigurationApi.utiliserDonneesMockees
+            ? SourceCampagneMock.obtenirCampagneOuverte()
+            : null);
+    if (infoCampagne == null) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        appBar: _buildAppBar(context),
+        body: const SizedBox.shrink(),
+      );
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -57,7 +70,19 @@ class DetailCampagnePage extends StatelessWidget {
                     campagne: infoCampagne,
                     hopitaux: infoCampagne.hopitaux,
                     onSelectionnerHopital: (hopital) {
-                      _naviguerVersReservation(context, infoCampagne, hopital);
+                      if (infoCampagne.autoriseReservationAutonome) {
+                        _naviguerVersReservation(
+                          context,
+                          infoCampagne,
+                          hopital,
+                        );
+                      } else {
+                        _naviguerVersHopitauxDisponibles(
+                          context,
+                          infoCampagne,
+                          hopital: hopital,
+                        );
+                      }
                     },
                     onOuvrirCarte: () {
                       _naviguerVersHopitauxDisponibles(context, infoCampagne);
@@ -86,11 +111,14 @@ class DetailCampagnePage extends StatelessWidget {
                 width: double.infinity,
                 height: 52,
                 child: FilledButton(
-                  onPressed: () {
-                    _naviguerVersHopitauxDisponibles(context, infoCampagne);
-                  },
+                  onPressed: infoCampagne.hopitaux.isEmpty
+                      ? null
+                      : () => _naviguerVersHopitauxDisponibles(
+                          context,
+                          infoCampagne,
+                        ),
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF1D61F2),
+                    backgroundColor: const Color(0xFFFF751F),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
@@ -98,7 +126,9 @@ class DetailCampagnePage extends StatelessWidget {
                     elevation: 0,
                   ),
                   child: Text(
-                    'Réserver ma place',
+                    infoCampagne.autoriseReservationAutonome
+                        ? 'Réserver ma place'
+                        : 'Voir les hôpitaux éligibles',
                     style: GoogleFonts.inter(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
@@ -149,7 +179,7 @@ class DetailCampagnePage extends StatelessWidget {
                 ),
               ),
               icon: const Icon(
-                Icons.notifications_none_rounded,
+                CupertinoIcons.bell,
                 color: Color(0xFF0F172A),
                 size: 26,
               ),
@@ -191,10 +221,7 @@ class DetailCampagnePage extends StatelessWidget {
   ) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => ReservationPage(
-          campagne: campagne,
-          hopital: hopital,
-        ),
+        builder: (_) => ReservationPage(campagne: campagne, hopital: hopital),
       ),
     );
   }
@@ -232,10 +259,7 @@ class _CarteHeroCampagne extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF2355F6),
-            Color(0xFF7032DF),
-          ],
+          colors: [Color(0xFFFF751F), Color(0xFFFF7510)],
         ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [

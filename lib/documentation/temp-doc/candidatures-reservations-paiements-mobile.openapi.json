@@ -1,0 +1,789 @@
+{
+  "openapi": "3.1.0",
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "info": {
+    "title": "STAGIA - API mobile des candidatures, réservations et paiements",
+    "version": "1.0.0",
+    "description": "Contrat des tâches 4 et 5 : offres éligibles, candidature D4, réservation, décision universitaire, paiement, placement et admission. Toutes les routes exigent un compte étudiant actif et un access token Bearer."
+  },
+  "servers": [
+    { "url": "http://localhost/stagia/api/v1", "description": "Wamp sur la machine de développement" },
+    {
+      "url": "http://{host}/stagia/api/v1",
+      "description": "Wamp depuis le réseau local",
+      "variables": { "host": { "default": "192.168.1.20" } }
+    }
+  ],
+  "security": [{ "bearerAuth": [] }],
+  "tags": [
+    { "name": "Offres", "description": "Campagnes et offres hospitalières accessibles à l'étudiant" },
+    { "name": "Candidatures", "description": "Candidatures et décisions universitaires" },
+    { "name": "Réservations", "description": "Réservation temporaire, confirmation et annulation" },
+    { "name": "Paiements", "description": "Factures et tentatives de paiement" },
+    { "name": "Admissions", "description": "Placement universitaire, admission et affectation" }
+  ],
+  "paths": {
+    "/student/stage-options": {
+      "get": {
+        "tags": ["Offres"],
+        "operationId": "getStudentStageOptions",
+        "summary": "Lister les options de stage éligibles",
+        "description": "Retourne séparément les campagnes D4 réservables par l'étudiant et les autres campagnes gérées par l'université. Les disponibilités utilisent la capacité acceptée et les réservations encore actives.",
+        "responses": {
+          "200": {
+            "description": "Options calculées",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StageOptionsResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/student/reservations": {
+      "post": {
+        "tags": ["Candidatures", "Réservations"],
+        "operationId": "createStudentReservation",
+        "summary": "Soumettre une candidature D4 et réserver temporairement une place",
+        "description": "Route réservée au mode STUDENT_D4_CHOICE. Une répétition correspondant à une réservation déjà active retourne cette réservation sans créer de doublon.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateReservationRequest" },
+              "example": {
+                "campaign_id": 17,
+                "academic_enrollment_id": 33,
+                "participation_id": 42,
+                "motivation": "Je souhaite effectuer ce stage dans cet hôpital."
+              }
+            },
+            "application/x-www-form-urlencoded": { "schema": { "$ref": "#/components/schemas/CreateReservationRequest" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Candidature et réservation créées",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateReservationResponse" } } }
+          },
+          "200": {
+            "description": "Réservation active existante retournée de façon idempotente",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateReservationResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "422": { "$ref": "#/components/responses/ValidationError" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      },
+      "get": {
+        "tags": ["Réservations"],
+        "operationId": "getStudentReservations",
+        "summary": "Lister les réservations",
+        "responses": {
+          "200": {
+            "description": "Réservations et actions autorisées",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReservationsResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/student/applications": {
+      "get": {
+        "tags": ["Candidatures"],
+        "operationId": "getStudentApplications",
+        "summary": "Lister les candidatures et leur progression",
+        "responses": {
+          "200": {
+            "description": "Candidatures retournées",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApplicationsResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/student/reservations/{uuid}/confirm": {
+      "post": {
+        "tags": ["Réservations"],
+        "operationId": "confirmStudentReservation",
+        "summary": "Vérifier une réservation déjà confirmée",
+        "description": "Ne contourne ni la décision universitaire ni le paiement. La réussite est idempotente lorsque la réservation est déjà CONFIRMEE.",
+        "parameters": [{ "$ref": "#/components/parameters/ReservationUuid" }],
+        "responses": {
+          "200": {
+            "description": "Réservation déjà confirmée",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ConfirmReservationResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "422": { "$ref": "#/components/responses/ValidationError" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/student/reservations/{uuid}/cancel": {
+      "post": {
+        "tags": ["Réservations"],
+        "operationId": "cancelStudentReservation",
+        "summary": "Annuler une réservation avant placement",
+        "description": "Opération idempotente. Refusée si un placement/admission ou un paiement validé existe.",
+        "parameters": [{ "$ref": "#/components/parameters/ReservationUuid" }],
+        "responses": {
+          "200": {
+            "description": "Réservation annulée ou déjà annulée",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CancelReservationResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "422": { "$ref": "#/components/responses/ValidationError" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/student/payments": {
+      "get": {
+        "tags": ["Paiements"],
+        "operationId": "getStudentPayments",
+        "summary": "Lister les factures, paiements et canaux",
+        "description": "Retourne uniquement les candidatures acceptées. Le mobile doit utiliser payment_allowed pour activer le bouton de paiement.",
+        "responses": {
+          "200": {
+            "description": "Situation des paiements",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PaymentsResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/student/payments/initiate": {
+      "post": {
+        "tags": ["Paiements"],
+        "operationId": "initiateStudentPayment",
+        "summary": "Initier une tentative de paiement idempotente",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Alternative à idempotency_key dans le corps. Maximum 100 caractères.",
+            "schema": { "type": "string", "minLength": 1, "maxLength": 100 }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/InitiatePaymentRequest" },
+              "example": {
+                "reservation_uuid": "22222222-2222-4222-8222-222222222222",
+                "channel": "MPESA",
+                "phone_number": "+243810000000",
+                "idempotency_key": "pay-22222222-attempt-1"
+              }
+            },
+            "application/x-www-form-urlencoded": { "schema": { "$ref": "#/components/schemas/InitiatePaymentRequest" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Nouvelle tentative créée",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/InitiatePaymentResponse" } } }
+          },
+          "200": {
+            "description": "Tentative existante retournée ou facture déjà réglée",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/InitiatePaymentResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "422": { "$ref": "#/components/responses/ValidationError" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/student/payments/sync": {
+      "post": {
+        "tags": ["Paiements"],
+        "operationId": "syncStudentPayment",
+        "summary": "Recalculer l'état du paiement et de la réservation",
+        "description": "Ne crée aucune transaction. Une réponse HTTP 200 peut contenir PENDING, FAILED ou NOT_STARTED; toujours lire payment_status.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SyncPaymentRequest" },
+              "example": { "reservation_uuid": "22222222-2222-4222-8222-222222222222" }
+            },
+            "application/x-www-form-urlencoded": { "schema": { "$ref": "#/components/schemas/SyncPaymentRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "État synchronisé",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SyncPaymentResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "422": { "$ref": "#/components/responses/ValidationError" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/student/admissions": {
+      "get": {
+        "tags": ["Admissions"],
+        "operationId": "getStudentAdmissions",
+        "summary": "Suivre placement, admission et affectation",
+        "parameters": [
+          {
+            "name": "reservation_uuid",
+            "in": "query",
+            "required": false,
+            "schema": { "$ref": "#/components/schemas/Uuid" },
+            "description": "Filtre facultatif sur une réservation appartenant à l'étudiant."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "États du workflow",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdmissionsResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "Opaque token",
+        "description": "Access token retourné par /login ou /refresh-token."
+      }
+    },
+    "parameters": {
+      "ReservationUuid": {
+        "name": "uuid",
+        "in": "path",
+        "required": true,
+        "schema": { "$ref": "#/components/schemas/Uuid" }
+      }
+    },
+    "schemas": {
+      "Uuid": { "type": "string", "format": "uuid" },
+      "NullableString": { "type": ["string", "null"] },
+      "NullableDateTime": { "type": ["string", "null"], "format": "date-time" },
+      "WorkflowStatus": {
+        "type": "string",
+        "enum": [
+          "DECISION_UNIVERSITAIRE_EN_ATTENTE", "CANDIDATURE_REFUSEE", "RESERVATION_EXPIREE",
+          "EN_ATTENTE_PAIEMENT", "PLACEMENT_UNIVERSITAIRE_EN_ATTENTE", "ADMISSION_HOSPITALIERE_EN_ATTENTE",
+          "AFFECTATION_EN_ATTENTE", "STAGE_PLANIFIE", "STAGE_EN_COURS", "STAGE_TERMINE", "STAGE_VALIDE",
+          "ANNULEE", "SOUMISE", "EN_ETUDE", "ACCEPTEE", "INCONNU"
+        ]
+      },
+      "StageMode": {
+        "type": "object",
+        "properties": {
+          "is_d4": { "type": "boolean" },
+          "self_reservation_allowed": { "type": "boolean" },
+          "reservation_mode": { "type": "string", "enum": ["STUDENT_D4_CHOICE", "UNIVERSITY_MANAGED"] }
+        },
+        "required": ["is_d4", "self_reservation_allowed", "reservation_mode"]
+      },
+      "StageType": {
+        "type": "object",
+        "properties": { "code": { "type": "string" }, "label": { "type": "string" } },
+        "required": ["code", "label"]
+      },
+      "HospitalOption": {
+        "type": "object",
+        "properties": {
+          "participation_id": { "type": "integer" },
+          "hospital": {
+            "type": "object",
+            "properties": {
+              "code": { "type": "string" }, "name": { "type": "string" },
+              "city": { "$ref": "#/components/schemas/NullableString" },
+              "province": { "$ref": "#/components/schemas/NullableString" }
+            },
+            "required": ["code", "name", "city", "province"]
+          },
+          "capacity": { "type": "integer", "minimum": 0 },
+          "used_places": { "type": "integer", "minimum": 0 },
+          "available_places": { "type": "integer", "minimum": 0 },
+          "available": { "type": "boolean" },
+          "fees_required": { "type": "boolean" },
+          "amount": { "type": ["number", "null"] },
+          "currency": { "$ref": "#/components/schemas/NullableString" },
+          "conditions": { "$ref": "#/components/schemas/NullableString" }
+        },
+        "required": ["participation_id", "hospital", "capacity", "used_places", "available_places", "available", "fees_required", "amount", "currency", "conditions"]
+      },
+      "CampaignOption": {
+        "type": "object",
+        "properties": {
+          "campaign_id": { "type": "integer" },
+          "academic_enrollment_id": { "type": "integer" },
+          "code": { "type": "string" }, "title": { "type": "string" },
+          "start_date": { "type": ["string", "null"], "format": "date" },
+          "end_date": { "type": ["string", "null"], "format": "date" },
+          "stage_type": { "$ref": "#/components/schemas/StageType" },
+          "mode": { "$ref": "#/components/schemas/StageMode" },
+          "promotion": {
+            "type": "object",
+            "properties": {
+              "code": { "$ref": "#/components/schemas/NullableString" },
+              "name": { "type": "string" }, "level": { "$ref": "#/components/schemas/NullableString" }
+            },
+            "required": ["code", "name", "level"]
+          },
+          "program": { "$ref": "#/components/schemas/NullableString" },
+          "hospitals": { "type": "array", "items": { "$ref": "#/components/schemas/HospitalOption" } },
+          "hospitals_count": { "type": "integer", "minimum": 0 },
+          "available_hospitals": { "type": "integer", "minimum": 0 }
+        },
+        "required": ["campaign_id", "academic_enrollment_id", "code", "title", "start_date", "end_date", "stage_type", "mode", "promotion", "program", "hospitals"]
+      },
+      "StageOptionsResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "const": true }, "message": { "type": "string" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "campaigns": { "type": "array", "items": { "$ref": "#/components/schemas/CampaignOption" } },
+              "university_managed_campaigns": { "type": "array", "items": { "$ref": "#/components/schemas/CampaignOption" } },
+              "stats": {
+                "type": "object",
+                "properties": {
+                  "campaigns": { "type": "integer" }, "university_managed_campaigns": { "type": "integer" },
+                  "hospitals": { "type": "integer" }, "available_hospitals": { "type": "integer" }, "available_places": { "type": "integer" }
+                },
+                "required": ["campaigns", "university_managed_campaigns", "hospitals", "available_hospitals", "available_places"]
+              }
+            },
+            "required": ["campaigns", "university_managed_campaigns", "stats"]
+          }
+        },
+        "required": ["success", "message", "data"]
+      },
+      "CreateReservationRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "campaign_id": { "type": "integer", "minimum": 1 },
+          "academic_enrollment_id": { "type": "integer", "minimum": 1 },
+          "participation_id": { "type": "integer", "minimum": 1 },
+          "motivation": { "type": "string", "maxLength": 1000 }
+        },
+        "required": ["campaign_id", "academic_enrollment_id", "participation_id"]
+      },
+      "ReservationCreationData": {
+        "type": "object",
+        "properties": {
+          "created": { "type": "boolean" },
+          "application_id": { "type": "integer" }, "application_uuid": { "$ref": "#/components/schemas/Uuid" },
+          "application_status": { "type": "string", "enum": ["SOUMISE", "EN_ETUDE", "ACCEPTEE"] },
+          "reservation_id": { "type": "integer" }, "reservation_uuid": { "$ref": "#/components/schemas/Uuid" },
+          "reservation_status": { "type": "string", "enum": ["RESERVEE_TEMPORAIREMENT", "EN_ATTENTE_PAIEMENT", "CONFIRMEE"] },
+          "expires_at": { "$ref": "#/components/schemas/NullableDateTime" },
+          "reservation_duration_minutes": { "type": "integer", "minimum": 1 },
+          "hospital": {
+            "type": "object",
+            "properties": { "code": { "type": "string" }, "name": { "type": "string" } },
+            "required": ["code", "name"]
+          },
+          "fees": {
+            "type": "object",
+            "properties": {
+              "required": { "type": "boolean" }, "amount": { "type": ["number", "null"] },
+              "currency": { "$ref": "#/components/schemas/NullableString" }
+            },
+            "required": ["required", "amount", "currency"]
+          },
+          "places_remaining": { "type": "integer", "minimum": 0 }
+        },
+        "required": ["created", "application_id", "application_uuid", "application_status", "reservation_id", "reservation_uuid", "reservation_status", "expires_at", "reservation_duration_minutes", "hospital", "fees"]
+      },
+      "CreateReservationResponse": {
+        "type": "object",
+        "properties": { "success": { "const": true }, "message": { "type": "string" }, "data": { "$ref": "#/components/schemas/ReservationCreationData" } },
+        "required": ["success", "message", "data"]
+      },
+      "Application": {
+        "type": "object",
+        "properties": {
+          "uuid": { "$ref": "#/components/schemas/Uuid" },
+          "statut": { "type": "string" }, "application_status": { "type": "string" },
+          "motivation": { "$ref": "#/components/schemas/NullableString" }, "motif_refus": { "$ref": "#/components/schemas/NullableString" },
+          "submitted_at": { "$ref": "#/components/schemas/NullableDateTime" }, "responded_at": { "$ref": "#/components/schemas/NullableDateTime" },
+          "campaign_code": { "type": "string" }, "campaign_title": { "type": "string" },
+          "campaign_start": { "type": ["string", "null"], "format": "date" }, "campaign_end": { "type": ["string", "null"], "format": "date" },
+          "hospital_code": { "type": "string" }, "hospital_name": { "type": "string" },
+          "ville": { "$ref": "#/components/schemas/NullableString" }, "province": { "$ref": "#/components/schemas/NullableString" },
+          "reservation_uuid": { "type": ["string", "null"], "format": "uuid" }, "reservation_status": { "$ref": "#/components/schemas/NullableString" },
+          "placement_uuid": { "type": ["string", "null"], "format": "uuid" }, "placement_status": { "$ref": "#/components/schemas/NullableString" },
+          "admission_uuid": { "type": ["string", "null"], "format": "uuid" }, "admission_status": { "$ref": "#/components/schemas/NullableString" },
+          "assignment_uuid": { "type": ["string", "null"], "format": "uuid" }, "assignment_status": { "$ref": "#/components/schemas/NullableString" },
+          "completion_status": { "$ref": "#/components/schemas/NullableString" },
+          "taux_presence": { "type": ["number", "null"] }, "note_finale": { "type": ["number", "null"] },
+          "stage_type": { "$ref": "#/components/schemas/StageType" }, "mode": { "$ref": "#/components/schemas/StageMode" },
+          "workflow_status": { "$ref": "#/components/schemas/WorkflowStatus" }
+        },
+        "required": ["uuid", "statut", "application_status", "stage_type", "mode", "workflow_status"]
+      },
+      "ApplicationsResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "const": true }, "message": { "type": "string" },
+          "data": {
+            "type": "object",
+            "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/Application" } }, "total": { "type": "integer" } },
+            "required": ["items", "total"]
+          }
+        },
+        "required": ["success", "message", "data"]
+      },
+      "Reservation": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "uuid": { "$ref": "#/components/schemas/Uuid" }, "statut": { "type": "string" },
+          "expires_at": { "$ref": "#/components/schemas/NullableDateTime" }, "confirmed_at": { "$ref": "#/components/schemas/NullableDateTime" },
+          "cancelled_at": { "$ref": "#/components/schemas/NullableDateTime" }, "created_at": { "$ref": "#/components/schemas/NullableDateTime" },
+          "application_uuid": { "$ref": "#/components/schemas/Uuid" }, "application_status": { "type": "string" },
+          "frais_requis": { "type": "boolean" }, "montant_frais": { "type": ["number", "null"] }, "devise": { "$ref": "#/components/schemas/NullableString" },
+          "expired": { "type": "boolean" }, "stage_type": { "$ref": "#/components/schemas/StageType" },
+          "mode": { "$ref": "#/components/schemas/StageMode" }, "workflow_status": { "$ref": "#/components/schemas/WorkflowStatus" },
+          "can_confirm": { "type": "boolean" }, "confirmation_managed_by": { "type": "string", "enum": ["PAYMENT", "UNIVERSITY"] },
+          "can_cancel": { "type": "boolean" }
+        },
+        "required": ["uuid", "statut", "application_uuid", "application_status", "frais_requis", "expired", "stage_type", "mode", "workflow_status", "can_confirm", "confirmation_managed_by", "can_cancel"]
+      },
+      "ReservationsResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "const": true }, "message": { "type": "string" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": { "type": "array", "items": { "$ref": "#/components/schemas/Reservation" } },
+              "stats": {
+                "type": "object",
+                "properties": {
+                  "total": { "type": "integer" }, "temporary": { "type": "integer" }, "waiting_payment": { "type": "integer" },
+                  "confirmed": { "type": "integer" }, "expired": { "type": "integer" }, "cancelled": { "type": "integer" }
+                },
+                "required": ["total", "temporary", "waiting_payment", "confirmed", "expired", "cancelled"]
+              }
+            },
+            "required": ["items", "stats"]
+          }
+        },
+        "required": ["success", "message", "data"]
+      },
+      "ConfirmReservationResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "const": true }, "message": { "type": "string" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "confirmed": { "const": true }, "idempotent": { "const": true },
+              "reservation_uuid": { "$ref": "#/components/schemas/Uuid" }, "reservation_status": { "const": "CONFIRMEE" },
+              "next_step": { "type": "string", "enum": ["UNIVERSITY_PLACEMENT", "HOSPITAL_ADMISSION"] }
+            },
+            "required": ["confirmed", "idempotent", "reservation_uuid", "reservation_status", "next_step"]
+          }
+        },
+        "required": ["success", "message", "data"]
+      },
+      "CancelReservationResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "const": true }, "message": { "type": "string" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "cancelled": { "const": true }, "idempotent": { "type": "boolean" },
+              "reservation_uuid": { "$ref": "#/components/schemas/Uuid" }, "reservation_status": { "const": "ANNULEE" }
+            },
+            "required": ["cancelled", "idempotent", "reservation_uuid", "reservation_status"]
+          }
+        },
+        "required": ["success", "message", "data"]
+      },
+      "Payment": {
+        "type": "object",
+        "properties": {
+          "created": { "type": "boolean" }, "idempotent": { "type": "boolean" },
+          "uuid": { "type": ["string", "null"], "format": "uuid" }, "reference": { "$ref": "#/components/schemas/NullableString" },
+          "transaction_reference": { "$ref": "#/components/schemas/NullableString" }, "amount": { "type": ["number", "null"] },
+          "currency": { "$ref": "#/components/schemas/NullableString" },
+          "channel": { "type": ["string", "null"], "enum": ["MPESA", "ORANGE_MONEY", "AIRTEL_MONEY", "AFRIMONEY", "BANQUE", "CARTE", null] },
+          "operator": { "$ref": "#/components/schemas/NullableString" }, "status": { "$ref": "#/components/schemas/NullableString" },
+          "phone_number": { "$ref": "#/components/schemas/NullableString" }, "initiated_at": { "$ref": "#/components/schemas/NullableDateTime" },
+          "paid_at": { "$ref": "#/components/schemas/NullableDateTime" }, "validated_at": { "$ref": "#/components/schemas/NullableDateTime" }
+        },
+        "required": ["uuid", "reference", "transaction_reference", "amount", "currency", "channel", "operator", "status", "phone_number", "initiated_at", "paid_at", "validated_at"]
+      },
+      "PaymentSituation": {
+        "type": "object",
+        "properties": {
+          "application_uuid": { "$ref": "#/components/schemas/Uuid" }, "reservation_uuid": { "type": ["string", "null"], "format": "uuid" },
+          "reservation_status": { "$ref": "#/components/schemas/NullableString" },
+          "campaign": { "type": "object", "properties": { "code": { "type": "string" }, "title": { "type": "string" } }, "required": ["code", "title"] },
+          "hospital": { "type": "object", "properties": { "code": { "type": "string" }, "name": { "type": "string" } }, "required": ["code", "name"] },
+          "payment_required": { "type": "boolean" }, "payment_allowed": { "type": "boolean" },
+          "payment_status": { "$ref": "#/components/schemas/PaymentStatus" },
+          "amount_required": { "type": "number" }, "amount_validated": { "type": "number" }, "amount_remaining": { "type": "number" },
+          "currency": { "$ref": "#/components/schemas/NullableString" },
+          "invoice": {
+            "type": ["object", "null"],
+            "properties": {
+              "uuid": { "$ref": "#/components/schemas/Uuid" }, "reference": { "type": "string" }, "status": { "type": "string" },
+              "issued_at": { "$ref": "#/components/schemas/NullableDateTime" }, "due_at": { "$ref": "#/components/schemas/NullableDateTime" }, "paid_at": { "$ref": "#/components/schemas/NullableDateTime" }
+            },
+            "required": ["uuid", "reference", "status", "issued_at", "due_at", "paid_at"]
+          },
+          "payments": { "type": "array", "items": { "$ref": "#/components/schemas/Payment" } }
+        },
+        "required": ["application_uuid", "reservation_uuid", "reservation_status", "campaign", "hospital", "payment_required", "payment_allowed", "payment_status", "amount_required", "amount_validated", "amount_remaining", "currency", "invoice", "payments"]
+      },
+      "PaymentStatus": { "type": "string", "enum": ["NOT_REQUIRED", "NOT_STARTED", "PENDING", "FAILED", "PARTIAL", "PAID", "NOT_CONFIRMED"] },
+      "PaymentsResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "const": true }, "message": { "type": "string" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": { "type": "array", "items": { "$ref": "#/components/schemas/PaymentSituation" } },
+              "stats": {
+                "type": "object",
+                "properties": {
+                  "total": { "type": "integer" }, "payable": { "type": "integer" }, "paid": { "type": "integer" },
+                  "pending": { "type": "integer" }, "failed": { "type": "integer" }, "free": { "type": "integer" }
+                },
+                "required": ["total", "payable", "paid", "pending", "failed", "free"]
+              },
+              "channels": {
+                "type": "object",
+                "properties": {
+                  "MPESA": { "const": "M-Pesa" }, "ORANGE_MONEY": { "const": "Orange Money" },
+                  "AIRTEL_MONEY": { "const": "Airtel Money" }, "AFRIMONEY": { "const": "Afrimoney" },
+                  "BANQUE": { "const": "Banque" }, "CARTE": { "const": "Carte bancaire" }
+                },
+                "required": ["MPESA", "ORANGE_MONEY", "AIRTEL_MONEY", "AFRIMONEY", "BANQUE", "CARTE"]
+              }
+            },
+            "required": ["items", "stats", "channels"]
+          }
+        },
+        "required": ["success", "message", "data"]
+      },
+      "InitiatePaymentRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "invoice_id": { "type": "integer", "minimum": 1 }, "invoice_uuid": { "$ref": "#/components/schemas/Uuid" },
+          "reservation_uuid": { "$ref": "#/components/schemas/Uuid" },
+          "channel": { "type": "string", "enum": ["MPESA", "ORANGE_MONEY", "AIRTEL_MONEY", "AFRIMONEY", "BANQUE", "CARTE"] },
+          "canal": { "type": "string", "enum": ["MPESA", "ORANGE_MONEY", "AIRTEL_MONEY", "AFRIMONEY", "BANQUE", "CARTE"] },
+          "phone_number": { "type": "string", "description": "Obligatoire pour les quatre canaux mobile money." },
+          "idempotency_key": { "type": "string", "minLength": 1, "maxLength": 100 }
+        },
+        "anyOf": [{ "required": ["invoice_id"] }, { "required": ["invoice_uuid"] }, { "required": ["reservation_uuid"] }],
+        "allOf": [{ "anyOf": [{ "required": ["channel"] }, { "required": ["canal"] }] }]
+      },
+      "InitiatePaymentResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "const": true }, "message": { "type": "string" },
+          "data": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": { "payment": { "$ref": "#/components/schemas/Payment" }, "reservation_uuid": { "$ref": "#/components/schemas/Uuid" } },
+                "required": ["payment"]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "created": { "const": false }, "already_paid": { "const": true },
+                  "reservation_uuid": { "$ref": "#/components/schemas/Uuid" }, "reservation_status": { "const": "CONFIRMEE" }, "invoice_status": { "const": "PAYEE" }
+                },
+                "required": ["created", "already_paid", "reservation_uuid", "reservation_status", "invoice_status"]
+              }
+            ]
+          }
+        },
+        "required": ["success", "message", "data"]
+      },
+      "SyncPaymentRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": { "reservation_uuid": { "$ref": "#/components/schemas/Uuid" } },
+        "required": ["reservation_uuid"]
+      },
+      "SyncPaymentResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "const": true }, "message": { "type": "string" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "reservation_uuid": { "$ref": "#/components/schemas/Uuid" }, "reservation_status": { "type": "string" },
+              "payment_status": { "$ref": "#/components/schemas/PaymentStatus" }, "invoice_status": { "$ref": "#/components/schemas/NullableString" },
+              "amount_required": { "type": "number" }, "amount_validated": { "type": "number" }, "amount_remaining": { "type": "number" },
+              "currency": { "$ref": "#/components/schemas/NullableString" }, "placement_pending": { "type": "boolean" }
+            },
+            "required": ["reservation_uuid", "reservation_status", "payment_status"]
+          }
+        },
+        "required": ["success", "message", "data"]
+      },
+      "AdmissionItem": {
+        "type": "object",
+        "properties": {
+          "reservation": { "$ref": "#/components/schemas/WorkflowEntity" },
+          "application": { "$ref": "#/components/schemas/WorkflowEntity" },
+          "placement": { "$ref": "#/components/schemas/WorkflowEntity" },
+          "admission": { "$ref": "#/components/schemas/WorkflowEntity" },
+          "assignment": { "$ref": "#/components/schemas/AssignmentEntity" },
+          "campaign": {
+            "type": "object", "additionalProperties": true,
+            "properties": { "code": { "type": "string" }, "title": { "type": "string" }, "start_date": { "type": ["string", "null"], "format": "date" }, "end_date": { "type": ["string", "null"], "format": "date" } },
+            "required": ["code", "title", "start_date", "end_date"]
+          },
+          "stage_type": { "$ref": "#/components/schemas/StageType" }, "mode": { "$ref": "#/components/schemas/StageMode" },
+          "hospital": {
+            "type": "object",
+            "properties": { "code": { "type": "string" }, "name": { "type": "string" }, "city": { "$ref": "#/components/schemas/NullableString" }, "province": { "$ref": "#/components/schemas/NullableString" } },
+            "required": ["code", "name", "city", "province"]
+          },
+          "completion": {
+            "type": "object",
+            "properties": { "status": { "$ref": "#/components/schemas/NullableString" }, "attendance_rate": { "type": ["number", "null"] }, "final_score": { "type": ["number", "null"] } },
+            "required": ["status", "attendance_rate", "final_score"]
+          },
+          "workflow_status": { "$ref": "#/components/schemas/WorkflowStatus" }
+        },
+        "required": ["reservation", "application", "placement", "admission", "assignment", "campaign", "stage_type", "mode", "hospital", "completion", "workflow_status"]
+      },
+      "WorkflowEntity": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "exists": { "type": "boolean" }, "uuid": { "type": ["string", "null"], "format": "uuid" },
+          "status": { "$ref": "#/components/schemas/NullableString" }
+        },
+        "required": ["uuid", "status"]
+      },
+      "AssignmentEntity": {
+        "allOf": [
+          { "$ref": "#/components/schemas/WorkflowEntity" },
+          {
+            "type": "object",
+            "properties": {
+              "start_date": { "type": ["string", "null"], "format": "date" }, "end_date": { "type": ["string", "null"], "format": "date" },
+              "assigned_at": { "$ref": "#/components/schemas/NullableDateTime" }, "ended_at": { "$ref": "#/components/schemas/NullableDateTime" },
+              "observation": { "$ref": "#/components/schemas/NullableString" },
+              "unit": { "type": "object", "properties": { "code": { "$ref": "#/components/schemas/NullableString" }, "name": { "$ref": "#/components/schemas/NullableString" } }, "required": ["code", "name"] }
+            },
+            "required": ["start_date", "end_date", "assigned_at", "ended_at", "observation", "unit"]
+          }
+        ]
+      },
+      "AdmissionsResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "const": true }, "message": { "type": "string" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": { "type": "array", "items": { "$ref": "#/components/schemas/AdmissionItem" } },
+              "stats": {
+                "type": "object",
+                "properties": {
+                  "total": { "type": "integer" }, "waiting_decision": { "type": "integer" }, "waiting_payment": { "type": "integer" },
+                  "waiting_placement": { "type": "integer" }, "waiting_admission": { "type": "integer" }, "admitted": { "type": "integer" },
+                  "assigned": { "type": "integer" }, "completed": { "type": "integer" }, "refused": { "type": "integer" }, "expired": { "type": "integer" }
+                },
+                "required": ["total", "waiting_decision", "waiting_payment", "waiting_placement", "waiting_admission", "admitted", "assigned", "completed", "refused", "expired"]
+              }
+            },
+            "required": ["items", "stats"]
+          }
+        },
+        "required": ["success", "message", "data"]
+      },
+      "EmptyData": { "type": "array", "maxItems": 0, "items": false },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": { "success": { "const": false }, "message": { "type": "string" }, "data": { "oneOf": [{ "$ref": "#/components/schemas/EmptyData" }, { "type": "object" }] } },
+        "required": ["success", "message", "data"]
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "Access token absent, invalide ou expiré",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" }, "example": { "success": false, "message": "Token invalide ou expiré.", "data": [] } } }
+      },
+      "Forbidden": {
+        "description": "Compte non étudiant ou profil inactif",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" }, "example": { "success": false, "message": "Accès réservé aux étudiants.", "data": [] } } }
+      },
+      "NotFound": {
+        "description": "Ressource inexistante ou n'appartenant pas au compte Bearer",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" }, "example": { "success": false, "message": "Réservation introuvable.", "data": [] } } }
+      },
+      "Conflict": {
+        "description": "Transition interdite par l'état courant du workflow",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" }, "example": { "success": false, "message": "La décision de l'université est encore attendue.", "data": [] } } }
+      },
+      "ValidationError": {
+        "description": "Paramètres ou payload invalides",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" }, "example": { "success": false, "message": "Les données envoyées sont invalides.", "data": [] } } }
+      },
+      "MethodNotAllowed": {
+        "description": "Méthode HTTP incorrecte",
+        "headers": { "Allow": { "schema": { "type": "string" } } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" }, "example": { "success": false, "message": "Méthode HTTP non autorisée.", "data": [] } } }
+      },
+      "InternalError": {
+        "description": "Erreur interne",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" }, "example": { "success": false, "message": "Une erreur interne empêche l'opération.", "data": [] } } }
+      }
+    }
+  }
+}
