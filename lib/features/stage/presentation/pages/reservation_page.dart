@@ -24,7 +24,6 @@ class _ReservationPageState extends State<ReservationPage> {
   late final CampagneStage _campagne;
   late final HopitalCampagne _hopital;
 
-  late String _serviceSelectionne;
   String _periodeSelectionnee = 'Matin (7h-13h)';
   final TextEditingController _motivationController = TextEditingController();
   bool _conditionsAcceptees = true;
@@ -51,10 +50,6 @@ class _ReservationPageState extends State<ReservationPage> {
             : ConfigurationApi.utiliserDonneesMockees
             ? SourceCampagneMock.campagnePrincipale.hopitaux.first
             : throw StateError('Aucun hôpital disponible.'));
-
-    _serviceSelectionne = _hopital.services.isNotEmpty
-        ? _hopital.services.first
-        : '';
   }
 
   @override
@@ -292,80 +287,6 @@ class _ReservationPageState extends State<ReservationPage> {
     );
   }
 
-  void _ouvrirSelectionService() {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return Container(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 38,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE2E8F0),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                'Choisir un service',
-                style: GoogleFonts.inter(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                  color: const Color(0xFF0F172A),
-                ),
-              ),
-              const SizedBox(height: 14),
-              ..._hopital.services.map((service) {
-                final estChoisi = service == _serviceSelectionne;
-                return ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(
-                    Icons.medical_services_outlined,
-                    color: estChoisi
-                        ? const Color(0xFF1D61F2)
-                        : const Color(0xFF64748B),
-                  ),
-                  title: Text(
-                    service,
-                    style: GoogleFonts.inter(
-                      fontSize: 15,
-                      fontWeight: estChoisi ? FontWeight.w700 : FontWeight.w500,
-                      color: estChoisi
-                          ? const Color(0xFF1D61F2)
-                          : const Color(0xFF0F172A),
-                    ),
-                  ),
-                  trailing: estChoisi
-                      ? const Icon(
-                          Icons.check_rounded,
-                          color: Color(0xFF1D61F2),
-                        )
-                      : null,
-                  onTap: () {
-                    setState(() => _serviceSelectionne = service);
-                    Navigator.of(ctx).pop();
-                  },
-                );
-              }),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
   void _ouvrirSelectionPeriode() {
     showModalBottomSheet<void>(
       context: context,
@@ -455,25 +376,7 @@ class _ReservationPageState extends State<ReservationPage> {
 
             const SizedBox(height: 22),
 
-            // 2. CHAMP SERVICE SOUHAITÉ
-            Text(
-              'Service souhaité',
-              style: GoogleFonts.inter(
-                fontSize: 14.5,
-                fontWeight: FontWeight.w800,
-                color: const Color(0xFF0F172A),
-              ),
-            ),
-            const SizedBox(height: 8),
-            _ChampSelecteur(
-              icone: Icons.medical_services_outlined,
-              valeur: _serviceSelectionne,
-              onTap: _ouvrirSelectionService,
-            ),
-
-            const SizedBox(height: 18),
-
-            // 3. CHAMP PÉRIODE PRÉFÉRÉE
+            // 2. CHAMP PÉRIODE PRÉFÉRÉE
             Text(
               'Période préférée',
               style: GoogleFonts.inter(
@@ -491,7 +394,7 @@ class _ReservationPageState extends State<ReservationPage> {
 
             const SizedBox(height: 18),
 
-            // 4. CHAMP MOTIVATION (OPTIONNEL)
+            // 3. CHAMP MOTIVATION (OPTIONNEL)
             Row(
               children: [
                 Text(
@@ -541,12 +444,12 @@ class _ReservationPageState extends State<ReservationPage> {
 
             const SizedBox(height: 20),
 
-            // 5. CARTE RÉSUMÉ FINANCIER
+            // 4. CARTE RÉSUMÉ FINANCIER
             _CarteResumeFinancier(campagne: _campagne),
 
             const SizedBox(height: 18),
 
-            // 6. CASE À COCHER CONDITIONS
+            // 5. CASE À COCHER CONDITIONS
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
@@ -585,7 +488,7 @@ class _ReservationPageState extends State<ReservationPage> {
 
             const SizedBox(height: 22),
 
-            // 7. BOUTON CONFIRMER LA RÉSERVATION
+            // 6. BOUTON CONFIRMER LA RÉSERVATION
             SizedBox(
               width: double.infinity,
               height: 52,
