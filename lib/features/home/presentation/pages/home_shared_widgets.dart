@@ -90,11 +90,17 @@ class _EnTeteAccueilState extends State<EnTeteAccueil> {
             builder: (_, _) {
               final photo = PhotoProfilService.instance.cheminPhoto;
               final photoValide = photo != null && File(photo).existsSync();
+              final avatarDistant =
+                  widget.etudiant['avatar_url']?.toString().trim() ?? '';
               return CircleAvatar(
                 radius: 23,
                 backgroundColor: const Color(0xFFE2E8F0),
-                backgroundImage: photoValide ? FileImage(File(photo)) : null,
-                child: photoValide
+                backgroundImage: photoValide
+                    ? FileImage(File(photo))
+                    : avatarDistant.isNotEmpty
+                    ? NetworkImage(avatarDistant)
+                    : null,
+                child: photoValide || avatarDistant.isNotEmpty
                     ? null
                     : const Icon(
                         Icons.person_rounded,

@@ -68,20 +68,51 @@ class _PlanningPageState extends State<PlanningPage> {
   }
 
   Future<void> _chargerEvenements() async {
+    final evenements = <TachePlanning>[];
+
     try {
-      final res = await _source.calendrier();
-      final items =
-          (res['items'] as List?)
-              ?.whereType<Map>()
-              .map((m) => TachePlanning.fromJson(Map<String, dynamic>.from(m)))
-              .toList() ??
-          <TachePlanning>[];
-      if (mounted) {
-        setState(() {
-          _evenementsDistants = items;
-        });
+      final calendrier = await _source.calendrier();
+      evenements.addAll(
+        (calendrier['items'] as List? ?? const []).whereType<Map>().map(
+          (m) => TachePlanning.fromJson(Map<String, dynamic>.from(m)),
+        ),
+      );
+    } catch (_) {}
+
+    try {
+      final stages = await _source.stages();
+      for (final stageBrut in (stages['items'] as List? ?? const [])) {
+        if (stageBrut is! Map) continue;
+        final stage = Map<String, dynamic>.from(stageBrut);
+        final nomHopital = stage['hospital_name']?.toString() ?? '';
+        for (final rotationBrute in (stage['rotations'] as List? ?? const [])) {
+          if (rotationBrute is! Map) continue;
+          final rotation = Map<String, dynamic>.from(rotationBrute);
+          final debut = DateTime.tryParse(
+            rotation['date_debut']?.toString() ?? '',
+          );
+          final fin = DateTime.tryParse(rotation['date_fin']?.toString() ?? '');
+          if (debut == null || fin == null || fin.isBefore(debut)) continue;
+          for (
+            var date = DateTime(debut.year, debut.month, debut.day);
+            !date.isAfter(DateTime(fin.year, fin.month, fin.day));
+            date = date.add(const Duration(days: 1))
+          ) {
+            evenements.add(
+              TachePlanning.depuisRotationStage(
+                rotation,
+                nomHopital: nomHopital,
+                dateAffichee: date,
+              ),
+            );
+          }
+        }
       }
     } catch (_) {}
+
+    if (mounted) {
+      setState(() => _evenementsDistants = evenements);
+    }
   }
 
   void _selectionnerDate(DateTime date) {

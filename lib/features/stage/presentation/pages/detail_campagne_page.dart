@@ -6,13 +6,15 @@ import '../../../../core/network/configuration_api.dart';
 import '../../../notifications/presentation/pages/notifications_page.dart';
 import '../../data/datasources/source_campagne_mock.dart';
 import '../../domain/entities/campagne_stage.dart';
+import '../../domain/entities/suivi_candidature_stage.dart';
 import 'hopitaux_disponibles_page.dart';
 import 'reservation_page.dart';
 
 class DetailCampagnePage extends StatelessWidget {
-  const DetailCampagnePage({this.campagne, super.key});
+  const DetailCampagnePage({this.campagne, this.suiviCandidature, super.key});
 
   final CampagneStage? campagne;
+  final SuiviCandidatureStage? suiviCandidature;
 
   @override
   Widget build(BuildContext context) {
@@ -45,6 +47,11 @@ class DetailCampagnePage extends StatelessWidget {
                   // Carte Hero en dégradé bleu / violet
                   _CarteHeroCampagne(campagne: infoCampagne),
 
+                  if (suiviCandidature != null) ...[
+                    const SizedBox(height: 16),
+                    _CarteSuiviCandidature(suivi: suiviCandidature!),
+                  ],
+
                   const SizedBox(height: 16),
 
                   // Grille 2x2 des informations clés (Début, Fin, Montant, Modalité)
@@ -53,41 +60,45 @@ class DetailCampagnePage extends StatelessWidget {
                   const SizedBox(height: 22),
 
                   // Section Consignes générales
-                  _SectionConsignes(consignes: infoCampagne.consignes),
-
-                  const SizedBox(height: 22),
+                  if (infoCampagne.consignes.isNotEmpty) ...[
+                    _SectionConsignes(consignes: infoCampagne.consignes),
+                    const SizedBox(height: 22),
+                  ],
 
                   // Section Éligibilité académique
-                  _SectionEligibilite(
-                    messageEligibilite: infoCampagne.messageEligibilite,
-                    criteres: infoCampagne.criteresEligibilite,
-                  ),
-
-                  const SizedBox(height: 22),
+                  if (infoCampagne.messageEligibilite.isNotEmpty ||
+                      infoCampagne.criteresEligibilite.isNotEmpty) ...[
+                    _SectionEligibilite(
+                      messageEligibilite: infoCampagne.messageEligibilite,
+                      criteres: infoCampagne.criteresEligibilite,
+                    ),
+                    const SizedBox(height: 22),
+                  ],
 
                   // Section Hôpitaux retenus
-                  _SectionHopitauxRetenus(
-                    campagne: infoCampagne,
-                    hopitaux: infoCampagne.hopitaux,
-                    onSelectionnerHopital: (hopital) {
-                      if (infoCampagne.autoriseReservationAutonome) {
-                        _naviguerVersReservation(
-                          context,
-                          infoCampagne,
-                          hopital,
-                        );
-                      } else {
-                        _naviguerVersHopitauxDisponibles(
-                          context,
-                          infoCampagne,
-                          hopital: hopital,
-                        );
-                      }
-                    },
-                    onOuvrirCarte: () {
-                      _naviguerVersHopitauxDisponibles(context, infoCampagne);
-                    },
-                  ),
+                  if (infoCampagne.hopitaux.isNotEmpty)
+                    _SectionHopitauxRetenus(
+                      campagne: infoCampagne,
+                      hopitaux: infoCampagne.hopitaux,
+                      onSelectionnerHopital: (hopital) {
+                        if (infoCampagne.autoriseReservationAutonome) {
+                          _naviguerVersReservation(
+                            context,
+                            infoCampagne,
+                            hopital,
+                          );
+                        } else {
+                          _naviguerVersHopitauxDisponibles(
+                            context,
+                            infoCampagne,
+                            hopital: hopital,
+                          );
+                        }
+                      },
+                      onOuvrirCarte: () {
+                        _naviguerVersHopitauxDisponibles(context, infoCampagne);
+                      },
+                    ),
 
                   const SizedBox(height: 16),
                 ],
@@ -111,7 +122,9 @@ class DetailCampagnePage extends StatelessWidget {
                 width: double.infinity,
                 height: 52,
                 child: FilledButton(
-                  onPressed: infoCampagne.hopitaux.isEmpty
+                  onPressed: suiviCandidature != null
+                      ? () => Navigator.of(context).maybePop()
+                      : infoCampagne.hopitaux.isEmpty
                       ? null
                       : () => _naviguerVersHopitauxDisponibles(
                           context,
@@ -126,7 +139,9 @@ class DetailCampagnePage extends StatelessWidget {
                     elevation: 0,
                   ),
                   child: Text(
-                    infoCampagne.autoriseReservationAutonome
+                    suiviCandidature != null
+                        ? 'Retour aux candidatures'
+                        : infoCampagne.autoriseReservationAutonome
                         ? 'Réserver ma place'
                         : 'Voir les hôpitaux éligibles',
                     style: GoogleFonts.inter(
@@ -252,6 +267,17 @@ class _CarteHeroCampagne extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final statut = campagne.statut.toLowerCase();
+    final statutCritique =
+        statut.contains('refus') ||
+        statut.contains('annul') ||
+        statut.contains('expir');
+    final fondStatut = statutCritique
+        ? const Color(0xFFFEE2E2)
+        : const Color(0xFFDCFCE7);
+    final couleurStatut = statutCritique
+        ? const Color(0xFFDC2626)
+        : const Color(0xFF15803D);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -277,7 +303,7 @@ class _CarteHeroCampagne extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
-              color: const Color(0xFFDCFCE7),
+              color: fondStatut,
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
@@ -285,7 +311,7 @@ class _CarteHeroCampagne extends StatelessWidget {
               style: GoogleFonts.inter(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
-                color: const Color(0xFF15803D),
+                color: couleurStatut,
               ),
             ),
           ),
@@ -313,6 +339,135 @@ class _CarteHeroCampagne extends StatelessWidget {
               height: 1.35,
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CarteSuiviCandidature extends StatelessWidget {
+  const _CarteSuiviCandidature({required this.suivi});
+
+  final SuiviCandidatureStage suivi;
+
+  @override
+  Widget build(BuildContext context) {
+    final estErreur = {
+      'CANDIDATURE_REFUSEE',
+      'ANNULEE',
+      'RESERVATION_EXPIREE',
+    }.contains(suivi.statut);
+    final couleur = estErreur
+        ? const Color(0xFFDC2626)
+        : suivi.statut == 'EN_ATTENTE_PAIEMENT'
+        ? const Color(0xFFEA580C)
+        : const Color(0xFF2563EB);
+    final fond = estErreur
+        ? const Color(0xFFFEF2F2)
+        : suivi.statut == 'EN_ATTENTE_PAIEMENT'
+        ? const Color(0xFFFFF7ED)
+        : const Color(0xFFEFF6FF);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: fond,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: couleur.withValues(alpha: 0.22)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: couleur.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  estErreur
+                      ? Icons.info_outline_rounded
+                      : Icons.hourglass_top_rounded,
+                  color: couleur,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Votre candidature',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF64748B),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      suivi.libelleStatut,
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: couleur,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: List.generate(6, (index) {
+              final atteint = index < suivi.progression && !estErreur;
+              return Expanded(
+                child: Container(
+                  height: 5,
+                  margin: EdgeInsets.only(right: index == 5 ? 0 : 5),
+                  decoration: BoxDecoration(
+                    color: atteint ? couleur : const Color(0xFFCBD5E1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                ),
+              );
+            }),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            suivi.message,
+            style: GoogleFonts.inter(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w500,
+              color: const Color(0xFF334155),
+              height: 1.4,
+            ),
+          ),
+          if (suivi.nomHopital.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(Icons.local_hospital_outlined, color: couleur, size: 18),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: Text(
+                    suivi.nomHopital,
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF0F172A),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -350,26 +505,31 @@ class _GrilleInformations extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _ItemInformation(
-                icone: Icons.payments_outlined,
-                label: 'Montant',
-                valeur: campagne.indemnite,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _ItemInformation(
-                icone: Icons.account_tree_outlined,
-                label: 'Modalité',
-                valeur: campagne.modalite,
-              ),
-            ),
-          ],
-        ),
+        if (campagne.indemnite.isNotEmpty || campagne.modalite.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              if (campagne.indemnite.isNotEmpty)
+                Expanded(
+                  child: _ItemInformation(
+                    icone: Icons.payments_outlined,
+                    label: 'Montant',
+                    valeur: campagne.indemnite,
+                  ),
+                ),
+              if (campagne.indemnite.isNotEmpty && campagne.modalite.isNotEmpty)
+                const SizedBox(width: 12),
+              if (campagne.modalite.isNotEmpty)
+                Expanded(
+                  child: _ItemInformation(
+                    icone: Icons.account_tree_outlined,
+                    label: 'Modalité',
+                    valeur: campagne.modalite,
+                  ),
+                ),
+            ],
+          ),
+        ],
       ],
     );
   }

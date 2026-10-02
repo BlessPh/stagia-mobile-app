@@ -71,7 +71,9 @@ class SourceEtudiantDistante {
       );
     }
     final donnees = reponse['data'];
-    return donnees is Map ? Map<String, dynamic>.from(donnees) : <String, dynamic>{};
+    return donnees is Map
+        ? Map<String, dynamic>.from(donnees)
+        : <String, dynamic>{};
   }
 
   Future<Map<String, dynamic>> annulerReservation(String uuid) async {
@@ -86,16 +88,22 @@ class SourceEtudiantDistante {
       );
     }
     final donnees = reponse['data'];
-    return donnees is Map ? Map<String, dynamic>.from(donnees) : <String, dynamic>{};
+    return donnees is Map
+        ? Map<String, dynamic>.from(donnees)
+        : <String, dynamic>{};
   }
 
   Future<Map<String, dynamic>> admissions([String? reservationUuid]) async {
     if (ConfigurationApi.utiliserDonneesMockees) {
-      return DonneesEtudiantMockees.pourEndpoint(EndpointsApi.admissionEtudiant);
+      return DonneesEtudiantMockees.pourEndpoint(
+        EndpointsApi.admissionEtudiant,
+      );
     }
     final reponse = await _client.get(
       EndpointsApi.admissionEtudiant,
-      parametres: reservationUuid != null ? {'reservation_uuid': reservationUuid} : null,
+      parametres: reservationUuid != null
+          ? {'reservation_uuid': reservationUuid}
+          : null,
     );
     if (reponse['success'] != true) {
       throw ErreurApi(
@@ -122,7 +130,9 @@ class SourceEtudiantDistante {
   Future<Map<String, dynamic>> candidatures() =>
       _donnees(EndpointsApi.candidaturesEtudiant);
 
-  Future<Map<String, dynamic>> contextePointage([String? assignmentUuid]) async {
+  Future<Map<String, dynamic>> contextePointage([
+    String? assignmentUuid,
+  ]) async {
     if (ConfigurationApi.utiliserDonneesMockees) {
       return {
         'can_punch': true,
@@ -137,17 +147,23 @@ class SourceEtudiantDistante {
     }
     final reponse = await _client.get(
       EndpointsApi.contextePointage,
-      parametres: assignmentUuid != null ? {'assignment_uuid': assignmentUuid} : null,
+      parametres: assignmentUuid != null
+          ? {'assignment_uuid': assignmentUuid}
+          : null,
     );
     if (reponse['success'] != true) {
       throw ErreurApi(
         code: 'REPONSE_API_REFUSEE',
-        message: reponse['message']?.toString() ?? 'Impossible d\'obtenir le contexte de pointage.',
+        message:
+            reponse['message']?.toString() ??
+            'Impossible d\'obtenir le contexte de pointage.',
         details: reponse['data'],
       );
     }
     final donnees = reponse['data'];
-    return donnees is Map ? Map<String, dynamic>.from(donnees) : <String, dynamic>{};
+    return donnees is Map
+        ? Map<String, dynamic>.from(donnees)
+        : <String, dynamic>{};
   }
 
   Future<Map<String, dynamic>> pointerArrivee() async {
@@ -155,12 +171,15 @@ class SourceEtudiantDistante {
     if (reponse['success'] != true) {
       throw ErreurApi(
         code: 'POINTAGE_REFUSE',
-        message: reponse['message']?.toString() ?? 'Pointage d\'arrivée impossible.',
+        message:
+            reponse['message']?.toString() ?? 'Pointage d\'arrivée impossible.',
         details: reponse['data'],
       );
     }
     final donnees = reponse['data'];
-    return donnees is Map ? Map<String, dynamic>.from(donnees) : <String, dynamic>{};
+    return donnees is Map
+        ? Map<String, dynamic>.from(donnees)
+        : <String, dynamic>{};
   }
 
   Future<Map<String, dynamic>> pointerDepart() async {
@@ -168,12 +187,15 @@ class SourceEtudiantDistante {
     if (reponse['success'] != true) {
       throw ErreurApi(
         code: 'POINTAGE_REFUSE',
-        message: reponse['message']?.toString() ?? 'Pointage de départ impossible.',
+        message:
+            reponse['message']?.toString() ?? 'Pointage de départ impossible.',
         details: reponse['data'],
       );
     }
     final donnees = reponse['data'];
-    return donnees is Map ? Map<String, dynamic>.from(donnees) : <String, dynamic>{};
+    return donnees is Map
+        ? Map<String, dynamic>.from(donnees)
+        : <String, dynamic>{};
   }
 
   Future<Map<String, dynamic>> presences([String? assignmentUuid]) async {
@@ -184,8 +206,9 @@ class SourceEtudiantDistante {
     }
     final reponse = await _client.get(
       EndpointsApi.presencesEtudiant,
-      parametres:
-          assignmentUuid != null ? {'assignment_uuid': assignmentUuid} : null,
+      parametres: assignmentUuid != null
+          ? {'assignment_uuid': assignmentUuid}
+          : null,
     );
     if (reponse['success'] != true) {
       throw ErreurApi(
@@ -206,14 +229,13 @@ class SourceEtudiantDistante {
 
   Future<Map<String, dynamic>> journal([String? assignmentUuid]) async {
     if (ConfigurationApi.utiliserDonneesMockees) {
-      return DonneesEtudiantMockees.pourEndpoint(
-        EndpointsApi.journalEtudiant,
-      );
+      return DonneesEtudiantMockees.pourEndpoint(EndpointsApi.journalEtudiant);
     }
     final reponse = await _client.get(
       EndpointsApi.journalEtudiant,
-      parametres:
-          assignmentUuid != null ? {'assignment_uuid': assignmentUuid} : null,
+      parametres: assignmentUuid != null
+          ? {'assignment_uuid': assignmentUuid}
+          : null,
     );
     if (reponse['success'] != true) {
       throw ErreurApi(
@@ -247,8 +269,9 @@ class SourceEtudiantDistante {
     String? logbookUuid,
   }) async {
     if (ConfigurationApi.utiliserDonneesMockees) {
-      final premiereActivite =
-          activities.isNotEmpty ? activities.first : <String, dynamic>{};
+      final premiereActivite = activities.isNotEmpty
+          ? activities.first
+          : <String, dynamic>{};
       final categorie = premiereActivite['category']?.toString() ?? 'CHIRURGIE';
       if (logbookUuid != null && logbookUuid.isNotEmpty) {
         DepotMockEtudiant.modifierActivite(
@@ -323,10 +346,7 @@ class SourceEtudiantDistante {
   }) async {
     if (ConfigurationApi.utiliserDonneesMockees) {
       DepotMockEtudiant.soumettreActivite(logbookUuid);
-      return {
-        'logbook_uuid': logbookUuid,
-        'statut': 'SOUMIS',
-      };
+      return {'logbook_uuid': logbookUuid, 'statut': 'SOUMIS'};
     }
 
     final reponse = await _client.post(
@@ -348,7 +368,13 @@ class SourceEtudiantDistante {
   }
 
   // Tâches
-  Future<Map<String, dynamic>> taches({String? assignmentUuid, String? status}) async {
+  Future<Map<String, dynamic>> taches({
+    String? assignmentUuid,
+    String? status,
+  }) async {
+    if (ConfigurationApi.utiliserDonneesMockees) {
+      return DonneesEtudiantMockees.pourEndpoint(EndpointsApi.tachesEtudiant);
+    }
     final parametres = <String, dynamic>{};
     if (assignmentUuid != null) parametres['assignment_uuid'] = assignmentUuid;
     if (status != null) parametres['status'] = status;
@@ -360,31 +386,47 @@ class SourceEtudiantDistante {
     if (reponse['success'] != true) {
       throw ErreurApi(
         code: 'REPONSE_API_REFUSEE',
-        message: reponse['message']?.toString() ?? 'Impossible de récupérer les tâches.',
+        message:
+            reponse['message']?.toString() ??
+            'Impossible de récupérer les tâches.',
         details: reponse['data'],
       );
     }
     final donnees = reponse['data'];
-    return donnees is Map ? Map<String, dynamic>.from(donnees) : <String, dynamic>{};
+    return donnees is Map
+        ? Map<String, dynamic>.from(donnees)
+        : <String, dynamic>{};
   }
 
-  Future<Map<String, dynamic>> demarrerTache(String uuid, {String? commentaire}) async {
+  Future<Map<String, dynamic>> demarrerTache(
+    String uuid, {
+    String? commentaire,
+  }) async {
     final reponse = await _client.post(
       EndpointsApi.demarrerTache(uuid),
-      corps: commentaire != null && commentaire.isNotEmpty ? {'comment': commentaire} : {},
+      corps: commentaire != null && commentaire.isNotEmpty
+          ? {'comment': commentaire}
+          : {},
     );
     if (reponse['success'] != true) {
       throw ErreurApi(
         code: 'ACTION_TACHE_REFUSEE',
-        message: reponse['message']?.toString() ?? 'Impossible de démarrer la tâche.',
+        message:
+            reponse['message']?.toString() ??
+            'Impossible de démarrer la tâche.',
         details: reponse['data'],
       );
     }
     final donnees = reponse['data'];
-    return donnees is Map ? Map<String, dynamic>.from(donnees) : <String, dynamic>{};
+    return donnees is Map
+        ? Map<String, dynamic>.from(donnees)
+        : <String, dynamic>{};
   }
 
-  Future<Map<String, dynamic>> commenterTache(String uuid, String commentaire) async {
+  Future<Map<String, dynamic>> commenterTache(
+    String uuid,
+    String commentaire,
+  ) async {
     final reponse = await _client.post(
       EndpointsApi.commenterTache(uuid),
       corps: {'comment': commentaire},
@@ -392,28 +434,41 @@ class SourceEtudiantDistante {
     if (reponse['success'] != true) {
       throw ErreurApi(
         code: 'ACTION_TACHE_REFUSEE',
-        message: reponse['message']?.toString() ?? 'Impossible d\'ajouter le commentaire.',
+        message:
+            reponse['message']?.toString() ??
+            'Impossible d\'ajouter le commentaire.',
         details: reponse['data'],
       );
     }
     final donnees = reponse['data'];
-    return donnees is Map ? Map<String, dynamic>.from(donnees) : <String, dynamic>{};
+    return donnees is Map
+        ? Map<String, dynamic>.from(donnees)
+        : <String, dynamic>{};
   }
 
-  Future<Map<String, dynamic>> terminerTache(String uuid, {String? commentaire}) async {
+  Future<Map<String, dynamic>> terminerTache(
+    String uuid, {
+    String? commentaire,
+  }) async {
     final reponse = await _client.post(
       EndpointsApi.terminerTache(uuid),
-      corps: commentaire != null && commentaire.isNotEmpty ? {'comment': commentaire} : {},
+      corps: commentaire != null && commentaire.isNotEmpty
+          ? {'comment': commentaire}
+          : {},
     );
     if (reponse['success'] != true) {
       throw ErreurApi(
         code: 'ACTION_TACHE_REFUSEE',
-        message: reponse['message']?.toString() ?? 'Impossible de terminer la tâche.',
+        message:
+            reponse['message']?.toString() ??
+            'Impossible de terminer la tâche.',
         details: reponse['data'],
       );
     }
     final donnees = reponse['data'];
-    return donnees is Map ? Map<String, dynamic>.from(donnees) : <String, dynamic>{};
+    return donnees is Map
+        ? Map<String, dynamic>.from(donnees)
+        : <String, dynamic>{};
   }
 
   // Feedbacks
@@ -425,12 +480,16 @@ class SourceEtudiantDistante {
     if (reponse['success'] != true) {
       throw ErreurApi(
         code: 'REPONSE_API_REFUSEE',
-        message: reponse['message']?.toString() ?? 'Impossible de récupérer les feedbacks.',
+        message:
+            reponse['message']?.toString() ??
+            'Impossible de récupérer les feedbacks.',
         details: reponse['data'],
       );
     }
     final donnees = reponse['data'];
-    return donnees is Map ? Map<String, dynamic>.from(donnees) : <String, dynamic>{};
+    return donnees is Map
+        ? Map<String, dynamic>.from(donnees)
+        : <String, dynamic>{};
   }
 
   Future<Map<String, dynamic>> evaluations([String? assignmentUuid]) async {
@@ -492,28 +551,27 @@ class SourceEtudiantDistante {
           'phone_number': phoneNumber.trim(),
         'idempotency_key': idempotencyKey,
       },
-      entetes: {
-        'Idempotency-Key': idempotencyKey,
-      },
+      entetes: {'Idempotency-Key': idempotencyKey},
     );
     if (reponse['success'] != true) {
       throw ErreurApi(
         code: 'PAIEMENT_REFUSE',
-        message: reponse['message']?.toString() ?? 'Initiation du paiement refusée.',
+        message:
+            reponse['message']?.toString() ?? 'Initiation du paiement refusée.',
         details: reponse['data'],
       );
     }
     final donnees = reponse['data'];
-    return donnees is Map ? Map<String, dynamic>.from(donnees) : <String, dynamic>{};
+    return donnees is Map
+        ? Map<String, dynamic>.from(donnees)
+        : <String, dynamic>{};
   }
 
   Future<Map<String, dynamic>> paiementSync({
     required String reservationUuid,
   }) async {
     if (ConfigurationApi.utiliserDonneesMockees) {
-      return DonneesEtudiantMockees.pourEndpoint(
-        EndpointsApi.paiementSync,
-      );
+      return DonneesEtudiantMockees.pourEndpoint(EndpointsApi.paiementSync);
     }
     final reponse = await _client.post(
       EndpointsApi.paiementSync,
@@ -536,25 +594,34 @@ class SourceEtudiantDistante {
   Future<Map<String, dynamic>> notes([int? academicEnrollmentId]) async {
     final reponse = await _client.get(
       EndpointsApi.notesEtudiant,
-      parametres: academicEnrollmentId != null ? {'academic_enrollment_id': academicEnrollmentId} : null,
+      parametres: academicEnrollmentId != null
+          ? {'academic_enrollment_id': academicEnrollmentId}
+          : null,
     );
     if (reponse['success'] != true) {
       throw ErreurApi(
         code: 'REPONSE_API_REFUSEE',
-        message: reponse['message']?.toString() ?? 'Impossible de récupérer les notes.',
+        message:
+            reponse['message']?.toString() ??
+            'Impossible de récupérer les notes.',
         details: reponse['data'],
       );
     }
     final donnees = reponse['data'];
-    return donnees is Map ? Map<String, dynamic>.from(donnees) : <String, dynamic>{};
+    return donnees is Map
+        ? Map<String, dynamic>.from(donnees)
+        : <String, dynamic>{};
   }
 
   // Conventions & Documents officiels
-  Future<Map<String, dynamic>> conventions() => _donnees(EndpointsApi.conventionsEtudiant);
+  Future<Map<String, dynamic>> conventions() =>
+      _donnees(EndpointsApi.conventionsEtudiant);
 
-  Future<Map<String, dynamic>> documentsAcademiques() => _donnees(EndpointsApi.documentsAcademiques);
+  Future<Map<String, dynamic>> documentsAcademiques() =>
+      _donnees(EndpointsApi.documentsAcademiques);
 
-  Future<Map<String, dynamic>> documentsPersonnels() => _donnees(EndpointsApi.documentsPersonnels);
+  Future<Map<String, dynamic>> documentsPersonnels() =>
+      _donnees(EndpointsApi.documentsPersonnels);
 
   Future<Map<String, dynamic>> televerserDocumentPersonnel({
     required String cheminFichier,
@@ -564,10 +631,7 @@ class SourceEtudiantDistante {
     final reponse = await _client.envoyerFichier(
       EndpointsApi.documentsPersonnels,
       cheminFichier: cheminFichier,
-      champs: {
-        'title': titre,
-        'category': categorie,
-      },
+      champs: {'title': titre, 'category': categorie},
       cleFichier: 'document',
     );
     if (reponse['success'] != true) {
@@ -578,7 +642,9 @@ class SourceEtudiantDistante {
       );
     }
     final donnees = reponse['data'];
-    return donnees is Map ? Map<String, dynamic>.from(donnees) : <String, dynamic>{};
+    return donnees is Map
+        ? Map<String, dynamic>.from(donnees)
+        : <String, dynamic>{};
   }
 
   Future<void> supprimerDocumentPersonnel(String uuid) async {
@@ -600,7 +666,9 @@ class SourceEtudiantDistante {
     String? type,
   }) async {
     if (ConfigurationApi.utiliserDonneesMockees) {
-      return DonneesEtudiantMockees.pourEndpoint(EndpointsApi.notificationsEtudiant);
+      return DonneesEtudiantMockees.pourEndpoint(
+        EndpointsApi.notificationsEtudiant,
+      );
     }
     final params = <String, String>{};
     if (limit != null) params['limit'] = limit.toString();
@@ -615,28 +683,38 @@ class SourceEtudiantDistante {
     if (reponse['success'] != true) {
       throw ErreurApi(
         code: 'NOTIFICATIONS_REFUSEES',
-        message: reponse['message']?.toString() ?? 'Impossible de récupérer les notifications.',
+        message:
+            reponse['message']?.toString() ??
+            'Impossible de récupérer les notifications.',
         details: reponse['data'],
       );
     }
     final donnees = reponse['data'];
-    return donnees is Map ? Map<String, dynamic>.from(donnees) : <String, dynamic>{};
+    return donnees is Map
+        ? Map<String, dynamic>.from(donnees)
+        : <String, dynamic>{};
   }
 
   Future<Map<String, dynamic>> notificationCounts() async {
     if (ConfigurationApi.utiliserDonneesMockees) {
-      return DonneesEtudiantMockees.pourEndpoint(EndpointsApi.notificationsCounts);
+      return DonneesEtudiantMockees.pourEndpoint(
+        EndpointsApi.notificationsCounts,
+      );
     }
     final reponse = await _client.get(EndpointsApi.notificationsCounts);
     if (reponse['success'] != true) {
       throw ErreurApi(
         code: 'COUNTS_REFUSES',
-        message: reponse['message']?.toString() ?? 'Impossible d\'obtenir les compteurs.',
+        message:
+            reponse['message']?.toString() ??
+            'Impossible d\'obtenir les compteurs.',
         details: reponse['data'],
       );
     }
     final donnees = reponse['data'];
-    return donnees is Map ? Map<String, dynamic>.from(donnees) : <String, dynamic>{};
+    return donnees is Map
+        ? Map<String, dynamic>.from(donnees)
+        : <String, dynamic>{};
   }
 
   Future<void> marquerNotificationLue(String uuid) async {
@@ -644,11 +722,16 @@ class SourceEtudiantDistante {
       DepotMockEtudiant.marquerNotificationLue(uuid);
       return;
     }
-    final reponse = await _client.post(EndpointsApi.marquerNotificationLue(uuid), corps: {});
+    final reponse = await _client.post(
+      EndpointsApi.marquerNotificationLue(uuid),
+      corps: {},
+    );
     if (reponse['success'] != true) {
       throw ErreurApi(
         code: 'LECTURE_NOTIFICATION_REFUSEE',
-        message: reponse['message']?.toString() ?? 'Impossible de marquer la notification comme lue.',
+        message:
+            reponse['message']?.toString() ??
+            'Impossible de marquer la notification comme lue.',
         details: reponse['data'],
       );
     }
@@ -659,11 +742,16 @@ class SourceEtudiantDistante {
       DepotMockEtudiant.archiverNotification(uuid);
       return;
     }
-    final reponse = await _client.post(EndpointsApi.archiverNotification(uuid), corps: {});
+    final reponse = await _client.post(
+      EndpointsApi.archiverNotification(uuid),
+      corps: {},
+    );
     if (reponse['success'] != true) {
       throw ErreurApi(
         code: 'ARCHIVAGE_NOTIFICATION_REFUSE',
-        message: reponse['message']?.toString() ?? 'Impossible d\'archiver la notification.',
+        message:
+            reponse['message']?.toString() ??
+            'Impossible d\'archiver la notification.',
         details: reponse['data'],
       );
     }
@@ -688,12 +776,16 @@ class SourceEtudiantDistante {
     if (reponse['success'] != true) {
       throw ErreurApi(
         code: 'CONVERSATIONS_REFUSEES',
-        message: reponse['message']?.toString() ?? 'Impossible de charger les conversations.',
+        message:
+            reponse['message']?.toString() ??
+            'Impossible de charger les conversations.',
         details: reponse['data'],
       );
     }
     final donnees = reponse['data'];
-    return donnees is Map ? Map<String, dynamic>.from(donnees) : <String, dynamic>{};
+    return donnees is Map
+        ? Map<String, dynamic>.from(donnees)
+        : <String, dynamic>{};
   }
 
   Future<Map<String, dynamic>> messagesConversation(
@@ -724,12 +816,16 @@ class SourceEtudiantDistante {
     if (reponse['success'] != true) {
       throw ErreurApi(
         code: 'MESSAGES_REFUSES',
-        message: reponse['message']?.toString() ?? 'Impossible de charger les messages.',
+        message:
+            reponse['message']?.toString() ??
+            'Impossible de charger les messages.',
         details: reponse['data'],
       );
     }
     final donnees = reponse['data'];
-    return donnees is Map ? Map<String, dynamic>.from(donnees) : <String, dynamic>{};
+    return donnees is Map
+        ? Map<String, dynamic>.from(donnees)
+        : <String, dynamic>{};
   }
 
   Future<Map<String, dynamic>> envoyerMessageConversation(
@@ -756,12 +852,15 @@ class SourceEtudiantDistante {
       if (reponse['success'] != true) {
         throw ErreurApi(
           code: 'ENVOI_MESSAGE_REFUSE',
-          message: reponse['message']?.toString() ?? 'Échec d\'envoi du message.',
+          message:
+              reponse['message']?.toString() ?? 'Échec d\'envoi du message.',
           details: reponse['data'],
         );
       }
       final donnees = reponse['data'];
-      return donnees is Map ? Map<String, dynamic>.from(donnees) : <String, dynamic>{};
+      return donnees is Map
+          ? Map<String, dynamic>.from(donnees)
+          : <String, dynamic>{};
     }
 
     final reponse = await _client.post(
@@ -776,10 +875,15 @@ class SourceEtudiantDistante {
       );
     }
     final donnees = reponse['data'];
-    return donnees is Map ? Map<String, dynamic>.from(donnees) : <String, dynamic>{};
+    return donnees is Map
+        ? Map<String, dynamic>.from(donnees)
+        : <String, dynamic>{};
   }
 
-  Future<void> marquerMessagesConversationLus(String convUuid, String messageUuid) async {
+  Future<void> marquerMessagesConversationLus(
+    String convUuid,
+    String messageUuid,
+  ) async {
     if (ConfigurationApi.utiliserDonneesMockees) return;
     await _client.post(
       EndpointsApi.marquerMessagesConversationLus(convUuid),
@@ -788,9 +892,14 @@ class SourceEtudiantDistante {
   }
 
   // --- Tâche 8 : Communications Officielles ---
-  Future<Map<String, dynamic>> communicationsOfficielles({int? limit, int? offset}) async {
+  Future<Map<String, dynamic>> communicationsOfficielles({
+    int? limit,
+    int? offset,
+  }) async {
     if (ConfigurationApi.utiliserDonneesMockees) {
-      return DonneesEtudiantMockees.pourEndpoint(EndpointsApi.communicationsOfficielles);
+      return DonneesEtudiantMockees.pourEndpoint(
+        EndpointsApi.communicationsOfficielles,
+      );
     }
     final params = <String, String>{};
     if (limit != null) params['limit'] = limit.toString();
@@ -803,12 +912,16 @@ class SourceEtudiantDistante {
     if (reponse['success'] != true) {
       throw ErreurApi(
         code: 'COMMUNICATIONS_REFUSEES',
-        message: reponse['message']?.toString() ?? 'Impossible de charger les communications officielles.',
+        message:
+            reponse['message']?.toString() ??
+            'Impossible de charger les communications officielles.',
         details: reponse['data'],
       );
     }
     final donnees = reponse['data'];
-    return donnees is Map ? Map<String, dynamic>.from(donnees) : <String, dynamic>{};
+    return donnees is Map
+        ? Map<String, dynamic>.from(donnees)
+        : <String, dynamic>{};
   }
 
   Future<void> marquerCommunicationLue(String uuid) async {
@@ -816,7 +929,10 @@ class SourceEtudiantDistante {
       DepotMockEtudiant.marquerCommunicationLue(uuid);
       return;
     }
-    final reponse = await _client.post(EndpointsApi.marquerCommunicationLue(uuid), corps: {});
+    final reponse = await _client.post(
+      EndpointsApi.marquerCommunicationLue(uuid),
+      corps: {},
+    );
     if (reponse['success'] != true) {
       throw ErreurApi(
         code: 'LECTURE_COMMUNICATION_REFUSEE',
@@ -827,9 +943,14 @@ class SourceEtudiantDistante {
   }
 
   // --- Tâche 8 : Calendrier & Invitations ---
-  Future<Map<String, dynamic>> calendrier({DateTime? from, DateTime? to}) async {
+  Future<Map<String, dynamic>> calendrier({
+    DateTime? from,
+    DateTime? to,
+  }) async {
     if (ConfigurationApi.utiliserDonneesMockees) {
-      return DonneesEtudiantMockees.pourEndpoint(EndpointsApi.calendrierEtudiant);
+      return DonneesEtudiantMockees.pourEndpoint(
+        EndpointsApi.calendrierEtudiant,
+      );
     }
     final params = <String, String>{};
     if (from != null) params['from'] = from.toIso8601String();
@@ -842,15 +963,22 @@ class SourceEtudiantDistante {
     if (reponse['success'] != true) {
       throw ErreurApi(
         code: 'CALENDRIER_REFUSE',
-        message: reponse['message']?.toString() ?? 'Impossible d\'obtenir le calendrier.',
+        message:
+            reponse['message']?.toString() ??
+            'Impossible d\'obtenir le calendrier.',
         details: reponse['data'],
       );
     }
     final donnees = reponse['data'];
-    return donnees is Map ? Map<String, dynamic>.from(donnees) : <String, dynamic>{};
+    return donnees is Map
+        ? Map<String, dynamic>.from(donnees)
+        : <String, dynamic>{};
   }
 
-  Future<void> repondreInvitationCalendrier(String uuid, String response) async {
+  Future<void> repondreInvitationCalendrier(
+    String uuid,
+    String response,
+  ) async {
     if (ConfigurationApi.utiliserDonneesMockees) {
       DepotMockEtudiant.repondreInvitationCalendrier(uuid, response);
       return;
@@ -862,7 +990,9 @@ class SourceEtudiantDistante {
     if (reponse['success'] != true) {
       throw ErreurApi(
         code: 'REPONSE_CALENDRIER_REFUSEE',
-        message: reponse['message']?.toString() ?? 'Impossible d\'enregistrer votre réponse.',
+        message:
+            reponse['message']?.toString() ??
+            'Impossible d\'enregistrer votre réponse.',
         details: reponse['data'],
       );
     }
@@ -887,7 +1017,6 @@ class SourceEtudiantDistante {
       if (location != null) ...{'location': location},
     };
 
-
     if (ConfigurationApi.utiliserDonneesMockees) {
       DepotMockEtudiant.ajouterEvenementCalendrier({
         'uuid': '01JQ0CAL${DateTime.now().millisecondsSinceEpoch}',
@@ -909,12 +1038,13 @@ class SourceEtudiantDistante {
     if (reponse['success'] != true) {
       throw ErreurApi(
         code: 'CREATION_CALENDRIER_REFUSEE',
-        message: reponse['message']?.toString() ?? 'Impossible de créer l\'événement.',
+        message:
+            reponse['message']?.toString() ??
+            'Impossible de créer l\'événement.',
         details: reponse['data'],
       );
     }
   }
-
 
   Future<Map<String, dynamic>> _donnees(String endpoint) async {
     if (ConfigurationApi.utiliserDonneesMockees) {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/mocks/depot_mock_etudiant.dart';
 import '../../core/network/configuration_api.dart';
+import '../../core/services/suivi_stage_service.dart';
 import '../barre_navigation/barre_navigation_principale.dart';
 import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/stage/presentation/pages/stage_page.dart';
@@ -26,6 +27,18 @@ class _MainShellState extends State<MainShell> {
           if (ConfigurationApi.utiliserDonneesMockees) {
             DepotMockEtudiant.marquerCampagnesConsultees();
           }
+          SuiviStageService.ouvrirOngletStages(0);
+          setState(() => _currentIndex = 1);
+        },
+        onOuvrirCampagnes: () {
+          if (ConfigurationApi.utiliserDonneesMockees) {
+            DepotMockEtudiant.marquerCampagnesConsultees();
+          }
+          SuiviStageService.ouvrirOngletStages(1);
+          setState(() => _currentIndex = 1);
+        },
+        onOuvrirCandidatures: () {
+          SuiviStageService.ouvrirOngletStages(2);
           setState(() => _currentIndex = 1);
         },
       ),

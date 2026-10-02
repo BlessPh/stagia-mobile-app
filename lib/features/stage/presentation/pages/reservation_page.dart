@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/network/client_api_http.dart';
 import '../../../../core/network/configuration_api.dart';
 import '../../../../core/network/reponse_api.dart';
+import '../../../../core/services/suivi_stage_service.dart';
 import '../../../notifications/presentation/pages/notifications_page.dart';
 import '../../data/datasources/source_campagne_mock.dart';
 import '../../data/datasources/source_stage_distante.dart';
@@ -125,6 +126,8 @@ class _ReservationPageState extends State<ReservationPage> {
 
       if (!mounted) return;
       setState(() => _enCoursDeSoumission = false);
+
+      SuiviStageService.notifierChangement();
 
       _afficherConfirmationModal(resultat);
     } on ErreurApi catch (erreur) {

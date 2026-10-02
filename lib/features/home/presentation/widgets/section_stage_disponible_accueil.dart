@@ -9,11 +9,29 @@ class SectionStageDisponibleAccueil extends StatelessWidget {
   const SectionStageDisponibleAccueil({
     this.campagne,
     this.onVoirDetails,
+    this.titreSection = 'Stage disponible',
+    this.libelleCompteur = '1 campagne ouverte',
+    this.statutAffiche,
+    this.messageStatut,
+    this.libelleInformationSecondaire = 'Indemnité',
+    this.valeurInformationSecondaire,
+    this.afficherNombreHopitaux = true,
+    this.libelleAction = 'Voir les détails',
+    this.estSuiviCandidature = false,
     super.key,
   });
 
   final CampagneStage? campagne;
   final VoidCallback? onVoirDetails;
+  final String titreSection;
+  final String libelleCompteur;
+  final String? statutAffiche;
+  final String? messageStatut;
+  final String libelleInformationSecondaire;
+  final String? valeurInformationSecondaire;
+  final bool afficherNombreHopitaux;
+  final String libelleAction;
+  final bool estSuiviCandidature;
 
   @override
   Widget build(BuildContext context) {
@@ -23,6 +41,23 @@ class SectionStageDisponibleAccueil extends StatelessWidget {
             ? SourceCampagneMock.obtenirCampagneOuverte()
             : null);
     if (infoCampagne == null) return const SizedBox.shrink();
+    final statutNormalise = (statutAffiche ?? infoCampagne.statut)
+        .toLowerCase();
+    final statutCritique =
+        statutNormalise.contains('refus') ||
+        statutNormalise.contains('annul') ||
+        statutNormalise.contains('expir');
+    final paiementRequis = statutNormalise.contains('paiement');
+    final couleurSuivi = statutCritique
+        ? const Color(0xFFDC2626)
+        : paiementRequis
+        ? const Color(0xFFEA580C)
+        : const Color(0xFF2563EB);
+    final fondSuivi = statutCritique
+        ? const Color(0xFFFEE2E2)
+        : paiementRequis
+        ? const Color(0xFFFFEDD5)
+        : const Color(0xFFDBEAFE);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -32,7 +67,7 @@ class SectionStageDisponibleAccueil extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'Stage disponible',
+              titreSection,
               style: GoogleFonts.inter(
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
@@ -49,7 +84,7 @@ class SectionStageDisponibleAccueil extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
-                '1 campagne ouverte',
+                libelleCompteur,
                 style: GoogleFonts.inter(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -80,7 +115,6 @@ class SectionStageDisponibleAccueil extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
                 child: Column(
@@ -135,7 +169,7 @@ class SectionStageDisponibleAccueil extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Indemnité',
+                                libelleInformationSecondaire,
                                 style: GoogleFonts.inter(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w500,
@@ -144,7 +178,8 @@ class SectionStageDisponibleAccueil extends StatelessWidget {
                               ),
                               const SizedBox(height: 3),
                               Text(
-                                infoCampagne.indemnite,
+                                valeurInformationSecondaire ??
+                                    infoCampagne.indemnite,
                                 style: GoogleFonts.inter(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w800,
@@ -168,29 +203,35 @@ class SectionStageDisponibleAccueil extends StatelessWidget {
                             vertical: 4.5,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFDCFCE7),
+                            color: estSuiviCandidature
+                                ? fondSuivi
+                                : const Color(0xFFDCFCE7),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
-                            infoCampagne.statut,
+                            statutAffiche ?? infoCampagne.statut,
                             style: GoogleFonts.inter(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
-                              color: const Color(0xFF15803D),
+                              color: estSuiviCandidature
+                                  ? couleurSuivi
+                                  : const Color(0xFF15803D),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 10),
-                        Text(
-                          '${infoCampagne.nombreHopitaux} '
-                              '${infoCampagne.nombreHopitaux == 1 ? 'hôpital' : 'hôpitaux'} '
-                              'disponible${infoCampagne.nombreHopitaux == 1 ? '' : 's'}',
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: const Color(0xFF64748B),
+                        if (afficherNombreHopitaux) ...[
+                          const SizedBox(width: 10),
+                          Text(
+                            '${infoCampagne.nombreHopitaux} '
+                            '${infoCampagne.nombreHopitaux == 1 ? 'hôpital' : 'hôpitaux'} '
+                            'disponible${infoCampagne.nombreHopitaux == 1 ? '' : 's'}',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: const Color(0xFF64748B),
+                            ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
 
@@ -200,27 +241,37 @@ class SectionStageDisponibleAccueil extends StatelessWidget {
                     Row(
                       children: [
                         Icon(
-                          infoCampagne.estEligible
+                          estSuiviCandidature
+                              ? Icons.track_changes_rounded
+                              : infoCampagne.estEligible
                               ? Icons.check_circle_rounded
                               : Icons.cancel_rounded,
-                          color: infoCampagne.estEligible
+                          color: estSuiviCandidature
+                              ? couleurSuivi
+                              : infoCampagne.estEligible
                               ? const Color(0xFF16A34A)
                               : const Color(0xFFDC2626),
                           size: 18,
                         ),
                         const SizedBox(width: 6),
-                        Text(
-                          infoCampagne.messageEligibilite.isNotEmpty
-                              ? infoCampagne.messageEligibilite
-                              : infoCampagne.estEligible
-                              ? 'Vous êtes éligible'
-                              : 'Vous n’êtes pas éligible',
-                          style: GoogleFonts.inter(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w600,
-                            color: infoCampagne.estEligible
-                                ? const Color(0xFF16A34A)
-                                : const Color(0xFFDC2626),
+                        Expanded(
+                          child: Text(
+                            messageStatut?.isNotEmpty == true
+                                ? messageStatut!
+                                : infoCampagne.messageEligibilite.isNotEmpty
+                                ? infoCampagne.messageEligibilite
+                                : infoCampagne.estEligible
+                                ? 'Vous êtes éligible'
+                                : 'Vous n’êtes pas éligible',
+                            style: GoogleFonts.inter(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w600,
+                              color: estSuiviCandidature
+                                  ? couleurSuivi
+                                  : infoCampagne.estEligible
+                                  ? const Color(0xFF16A34A)
+                                  : const Color(0xFFDC2626),
+                            ),
                           ),
                         ),
                       ],
@@ -254,7 +305,7 @@ class SectionStageDisponibleAccueil extends StatelessWidget {
                           elevation: 0,
                         ),
                         child: Text(
-                          'Voir les détails',
+                          libelleAction,
                           style: GoogleFonts.inter(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,

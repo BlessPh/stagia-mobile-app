@@ -61,6 +61,7 @@ abstract final class MappeurCampagneStageApi {
 
     return CampagneStage(
       id: json['campaign_id']?.toString() ?? json['id']?.toString() ?? '',
+      code: json['code']?.toString() ?? '',
       academicEnrollmentId: academicEnrollmentId,
       isD4: mode['is_d4'] == true || typeStage['code'] == 'MEDICAL_D4',
       autoriseReservationAutonome: autoriseReservationAutonome,

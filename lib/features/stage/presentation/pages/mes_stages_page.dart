@@ -5,12 +5,17 @@ import '../../../../core/mocks/depot_mock_etudiant.dart';
 import '../../../../core/network/client_api_http.dart';
 import '../../../../core/network/configuration_api.dart';
 import '../../../../core/network/source_etudiant_distante.dart';
+import '../../../../core/services/suivi_stage_service.dart';
 import '../../../journal/presentation/pages/journal_page.dart';
 import '../../../messagerie/presentation/pages/messagerie_page.dart';
 import '../../../notifications/presentation/pages/notifications_page.dart';
 import '../../data/datasources/source_stage_distante.dart';
+import '../../data/datasources/source_campagne_mock.dart';
 import '../../data/mappers/mappeur_campagne_stage_api.dart';
+import '../../domain/entities/campagne_stage.dart';
+import '../../domain/entities/suivi_candidature_stage.dart';
 import '../routes/routes_stage.dart';
+import 'detail_campagne_page.dart';
 import '../widgets/barre_recherche_stages.dart';
 import '../widgets/carte_candidature_moderne.dart';
 import '../widgets/carte_stage_explorer.dart';
@@ -41,6 +46,8 @@ class _MesStagesPageState extends State<MesStagesPage> {
     if (ConfigurationApi.utiliserDonneesMockees) {
       DepotMockEtudiant.changements.addListener(_onChangementDonnees);
     }
+    SuiviStageService.ongletStagesDemande.addListener(_ouvrirOngletDemande);
+    _ouvrirOngletDemande();
   }
 
   @override
@@ -48,6 +55,7 @@ class _MesStagesPageState extends State<MesStagesPage> {
     if (ConfigurationApi.utiliserDonneesMockees) {
       DepotMockEtudiant.changements.removeListener(_onChangementDonnees);
     }
+    SuiviStageService.ongletStagesDemande.removeListener(_ouvrirOngletDemande);
     _rechercheController.dispose();
     super.dispose();
   }
@@ -60,10 +68,19 @@ class _MesStagesPageState extends State<MesStagesPage> {
     }
   }
 
+  void _ouvrirOngletDemande() {
+    final index = SuiviStageService.ongletStagesDemande.value;
+    if (index == null || index < 0 || index > 2) return;
+    if (mounted && _ongletActif != index) {
+      setState(() => _ongletActif = index);
+    }
+  }
+
   Future<List<Map<String, dynamic>>> _charger() => Future.wait([
     _sourceEtudiant.stages(),
     _sourceStages.campagnes(),
-    _sourceEtudiant.candidatures(),
+    _sourceEtudiant.candidatures().catchError((_) => <String, dynamic>{}),
+    _sourceEtudiant.admissions().catchError((_) => <String, dynamic>{}),
   ]);
 
   Future<void> _actualiser() async {
@@ -117,6 +134,10 @@ class _MesStagesPageState extends State<MesStagesPage> {
                       snapshot.data != null && snapshot.data!.length > 2
                       ? snapshot.data![2]
                       : const <String, dynamic>{};
+                  final donneesAdmissions =
+                      snapshot.data != null && snapshot.data!.length > 3
+                      ? snapshot.data![3]
+                      : const <String, dynamic>{};
 
                   final stagesListe =
                       (donneesStages['items'] as List?)
@@ -142,7 +163,11 @@ class _MesStagesPageState extends State<MesStagesPage> {
                     child: switch (_ongletActif) {
                       0 => _buildOngletEnCours(stageActif),
                       1 => _buildOngletExplorer(donneesCampagnes),
-                      2 => _buildOngletCandidatures(donneesCandidatures),
+                      2 => _buildOngletCandidatures(
+                        donneesCandidatures,
+                        donneesAdmissions,
+                        donneesCampagnes,
+                      ),
                       _ => const SizedBox.shrink(),
                     },
                   );
@@ -1057,13 +1082,34 @@ class _MesStagesPageState extends State<MesStagesPage> {
   // ==========================================
   // ONGLET 3 : CANDIDATURES (Fidèle à l'Image 4)
   // ==========================================
-  Widget _buildOngletCandidatures(Map<String, dynamic> candidaturesData) {
-    final itemsRaw =
+  Widget _buildOngletCandidatures(
+    Map<String, dynamic> candidaturesData,
+    Map<String, dynamic> admissionsData,
+    Map<String, dynamic> campagnesData,
+  ) {
+    final candidaturesRaw =
         (candidaturesData['items'] as List?)
             ?.whereType<Map>()
             .map(Map<String, dynamic>.from)
             .toList() ??
         [];
+    final admissionsRaw =
+        (admissionsData['items'] as List?)
+            ?.whereType<Map>()
+            .map(Map<String, dynamic>.from)
+            .toList() ??
+        [];
+    final itemsRaw = admissionsRaw.isNotEmpty ? admissionsRaw : candidaturesRaw;
+    final campagnesDisponibles =
+        (campagnesData['campaigns'] as List?)
+            ?.whereType<Map>()
+            .map(
+              (item) => MappeurCampagneStageApi.depuisJson(
+                Map<String, dynamic>.from(item),
+              ),
+            )
+            .toList() ??
+        <CampagneStage>[];
 
     if (itemsRaw.isEmpty && !ConfigurationApi.utiliserDonneesMockees) {
       return ListView(
@@ -1083,24 +1129,48 @@ class _MesStagesPageState extends State<MesStagesPage> {
 
     final List<Map<String, dynamic>> candidaturesListes = itemsRaw.isNotEmpty
         ? itemsRaw.map((item) {
+            var suiviAdmission = item['campaign'] is Map
+                ? SuiviCandidatureStage.depuisAdmission(item)
+                : null;
+            final admissionInitiale = suiviAdmission;
+            if (admissionInitiale != null) {
+              for (final campagneDisponible in campagnesDisponibles) {
+                if (admissionInitiale.concerne(campagneDisponible)) {
+                  suiviAdmission = admissionInitiale.avecCampagne(
+                    campagneDisponible,
+                  );
+                  break;
+                }
+              }
+            }
             final workflowStatus =
+                suiviAdmission?.statut ??
                 item['workflow_status']?.toString().toUpperCase() ??
                 item['statut']?.toString().toUpperCase() ??
                 '';
-            final nomHopital =
-                item['hospital_name']?.toString() ??
-                item['entreprise']?.toString() ??
-                '';
-            final titreCampagne =
-                item['campaign_title']?.toString() ??
-                item['titre']?.toString() ??
-                '';
+            final campagneInitiale =
+                suiviAdmission?.campagne ??
+                _campagnePourCandidature(
+                  item,
+                  campagnesDisponibles,
+                  statut: workflowStatus,
+                );
+            final suivi =
+                suiviAdmission ??
+                SuiviCandidatureStage.depuisCandidature(item, campagneInitiale);
+            final nomHopital = suivi.nomHopital.isNotEmpty
+                ? suivi.nomHopital
+                : item['hospital_name']?.toString() ??
+                      item['entreprise']?.toString() ??
+                      '';
+            final titreCampagne = suivi.campagne.titre;
             final dateSoumission =
                 item['submitted_at']?.toString() ??
                 item['date']?.toString() ??
                 '';
+            final campagne = suivi.campagne;
 
-            final (statutType, label) = switch (workflowStatus) {
+            final (statutType, libelleCalcule) = switch (workflowStatus) {
               'DECISION_UNIVERSITAIRE_EN_ATTENTE' ||
               'SOUMISE' ||
               'EN_ATTENTE' => (
@@ -1119,10 +1189,10 @@ class _MesStagesPageState extends State<MesStagesPage> {
               ),
               'ADMISSION_HOSPITALIERE_EN_ATTENTE' || 'AFFECTATION_EN_ATTENTE' =>
                 (StatutCandidatureType.confirme, 'Placement confirmé'),
-              'STAGE_EN_COURS' || 'STAGE_PLANIFIE' => (
-                StatutCandidatureType.admis,
-                'Admis en stage',
-              ),
+              'STAGE_EN_COURS' ||
+              'STAGE_PLANIFIE' ||
+              'STAGE_TERMINE' ||
+              'STAGE_VALIDE' => (StatutCandidatureType.admis, 'Admis en stage'),
               'CANDIDATURE_REFUSEE' ||
               'REFUSEE' => (StatutCandidatureType.refusee, 'Refusée'),
               'RESERVATION_EXPIREE' => (
@@ -1132,6 +1202,9 @@ class _MesStagesPageState extends State<MesStagesPage> {
               'ANNULEE' => (StatutCandidatureType.refusee, 'Annulée'),
               _ => (StatutCandidatureType.enAttente, workflowStatus),
             };
+            final label = suivi.libelleStatut.isNotEmpty
+                ? suivi.libelleStatut
+                : libelleCalcule;
 
             final initiale = nomHopital.isNotEmpty
                 ? nomHopital[0].toUpperCase()
@@ -1147,6 +1220,8 @@ class _MesStagesPageState extends State<MesStagesPage> {
                   : 'Soumis le $dateSoumission',
               'statutType': statutType,
               'statutLabel': label,
+              'campagne': campagne,
+              'suivi': suivi,
             };
           }).toList()
         : [
@@ -1159,6 +1234,10 @@ class _MesStagesPageState extends State<MesStagesPage> {
               'dateTexte': 'Soumis le 26 Sept 2026',
               'statutType': StatutCandidatureType.enAttente,
               'statutLabel': 'Décision en attente',
+              'campagne': SourceCampagneMock.campagnePrincipale,
+              'suivi': SuiviCandidatureStage.depuisCandidature(const {
+                'statut': 'EN_ATTENTE',
+              }, SourceCampagneMock.campagnePrincipale),
             },
           ];
 
@@ -1286,11 +1365,71 @@ class _MesStagesPageState extends State<MesStagesPage> {
                 statutType: item['statutType'] as StatutCandidatureType,
                 libelleStatutCustom: item['statutLabel'] as String?,
                 onTap: () {
-                  Navigator.of(context).pushNamed(RoutesStage.candidatures);
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => DetailCampagnePage(
+                        campagne: item['campagne'] as CampagneStage,
+                        suiviCandidature:
+                            item['suivi'] as SuiviCandidatureStage?,
+                      ),
+                    ),
+                  );
                 },
               ),
             ),
       ],
+    );
+  }
+
+  CampagneStage _campagnePourCandidature(
+    Map<String, dynamic> candidature,
+    List<CampagneStage> campagnes, {
+    required String statut,
+  }) {
+    final id =
+        (candidature['campaign_id'] ?? candidature['campagne_id'])
+            ?.toString()
+            .trim() ??
+        '';
+    final code =
+        (candidature['campaign_code'] ?? candidature['code'])
+            ?.toString()
+            .trim() ??
+        '';
+    final titre =
+        (candidature['campaign_title'] ?? candidature['titre'])
+            ?.toString()
+            .trim() ??
+        '';
+
+    for (final campagne in campagnes) {
+      if ((id.isNotEmpty && campagne.id == id) ||
+          (code.isNotEmpty && campagne.code == code) ||
+          (titre.isNotEmpty && campagne.titre == titre)) {
+        return campagne;
+      }
+    }
+
+    final debut = candidature['start_date']?.toString() ?? '';
+    final fin = candidature['end_date']?.toString() ?? '';
+    return CampagneStage(
+      id: id,
+      code: code,
+      titre: titre.isEmpty ? 'Candidature de stage' : titre,
+      sousTitre: candidature['hospital_name']?.toString() ?? '',
+      dateDebut: debut,
+      dateFin: fin,
+      periodeTexte: debut.isNotEmpty && fin.isNotEmpty
+          ? '$debut - $fin'
+          : 'Dates à confirmer',
+      indemnite: '',
+      modalite: '',
+      statut: SuiviCandidatureStage.libellePour(statut),
+      nombreHopitaux: 0,
+      estEligible: true,
+      consignes: const [],
+      criteresEligibilite: const [],
+      hopitaux: const [],
     );
   }
 

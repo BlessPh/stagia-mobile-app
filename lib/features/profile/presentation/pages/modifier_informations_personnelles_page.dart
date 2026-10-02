@@ -4,10 +4,7 @@ import '../../../../core/widgets/contenu_adaptatif.dart';
 import '../../data/models/etudiant_profil.dart';
 
 class ModifierInformationsPersonnellesPage extends StatefulWidget {
-  const ModifierInformationsPersonnellesPage({
-    required this.profil,
-    super.key,
-  });
+  const ModifierInformationsPersonnellesPage({required this.profil, super.key});
 
   final EtudiantProfil profil;
 
@@ -18,15 +15,13 @@ class ModifierInformationsPersonnellesPage extends StatefulWidget {
 
 class _ModifierInformationsPersonnellesPageState
     extends State<ModifierInformationsPersonnellesPage> {
-  final _cle = GlobalKey<FormState>();
-  late final TextEditingController _nom;
   late final TextEditingController _postnom;
   late final TextEditingController _prenom;
   late final TextEditingController _naissance;
   late final TextEditingController _adresse;
   late final TextEditingController _ville;
-  late String _sexe;
-  late String _province;
+  late final String _sexe;
+  late final String _province;
 
   final List<String> _provinces = const [
     'Kinshasa',
@@ -61,39 +56,26 @@ class _ModifierInformationsPersonnellesPageState
   void initState() {
     super.initState();
     final p = widget.profil;
-    final parties = p.nomComplet.trim().split(RegExp(r'\s+'));
-
-    _nom = TextEditingController(text: parties.isEmpty ? '' : parties.first);
-    _postnom = TextEditingController(
-      text: parties.length > 1
-          ? parties[1]
-          : (parties.isNotEmpty ? parties.first : 'KABAMBA'),
-    );
-    _prenom = TextEditingController(
-      text: parties.length > 2
-          ? parties.sublist(2).join(' ')
-          : (parties.length == 2 ? parties.last : 'Jonas'),
-    );
+    _postnom = TextEditingController(text: p.postnom);
+    _prenom = TextEditingController(text: p.prenom);
 
     _naissance = TextEditingController(
       text: p.dateNaissance.trim().isNotEmpty ? p.dateNaissance : '',
     );
     _adresse = TextEditingController(text: p.adresse);
-    _ville = TextEditingController();
+    _ville = TextEditingController(text: p.ville);
 
-    _sexe = p.sexe.trim().isNotEmpty ? p.sexe : 'Masculin';
-    if (_sexe != 'Masculin' && _sexe != 'Féminin') {
-      _sexe = 'Masculin';
-    }
+    _sexe = switch (p.sexe.trim().toUpperCase()) {
+      'F' || 'FEMININ' || 'FÉMININ' => 'Féminin',
+      'M' || 'MASCULIN' => 'Masculin',
+      _ => p.sexe,
+    };
 
-    _province = p.province.trim().isNotEmpty && _provinces.contains(p.province)
-        ? p.province
-        : 'Kinshasa';
+    _province = p.province;
   }
 
   @override
   void dispose() {
-    _nom.dispose();
     _postnom.dispose();
     _prenom.dispose();
     _naissance.dispose();
@@ -102,56 +84,17 @@ class _ModifierInformationsPersonnellesPageState
     super.dispose();
   }
 
-  Future<void> _choisirDate() async {
-    final date = await showDatePicker(
-      context: context,
-      firstDate: DateTime(1960),
-      lastDate: DateTime.now(),
-      initialDate: DateTime(2003, 3, 14),
-    );
-    if (date != null) {
-      setState(() {
-        _naissance.text =
-            '${date.day.toString().padLeft(2, '0')}-${date.month.toString().padLeft(2, '0')}-${date.year}';
-      });
-    }
-  }
-
-  void _enregistrer() {
-    FocusScope.of(context).unfocus();
-    if (!(_cle.currentState?.validate() ?? false)) return;
-
-    final nomComplet = [
-      _nom.text,
-      _postnom.text,
-      _prenom.text,
-    ].map((e) => e.trim()).where((e) => e.isNotEmpty).join(' ');
-
-    final adresseFinale = _ville.text.trim().isNotEmpty
-        ? '${_adresse.text.trim()}, ${_ville.text.trim()}'
-        : _adresse.text.trim();
-
-    Navigator.pop(
-      context,
-      widget.profil.copyWith(
-        nomComplet: nomComplet,
-        sexe: _sexe,
-        dateNaissance: _naissance.text.trim(),
-        adresse: adresseFinale,
-        province: _province,
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final modeSombre = Theme.of(context).brightness == Brightness.dark;
-    final fondPage =
-        modeSombre ? const Color(0xFF0F172A) : const Color(0xFFF4F5F7);
+    final fondPage = modeSombre
+        ? const Color(0xFF0F172A)
+        : const Color(0xFFF4F5F7);
     final fondChamp = modeSombre ? const Color(0xFF1E293B) : Colors.white;
     final texteCouleur = modeSombre ? Colors.white : const Color(0xFF1E293B);
-    final bordureCouleur =
-        modeSombre ? const Color(0xFF334155) : const Color(0xFFCBD5E1);
+    final bordureCouleur = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFCBD5E1);
 
     final inputDecoration = InputDecoration(
       filled: true,
@@ -199,7 +142,6 @@ class _ModifierInformationsPersonnellesPageState
       body: ContenuAdaptatif(
         largeurMaximale: 520,
         enfant: Form(
-          key: _cle,
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 36),
             children: [
@@ -208,6 +150,7 @@ class _ModifierInformationsPersonnellesPageState
               const SizedBox(height: 8),
               TextFormField(
                 controller: _postnom,
+                readOnly: true,
                 style: GoogleFonts.inter(
                   fontSize: 15.5,
                   fontWeight: FontWeight.w500,
@@ -223,6 +166,7 @@ class _ModifierInformationsPersonnellesPageState
               const SizedBox(height: 8),
               TextFormField(
                 controller: _prenom,
+                readOnly: true,
                 style: GoogleFonts.inter(
                   fontSize: 15.5,
                   fontWeight: FontWeight.w500,
@@ -237,7 +181,7 @@ class _ModifierInformationsPersonnellesPageState
               _Libelle(libelle: 'Sexe', couleur: texteCouleur),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
-                initialValue: _sexe,
+                initialValue: _sexe.isEmpty ? null : _sexe,
                 dropdownColor: fondChamp,
                 icon: Icon(
                   Icons.keyboard_arrow_down_rounded,
@@ -250,17 +194,11 @@ class _ModifierInformationsPersonnellesPageState
                   color: texteCouleur,
                 ),
                 decoration: inputDecoration,
-                items: const ['Masculin', 'Féminin']
-                    .map(
-                      (e) => DropdownMenuItem(
-                        value: e,
-                        child: Text(e),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (val) {
-                  if (val != null) setState(() => _sexe = val);
-                },
+                items:
+                    <String>{'Masculin', 'Féminin', if (_sexe.isNotEmpty) _sexe}
+                        .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                        .toList(),
+                onChanged: null,
               ),
 
               const SizedBox(height: 18),
@@ -269,11 +207,12 @@ class _ModifierInformationsPersonnellesPageState
               _Libelle(libelle: 'Date de naissance', couleur: texteCouleur),
               const SizedBox(height: 8),
               InkWell(
-                onTap: _choisirDate,
+                onTap: null,
                 borderRadius: BorderRadius.circular(14),
                 child: IgnorePointer(
                   child: TextFormField(
                     controller: _naissance,
+                    readOnly: true,
                     style: GoogleFonts.inter(
                       fontSize: 15.5,
                       fontWeight: FontWeight.w500,
@@ -310,6 +249,7 @@ class _ModifierInformationsPersonnellesPageState
               const SizedBox(height: 8),
               TextFormField(
                 controller: _adresse,
+                readOnly: true,
                 style: GoogleFonts.inter(
                   fontSize: 15.5,
                   fontWeight: FontWeight.w500,
@@ -325,6 +265,7 @@ class _ModifierInformationsPersonnellesPageState
               const SizedBox(height: 8),
               TextFormField(
                 controller: _ville,
+                readOnly: true,
                 style: GoogleFonts.inter(
                   fontSize: 15.5,
                   fontWeight: FontWeight.w500,
@@ -339,7 +280,7 @@ class _ModifierInformationsPersonnellesPageState
               _Libelle(libelle: 'Province', couleur: texteCouleur),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
-                initialValue: _province,
+                initialValue: _province.isEmpty ? null : _province,
                 dropdownColor: fondChamp,
                 icon: Icon(
                   Icons.keyboard_arrow_down_rounded,
@@ -352,17 +293,11 @@ class _ModifierInformationsPersonnellesPageState
                   color: texteCouleur,
                 ),
                 decoration: inputDecoration,
-                items: _provinces
-                    .map(
-                      (e) => DropdownMenuItem(
-                        value: e,
-                        child: Text(e),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (val) {
-                  if (val != null) setState(() => _province = val);
-                },
+                items:
+                    <String>{..._provinces, if (_province.isNotEmpty) _province}
+                        .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                        .toList(),
+                onChanged: null,
               ),
 
               const SizedBox(height: 32),
@@ -372,7 +307,7 @@ class _ModifierInformationsPersonnellesPageState
                 width: double.infinity,
                 height: 50,
                 child: FilledButton(
-                  onPressed: _enregistrer,
+                  onPressed: () => Navigator.of(context).pop(),
                   style: FilledButton.styleFrom(
                     backgroundColor: const Color(0xFF1D61FF),
                     shape: RoundedRectangleBorder(
@@ -380,7 +315,7 @@ class _ModifierInformationsPersonnellesPageState
                     ),
                   ),
                   child: Text(
-                    'Enregistrer les modifications',
+                    'Fermer',
                     style: GoogleFonts.inter(
                       fontSize: 15.5,
                       fontWeight: FontWeight.w600,

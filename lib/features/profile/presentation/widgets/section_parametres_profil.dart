@@ -170,7 +170,8 @@ class _SectionParametresProfilState extends State<SectionParametresProfil> {
                     if (nouveau != confirmation) {
                       AlertInfo.show(
                         context: context,
-                        text: 'Les nouveaux mots de passe ne correspondent pas.',
+                        text:
+                            'Les nouveaux mots de passe ne correspondent pas.',
                         typeInfo: TypeInfo.error,
                       );
                       return;
@@ -442,7 +443,7 @@ class _SectionParametresProfilState extends State<SectionParametresProfil> {
               const _ElementFaq(
                 question: 'Comment modifier mes informations académiques ?',
                 reponse:
-                    'Accédez à votre profil puis cliquez sur "Informations académiques" pour mettre à jour votre établissement, filière et cycle.',
+                    'Ces informations sont gérées par votre établissement. Contactez l’administration si une correction est nécessaire.',
               ),
               const _ElementFaq(
                 question: 'Qui contacter en cas de problème technique ?',
@@ -460,9 +461,7 @@ class _SectionParametresProfilState extends State<SectionParametresProfil> {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
             Container(
@@ -524,20 +523,22 @@ class _SectionParametresProfilState extends State<SectionParametresProfil> {
   @override
   Widget build(BuildContext context) {
     final modeSombre = Theme.of(context).brightness == Brightness.dark;
-    final fondPage =
-        modeSombre ? const Color(0xFF0F172A) : const Color(0xFFF4F5F7);
+    final fondPage = modeSombre
+        ? const Color(0xFF0F172A)
+        : const Color(0xFFF4F5F7);
     final fondCarte = modeSombre ? const Color(0xFF1E293B) : Colors.white;
     final texteCouleur = modeSombre ? Colors.white : const Color(0xFF1E293B);
-    final separateurCouleur =
-        modeSombre ? const Color(0xFF334155) : const Color(0xFFF1F5F9);
+    final separateurCouleur = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFF1F5F9);
 
     final nomAffiche = _profil.nomComplet.trim().isNotEmpty
         ? _profil.nomComplet
-        : 'Alfred Daniel';
+        : 'Étudiant';
 
     final roleAffiche = _profil.filiere.trim().isNotEmpty
         ? _profil.filiere
-        : 'Product/UI Designer';
+        : 'Stagiaire';
 
     final preferences = context.watch<PreferencesApplicationService>();
 
@@ -578,6 +579,7 @@ class _SectionParametresProfilState extends State<SectionParametresProfil> {
                 final cheminPhoto = PhotoProfilService.instance.cheminPhoto;
                 final photoValide =
                     cheminPhoto != null && File(cheminPhoto).existsSync();
+                final avatarDistant = _profil.avatarUrl.trim();
 
                 return Container(
                   decoration: BoxDecoration(
@@ -619,6 +621,20 @@ class _SectionParametresProfilState extends State<SectionParametresProfil> {
                                         height: 58,
                                         fit: BoxFit.cover,
                                       )
+                                    : avatarDistant.isNotEmpty
+                                    ? Image.network(
+                                        avatarDistant,
+                                        width: 58,
+                                        height: 58,
+                                        fit: BoxFit.cover,
+                                        errorBuilder:
+                                            (context, error, stackTrace) =>
+                                                const Icon(
+                                                  Icons.person,
+                                                  size: 36,
+                                                  color: Colors.white,
+                                                ),
+                                      )
                                     : Image.asset(
                                         'assets/images/avatar_etudiant.jpg',
                                         width: 58,
@@ -627,10 +643,10 @@ class _SectionParametresProfilState extends State<SectionParametresProfil> {
                                         errorBuilder:
                                             (context, error, stackTrace) =>
                                                 const Icon(
-                                          Icons.person,
-                                          size: 36,
-                                          color: Colors.white,
-                                        ),
+                                                  Icons.person,
+                                                  size: 36,
+                                                  color: Colors.white,
+                                                ),
                                       ),
                               ),
                             ),
@@ -838,11 +854,7 @@ class _LigneParametre extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
           child: Row(
             children: [
-              Icon(
-                icone,
-                size: 22,
-                color: couleurIcone ?? defautIcone,
-              ),
+              Icon(icone, size: 22, color: couleurIcone ?? defautIcone),
               const SizedBox(width: 16),
               Expanded(
                 child: Text(
@@ -890,11 +902,7 @@ class _LigneParametreSwitch extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
-          Icon(
-            icone,
-            size: 22,
-            color: texteCouleur,
-          ),
+          Icon(icone, size: 22, color: texteCouleur),
           const SizedBox(width: 16),
           Expanded(
             child: Text(
@@ -926,10 +934,7 @@ class _LigneParametreSwitch extends StatelessWidget {
 
 /// Élément dépliable pour la FAQ
 class _ElementFaq extends StatelessWidget {
-  const _ElementFaq({
-    required this.question,
-    required this.reponse,
-  });
+  const _ElementFaq({required this.question, required this.reponse});
 
   final String question;
   final String reponse;
@@ -942,10 +947,7 @@ class _ElementFaq extends StatelessWidget {
         tilePadding: EdgeInsets.zero,
         title: Text(
           question,
-          style: GoogleFonts.inter(
-            fontSize: 14.5,
-            fontWeight: FontWeight.w600,
-          ),
+          style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.w600),
         ),
         children: [
           Padding(

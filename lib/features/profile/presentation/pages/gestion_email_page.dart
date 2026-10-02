@@ -1,13 +1,11 @@
 import 'package:alert_info/alert_info.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../../core/network/configuration_api.dart';
 import '../../../../core/widgets/contenu_adaptatif.dart';
 
 class GestionEmailPage extends StatefulWidget {
-  const GestionEmailPage({
-    super.key,
-    required this.email,
-  });
+  const GestionEmailPage({super.key, required this.email});
 
   final String email;
 
@@ -24,12 +22,18 @@ class _GestionEmailPageState extends State<GestionEmailPage> {
   @override
   void initState() {
     super.initState();
-    _emailActuel = widget.email.trim().isNotEmpty
-        ? widget.email
-        : 'alfred.daniel@gmail.com';
+    _emailActuel = widget.email.trim();
   }
 
   void _ouvrirModifierEmail() {
+    if (!ConfigurationApi.utiliserDonneesMockees) {
+      AlertInfo.show(
+        context: context,
+        text: 'Cette adresse est gérée par l’administration.',
+        typeInfo: TypeInfo.info,
+      );
+      return;
+    }
     final controleur = TextEditingController(text: _emailActuel);
     showModalBottomSheet<void>(
       context: context,
@@ -125,12 +129,18 @@ class _GestionEmailPageState extends State<GestionEmailPage> {
   }
 
   void _confirmerSuppression() {
+    if (!ConfigurationApi.utiliserDonneesMockees) {
+      AlertInfo.show(
+        context: context,
+        text: 'Cette adresse est gérée par l’administration.',
+        typeInfo: TypeInfo.info,
+      );
+      return;
+    }
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
             Container(
@@ -193,12 +203,14 @@ class _GestionEmailPageState extends State<GestionEmailPage> {
   @override
   Widget build(BuildContext context) {
     final modeSombre = Theme.of(context).brightness == Brightness.dark;
-    final fondPage =
-        modeSombre ? const Color(0xFF0F172A) : const Color(0xFFF4F5F7);
+    final fondPage = modeSombre
+        ? const Color(0xFF0F172A)
+        : const Color(0xFFF4F5F7);
     final fondCarte = modeSombre ? const Color(0xFF1E293B) : Colors.white;
     final texteCouleur = modeSombre ? Colors.white : const Color(0xFF1E293B);
-    final separateurCouleur =
-        modeSombre ? const Color(0xFF334155) : const Color(0xFFF1F5F9);
+    final separateurCouleur = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFF1F5F9);
     const orangeAccent = Color(0xFFE86311);
 
     return PopScope(
@@ -487,11 +499,7 @@ class _LigneSwitchEmail extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
-          Icon(
-            icone,
-            size: 22,
-            color: texteCouleur,
-          ),
+          Icon(icone, size: 22, color: texteCouleur),
           const SizedBox(width: 16),
           Expanded(
             child: Text(

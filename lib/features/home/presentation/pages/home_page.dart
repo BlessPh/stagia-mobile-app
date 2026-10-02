@@ -4,11 +4,13 @@ import '../../../../core/network/client_api_http.dart';
 import '../../../../core/network/configuration_api.dart';
 import '../../../../core/network/source_etudiant_distante.dart';
 import '../../../../core/services/session_authentification_service.dart';
+import '../../../../core/services/suivi_stage_service.dart';
 import '../../../../core/widgets/contenu_adaptatif.dart';
 import '../../../planning/domain/entities/tache_planning.dart';
 import '../../../stage/data/datasources/source_stage_distante.dart';
 import '../../../stage/data/mappers/mappeur_campagne_stage_api.dart';
 import '../../../stage/domain/entities/campagne_stage.dart';
+import '../../../stage/domain/entities/suivi_candidature_stage.dart';
 import '../widgets/carousel_accueil.dart';
 import '../widgets/home_skeleton_widgets.dart';
 import '../widgets/section_stage_disponible_accueil.dart';
@@ -17,9 +19,16 @@ import '../widgets/section_taches_jour_accueil.dart';
 import 'home_shared_widgets.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({this.onOuvrirStages, super.key});
+  const HomePage({
+    this.onOuvrirStages,
+    this.onOuvrirCampagnes,
+    this.onOuvrirCandidatures,
+    super.key,
+  });
 
   final VoidCallback? onOuvrirStages;
+  final VoidCallback? onOuvrirCampagnes;
+  final VoidCallback? onOuvrirCandidatures;
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -39,6 +48,7 @@ class _HomePageState extends State<HomePage> {
 
   bool _chargementCampagnes = true;
   CampagneStage? _campagneDisponible;
+  SuiviCandidatureStage? _suiviCandidature;
 
   bool _chargementDashboard = true;
   Map<String, dynamic> _donneesDashboard = const {};
@@ -49,6 +59,7 @@ class _HomePageState extends State<HomePage> {
     if (ConfigurationApi.utiliserDonneesMockees) {
       DepotMockEtudiant.changements.addListener(_donneesLocalesModifiees);
     }
+    SuiviStageService.changements.addListener(_workflowStageModifie);
     _initialiserChargements();
   }
 
@@ -57,11 +68,19 @@ class _HomePageState extends State<HomePage> {
     if (ConfigurationApi.utiliserDonneesMockees) {
       DepotMockEtudiant.changements.removeListener(_donneesLocalesModifiees);
     }
+    SuiviStageService.changements.removeListener(_workflowStageModifie);
     super.dispose();
   }
 
   void _donneesLocalesModifiees() {
     if (mounted) _initialiserChargements();
+  }
+
+  void _workflowStageModifie() {
+    if (mounted) {
+      _chargerCampagnes();
+      _chargerDashboard();
+    }
   }
 
   void _initialiserChargements() {
@@ -93,11 +112,25 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _chargerTaches() async {
     try {
-      final res = await _source.calendrier();
+      final res = await _source.taches();
       final items =
           (res['items'] as List?)
               ?.whereType<Map>()
-              .map((m) => TachePlanning.fromJson(Map<String, dynamic>.from(m)))
+              .where((m) {
+                final statut = (m['statut'] ?? m['status'])
+                    ?.toString()
+                    .toUpperCase();
+                final echeance = DateTime.tryParse(
+                  (m['date_echeance'] ?? m['due_date'])?.toString() ?? '',
+                );
+                return (statut == 'A_FAIRE' || statut == 'EN_COURS') &&
+                    echeance != null;
+              })
+              .map(
+                (m) => TachePlanning.depuisTacheStage(
+                  Map<String, dynamic>.from(m),
+                ),
+              )
               .toList() ??
           <TachePlanning>[];
       if (mounted) {
@@ -117,26 +150,46 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _chargerCampagnes() async {
+    var campagnes = <CampagneStage>[];
+    var suivis = <SuiviCandidatureStage>[];
+    SuiviCandidatureStage? suivi;
+
     try {
       final res = await _sourceStages.campagnes();
       final list = listeApi(res['campaigns']);
-      CampagneStage? campagne;
-      if (list.isNotEmpty) {
-        campagne = MappeurCampagneStageApi.depuisJson(list.first);
+      campagnes = list.map(MappeurCampagneStageApi.depuisJson).toList();
+    } catch (_) {}
+
+    try {
+      final admissions = await _source.admissions();
+      final items = listeApi(admissions['items']);
+      if (items.isNotEmpty) {
+        suivis = items.map(SuiviCandidatureStage.depuisAdmission).toList();
+        suivi = suivis.firstWhere(
+          (element) => !element.estTermine,
+          orElse: () => suivis.first,
+        );
       }
-      if (mounted) {
-        setState(() {
-          _campagneDisponible = campagne;
-          _chargementCampagnes = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _campagneDisponible = null;
-          _chargementCampagnes = false;
-        });
-      }
+    } catch (_) {}
+
+    final campagnesNonEngagees = suivis.isEmpty
+        ? campagnes
+        : campagnes
+              .where(
+                (campagne) => !suivis.any(
+                  (suiviExistant) => suiviExistant.concerne(campagne),
+                ),
+              )
+              .toList();
+
+    if (mounted) {
+      setState(() {
+        _campagneDisponible = campagnesNonEngagees.isEmpty
+            ? null
+            : campagnesNonEngagees.first;
+        _suiviCandidature = suivi;
+        _chargementCampagnes = false;
+      });
     }
   }
 
@@ -177,7 +230,7 @@ class _HomePageState extends State<HomePage> {
     final etudiant = <String, dynamic>{};
     void ajouterIdentite(Map<String, dynamic> source) {
       for (final entree in source.entries) {
-        if (entree.value.toString().trim().isNotEmpty) {
+        if (entree.value != null && entree.value.toString().trim().isNotEmpty) {
           etudiant[entree.key] = entree.value;
         }
       }
@@ -230,12 +283,39 @@ class _HomePageState extends State<HomePage> {
               // 3. Stage disponible : Skeleton granulaire si en cours de chargement
               if (_chargementCampagnes)
                 const SectionStageDisponibleSkeleton()
-              else if (_campagneDisponible != null)
+              else if (_suiviCandidature != null)
+                SectionStageDisponibleAccueil(
+                  campagne: _suiviCandidature!.campagne,
+                  titreSection: 'Suivi de candidature',
+                  libelleCompteur: _suiviCandidature!.estTermine
+                      ? 'Dossier clôturé'
+                      : 'Dossier en cours',
+                  statutAffiche: _suiviCandidature!.libelleStatut,
+                  messageStatut: _suiviCandidature!.message,
+                  libelleInformationSecondaire: 'Hôpital',
+                  valeurInformationSecondaire:
+                      _suiviCandidature!.nomHopital.isEmpty
+                      ? 'À déterminer'
+                      : _suiviCandidature!.nomHopital,
+                  afficherNombreHopitaux: false,
+                  libelleAction: 'Suivre mon dossier',
+                  estSuiviCandidature: true,
+                  onVoirDetails:
+                      widget.onOuvrirCandidatures ?? widget.onOuvrirStages,
+                ),
+              if (!_chargementCampagnes &&
+                  _suiviCandidature != null &&
+                  _campagneDisponible != null)
+                const SizedBox(height: 20),
+              if (!_chargementCampagnes && _campagneDisponible != null)
                 SectionStageDisponibleAccueil(
                   campagne: _campagneDisponible,
-                  onVoirDetails: widget.onOuvrirStages,
+                  onVoirDetails:
+                      widget.onOuvrirCampagnes ?? widget.onOuvrirStages,
                 ),
-              if (_chargementCampagnes || _campagneDisponible != null)
+              if (_chargementCampagnes ||
+                  _campagneDisponible != null ||
+                  _suiviCandidature != null)
                 const SizedBox(height: 20),
 
               // 4. Stage en cours : Skeleton granulaire si en cours de chargement

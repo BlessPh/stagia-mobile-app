@@ -139,5 +139,73 @@ class TachePlanning {
       couleur: couleur,
     );
   }
-}
 
+  factory TachePlanning.depuisTacheStage(Map<String, dynamic> json) {
+    final echeance =
+        DateTime.tryParse(
+          (json['date_echeance'] ?? json['due_date'])?.toString() ?? '',
+        ) ??
+        DateTime.now();
+    final statut = (json['statut'] ?? json['status'])?.toString() ?? '';
+
+    return TachePlanning(
+      id: json['uuid']?.toString() ?? json['id']?.toString() ?? '',
+      titre: json['titre']?.toString() ?? json['title']?.toString() ?? '',
+      date: echeance,
+      heureDebut:
+          '${echeance.day.toString().padLeft(2, '0')}/'
+          '${echeance.month.toString().padLeft(2, '0')}',
+      heureFin: '',
+      type: 'Stage',
+      service: json['unit_name']?.toString() ?? '',
+      departement: json['host_name']?.toString() ?? '',
+      superviseur: '',
+      description: json['description']?.toString() ?? '',
+      lieu: [json['unit_name']?.toString(), json['host_name']?.toString()]
+          .whereType<String>()
+          .where((value) => value.trim().isNotEmpty)
+          .join(' • '),
+      statut: statut.replaceAll('_', ' '),
+      noteRappel: json['commentaire_encadreur']?.toString(),
+      couleur: statut == 'TERMINEE' || statut == 'VALIDEE'
+          ? const Color(0xFF16A34A)
+          : const Color(0xFF2563EB),
+    );
+  }
+
+  factory TachePlanning.depuisRotationStage(
+    Map<String, dynamic> json, {
+    String nomHopital = '',
+    DateTime? dateAffichee,
+  }) {
+    final debut =
+        DateTime.tryParse(json['date_debut']?.toString() ?? '') ??
+        DateTime.now();
+    final fin = DateTime.tryParse(json['date_fin']?.toString() ?? '') ?? debut;
+    final unite = json['unit_name']?.toString() ?? '';
+
+    return TachePlanning(
+      id:
+          json['rotation_uuid']?.toString() ??
+          json['rotation_id']?.toString() ??
+          '',
+      titre: unite.isEmpty ? 'Rotation de stage' : unite,
+      date: dateAffichee ?? debut,
+      heureDebut: '',
+      heureFin: '',
+      type: 'Stage',
+      service: unite,
+      departement: nomHopital,
+      superviseur: json['supervisor_name']?.toString() ?? '',
+      description: json['objectifs']?.toString() ?? '',
+      lieu: nomHopital.isEmpty ? unite : '$unite • $nomHopital',
+      statut: json['statut']?.toString() ?? '',
+      noteRappel: 'Du ${_dateCourte(debut)} au ${_dateCourte(fin)}',
+      couleur: const Color(0xFF10B981),
+    );
+  }
+
+  static String _dateCourte(DateTime date) =>
+      '${date.day.toString().padLeft(2, '0')}/'
+      '${date.month.toString().padLeft(2, '0')}/${date.year}';
+}

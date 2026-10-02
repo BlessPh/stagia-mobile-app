@@ -60,6 +60,7 @@ class HopitalCampagne {
 class CampagneStage {
   const CampagneStage({
     required this.id,
+    this.code = '',
     this.academicEnrollmentId,
     this.isD4 = true,
     this.autoriseReservationAutonome = true,
@@ -81,6 +82,7 @@ class CampagneStage {
   });
 
   final String id;
+  final String code;
   final int? academicEnrollmentId;
   final bool isD4;
   final bool autoriseReservationAutonome;
@@ -99,4 +101,27 @@ class CampagneStage {
   final List<String> consignes;
   final List<String> criteresEligibilite;
   final List<HopitalCampagne> hopitaux;
+
+  CampagneStage avecStatut(String nouveauStatut) => CampagneStage(
+    id: id,
+    code: code,
+    academicEnrollmentId: academicEnrollmentId,
+    isD4: isD4,
+    autoriseReservationAutonome: autoriseReservationAutonome,
+    modeReservation: modeReservation,
+    titre: titre,
+    sousTitre: sousTitre,
+    dateDebut: dateDebut,
+    dateFin: dateFin,
+    periodeTexte: periodeTexte,
+    indemnite: indemnite,
+    modalite: modalite,
+    statut: nouveauStatut,
+    nombreHopitaux: nombreHopitaux,
+    estEligible: estEligible,
+    messageEligibilite: messageEligibilite,
+    consignes: consignes,
+    criteresEligibilite: criteresEligibilite,
+    hopitaux: hopitaux,
+  );
 }

@@ -21,7 +21,6 @@ import 'modifier_informations_academiques_page.dart';
 import 'gestion_email_page.dart';
 import 'modifier_informations_personnelles_page.dart';
 import 'notes_academiques_page.dart';
-import 'parcours_academique_page.dart';
 import '../../../planning/presentation/pages/planning_page.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -58,7 +57,17 @@ class _ProfilePageState extends State<ProfilePage> {
     });
     try {
       final donnees = await _source.profil();
-      final profilApi = EtudiantProfil.fromApi(donnees);
+      Map<String, dynamic> donneesAcademiques = const {};
+      try {
+        donneesAcademiques = await _source.profilActif();
+      } catch (_) {
+        // L'identité /me reste affichable si le dossier académique est indisponible.
+      }
+      final profilApi = EtudiantProfil.fromApi({
+        ...donnees,
+        if (donneesAcademiques['current_academic'] is Map)
+          'current_academic': donneesAcademiques['current_academic'],
+      });
       final emailSession = await SessionAuthentificationService.email();
       final matriculeSession = await SessionAuthentificationService.matricule();
       if (!mounted) return;
@@ -103,25 +112,17 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _ouvrirModificationPersonnelle() async {
-    final resultat = await Navigator.of(context, rootNavigator: true)
-        .push<EtudiantProfil>(
-          MaterialPageRoute(
-            builder: (_) =>
-                ModifierInformationsPersonnellesPage(profil: _profil),
-          ),
-        );
-    if (resultat != null && mounted) setState(() => _profil = resultat);
+    await Navigator.of(context, rootNavigator: true).push<void>(
+      MaterialPageRoute(
+        builder: (_) => ModifierInformationsPersonnellesPage(profil: _profil),
+      ),
+    );
   }
 
   Future<void> _ouvrirModificationAcademique() async {
-    final resultat = await Navigator.of(context, rootNavigator: true)
-        .push<EtudiantProfil>(
-          MaterialPageRoute(
-            builder: (_) =>
-                ModifierInformationsAcademiquesPage(profil: _profil),
-          ),
-        );
-    if (resultat != null && mounted) setState(() => _profil = resultat);
+    await Navigator.of(context, rootNavigator: true).push<void>(
+      MaterialPageRoute(builder: (_) => const InformationsAcademiquesPage()),
+    );
   }
 
   void _ouvrirPage(String titre, Widget contenu) {
@@ -141,24 +142,14 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _ouvrirGestionEmail() async {
-    final nouvelEmail = await Navigator.of(context, rootNavigator: true)
-        .push<String>(
-          MaterialPageRoute(
-            builder: (_) => GestionEmailPage(
-              email: _profil.email,
-            ),
-          ),
-        );
-    if (nouvelEmail != null && mounted) {
-      setState(() => _profil = _profil.copyWith(email: nouvelEmail));
-    }
+    await Navigator.of(context, rootNavigator: true).push<void>(
+      MaterialPageRoute(builder: (_) => GestionEmailPage(email: _profil.email)),
+    );
   }
 
   void _ouvrirHistoriqueStage() {
     Navigator.of(context, rootNavigator: true).push(
-      MaterialPageRoute<void>(
-        builder: (_) => const CandidaturesStagePage(),
-      ),
+      MaterialPageRoute<void>(builder: (_) => const CandidaturesStagePage()),
     );
   }
 
@@ -179,11 +170,10 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   void _ouvrirPlanning() {
-    Navigator.of(context, rootNavigator: true).push(
-      MaterialPageRoute<void>(
-        builder: (_) => const PlanningPage(),
-      ),
-    );
+    Navigator.of(
+      context,
+      rootNavigator: true,
+    ).push(MaterialPageRoute<void>(builder: (_) => const PlanningPage()));
   }
 
   Future<void> _deconnecter() async {
@@ -244,15 +234,18 @@ class _ProfilePageState extends State<ProfilePage> {
     }
 
     final modeSombre = Theme.of(context).brightness == Brightness.dark;
-    final fondPage = modeSombre ? const Color(0xFF0F172A) : const Color(0xFFF4F6FA);
+    final fondPage = modeSombre
+        ? const Color(0xFF0F172A)
+        : const Color(0xFFF4F6FA);
     final fondCarte = modeSombre ? const Color(0xFF1E293B) : Colors.white;
     final texteCouleur = modeSombre ? Colors.white : const Color(0xFF1E293B);
-    final separateurCouleur =
-        modeSombre ? const Color(0xFF334155) : const Color(0xFFF1F5F9);
+    final separateurCouleur = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFF1F5F9);
 
     final nomAffiche = _profil.nomComplet.trim().isNotEmpty
         ? _profil.nomComplet
-        : 'Alfred KALONJI';
+        : 'Étudiant';
 
     final topPadding = MediaQuery.paddingOf(context).top;
     const double hauteurContenuEnTete = 224.0;
@@ -271,8 +264,10 @@ class _ProfilePageState extends State<ProfilePage> {
             final cheminPhoto = PhotoProfilService.instance.cheminPhoto;
             final photoValide =
                 cheminPhoto != null && File(cheminPhoto).existsSync();
-            final offset =
-                _scrollController.hasClients ? _scrollController.offset : 0.0;
+            final avatarDistant = _profil.avatarUrl.trim();
+            final offset = _scrollController.hasClients
+                ? _scrollController.offset
+                : 0.0;
             final masquerAvatar =
                 offset >= (hauteurEnTete - (topPadding + 164));
             final masquerBoutonParametres =
@@ -299,10 +294,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               gradient: LinearGradient(
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
-                                colors: [
-                                  Color(0xFF1E60FF),
-                                  Color(0xFF1757F2),
-                                ],
+                                colors: [Color(0xFF1E60FF), Color(0xFF1757F2)],
                               ),
                             ),
                             child: Stack(
@@ -367,8 +359,12 @@ class _ProfilePageState extends State<ProfilePage> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Padding(
-                                padding:
-                                    const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                                padding: const EdgeInsets.fromLTRB(
+                                  20,
+                                  12,
+                                  20,
+                                  0,
+                                ),
                                 child: Row(
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
@@ -387,19 +383,21 @@ class _ProfilePageState extends State<ProfilePage> {
                                       child: Material(
                                         color: Colors.transparent,
                                         child: InkWell(
-                                          onTap: () => Navigator.of(
-                                              context,
-                                              rootNavigator: true,
-                                            ).push(
-                                              MaterialPageRoute<void>(
-                                                builder: (_) =>
-                                                    SectionParametresProfil(
-                                                  profil: _profil,
+                                          onTap: () =>
+                                              Navigator.of(
+                                                context,
+                                                rootNavigator: true,
+                                              ).push(
+                                                MaterialPageRoute<void>(
+                                                  builder: (_) =>
+                                                      SectionParametresProfil(
+                                                        profil: _profil,
+                                                      ),
                                                 ),
                                               ),
-                                            ),
-                                          borderRadius:
-                                              BorderRadius.circular(20),
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
                                           child: Container(
                                             width: 40,
                                             height: 40,
@@ -436,8 +434,9 @@ class _ProfilePageState extends State<ProfilePage> {
                                             color: const Color(0xFFD4B28C),
                                             boxShadow: [
                                               BoxShadow(
-                                                color: Colors.black
-                                                    .withValues(alpha: 0.18),
+                                                color: Colors.black.withValues(
+                                                  alpha: 0.18,
+                                                ),
                                                 blurRadius: 14,
                                                 offset: const Offset(0, 4),
                                               ),
@@ -451,19 +450,38 @@ class _ProfilePageState extends State<ProfilePage> {
                                                     height: 98,
                                                     fit: BoxFit.cover,
                                                   )
+                                                : avatarDistant.isNotEmpty
+                                                ? Image.network(
+                                                    avatarDistant,
+                                                    width: 98,
+                                                    height: 98,
+                                                    fit: BoxFit.cover,
+                                                    errorBuilder:
+                                                        (
+                                                          context,
+                                                          error,
+                                                          stackTrace,
+                                                        ) => const Icon(
+                                                          Icons.person,
+                                                          size: 56,
+                                                          color: Colors.white,
+                                                        ),
+                                                  )
                                                 : Image.asset(
                                                     'assets/images/avatar_etudiant.jpg',
                                                     width: 98,
                                                     height: 98,
                                                     fit: BoxFit.cover,
-                                                    errorBuilder: (context,
-                                                            error,
-                                                            stackTrace) =>
-                                                        const Icon(
-                                                      Icons.person,
-                                                      size: 56,
-                                                      color: Colors.white,
-                                                    ),
+                                                    errorBuilder:
+                                                        (
+                                                          context,
+                                                          error,
+                                                          stackTrace,
+                                                        ) => const Icon(
+                                                          Icons.person,
+                                                          size: 56,
+                                                          color: Colors.white,
+                                                        ),
                                                   ),
                                           ),
                                         ),
@@ -545,46 +563,31 @@ class _ProfilePageState extends State<ProfilePage> {
                           ),
                           const SizedBox(height: 16),
 
-                          // GROUPE 2: Informations académiques, Parcours, Notes
+                          // GROUPE 2: Informations académiques et notes
                           _CarteMenuProfil(
                             couleurFond: fondCarte,
                             enfants: [
                               _ItemMenu(
                                 icone: Icons.school_outlined,
-                                titre: 'Informations académiques',
+                                titre: 'Information académique',
                                 couleurTexte: texteCouleur,
                                 onTap: _ouvrirModificationAcademique,
-                              ),
-                              Divider(height: 1, color: separateurCouleur),
-                              _ItemMenu(
-                                icone: Icons.school_outlined,
-                                titre: 'Parcours académique',
-                                couleurTexte: texteCouleur,
-                                onTap: () => Navigator.of(
-                                  context,
-                                  rootNavigator: true,
-                                ).push(
-                                  MaterialPageRoute<void>(
-                                    builder: (_) => ParcoursAcademiquePage(
-                                      profil: _profil,
-                                    ),
-                                  ),
-                                ),
                               ),
                               Divider(height: 1, color: separateurCouleur),
                               _ItemMenu(
                                 icone: Icons.assignment_outlined,
                                 titre: 'Notes académique',
                                 couleurTexte: texteCouleur,
-                                onTap: () => Navigator.of(
-                                  context,
-                                  rootNavigator: true,
-                                ).push(
-                                  MaterialPageRoute<void>(
-                                    builder: (_) =>
-                                        const NotesAcademiquesPage(),
-                                  ),
-                                ),
+                                onTap: () =>
+                                    Navigator.of(
+                                      context,
+                                      rootNavigator: true,
+                                    ).push(
+                                      MaterialPageRoute<void>(
+                                        builder: (_) =>
+                                            const NotesAcademiquesPage(),
+                                      ),
+                                    ),
                               ),
                             ],
                           ),
@@ -706,10 +709,7 @@ class _ClipperFondBleuProfil extends CustomClipper<Path> {
 
 /// Carte blanche avec coins arrondis pour regrouper les options
 class _CarteMenuProfil extends StatelessWidget {
-  const _CarteMenuProfil({
-    required this.enfants,
-    required this.couleurFond,
-  });
+  const _CarteMenuProfil({required this.enfants, required this.couleurFond});
 
   final List<Widget> enfants;
   final Color couleurFond;
@@ -728,9 +728,7 @@ class _CarteMenuProfil extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
-        children: enfants,
-      ),
+      child: Column(children: enfants),
     );
   }
 }
@@ -760,11 +758,7 @@ class _ItemMenu extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
           child: Row(
             children: [
-              Icon(
-                icone,
-                size: 20,
-                color: couleurTexte,
-              ),
+              Icon(icone, size: 20, color: couleurTexte),
               const SizedBox(width: 14),
               Expanded(
                 child: Text(
@@ -793,9 +787,7 @@ class _ItemMenu extends StatelessWidget {
 /// même si un défileur au premier plan couvre l'écran, tant que les zones cliquées
 /// ne sont pas interceptées par le contenu opaque du premier plan.
 class _StackInteractif extends Stack {
-  const _StackInteractif({
-    super.children,
-  });
+  const _StackInteractif({super.children});
 
   @override
   RenderStack createRenderObject(BuildContext context) {
@@ -838,4 +830,3 @@ class _RenderStackInteractif extends RenderStack {
     return isAnyHit;
   }
 }
-
