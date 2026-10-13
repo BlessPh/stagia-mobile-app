@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:iconsax/iconsax.dart';
 import '../../../../core/network/client_api_http.dart';
 import '../../../../core/network/configuration_api.dart';
+import '../../../../core/network/reponse_api.dart';
 import '../../../../core/network/source_etudiant_distante.dart';
 import '../../../messagerie/presentation/pages/messagerie_page.dart';
 import '../../../notifications/presentation/pages/notifications_page.dart';
@@ -39,19 +41,14 @@ class _JournalPageState extends State<JournalPage> {
 
   // État pointage de présence
   bool _pointageEnCours = false;
+  final Set<String> _feedbacksLectureEnCours = <String>{};
 
   late Future<List<Map<String, dynamic>>> _chargement;
 
   @override
   void initState() {
     super.initState();
-    _dateSelectionneeTaches = ConfigurationApi.utiliserDonneesMockees
-        ? DateTime(2026, 1, 15)
-        : DateTime.now();
-    if (ConfigurationApi.utiliserDonneesMockees) {
-      _filtreJournal = 'Aujourd\'hui (5)';
-      _nombreTachesAujourdhui = 5;
-    }
+    _dateSelectionneeTaches = DateTime.now();
     _chargement = _charger();
   }
 
@@ -62,15 +59,22 @@ class _JournalPageState extends State<JournalPage> {
   }
 
   Future<List<Map<String, dynamic>>> _charger() async {
+    final aujourdHui = DateTime.now();
+    final premierJour = DateTime(aujourdHui.year, aujourdHui.month);
+    final dernierJour = DateTime(aujourdHui.year, aujourdHui.month + 1, 0);
     final reponses = await Future.wait([
-      _source.journal(),
-      _source.presences(),
-      _source.evaluations(),
-      _source.contextePointage(),
-      _source.taches(),
+      _source.journal(perPage: 100),
+      _source.presences(
+        dateFrom: _dateApi(premierJour),
+        dateTo: _dateApi(dernierJour),
+        perPage: 100,
+      ),
+      _source.evaluations(perPage: 100),
+      _source.contexteExecution(),
+      _source.taches(perPage: 100),
+      _source.feedbacks(perPage: 100),
     ]);
     final taches = _items(reponses[4]['items']);
-    final aujourdHui = DateTime.now();
     final nombre = taches.where((tache) {
       final date = DateTime.tryParse(
         (tache['date_echeance'] ?? tache['due_date'])?.toString() ?? '',
@@ -94,35 +98,38 @@ class _JournalPageState extends State<JournalPage> {
 
   Future<void> _actionnerPointage(String action) async {
     if (_pointageEnCours) return;
+    if (action != 'ARRIVEE' && action != 'DEPART') return;
     setState(() => _pointageEnCours = true);
     try {
+      late final Map<String, dynamic> resultat;
       if (action == 'ARRIVEE') {
-        await _source.pointerArrivee();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Arrivée enregistrée avec succès !'),
-              backgroundColor: Color(0xFF16A34A),
-            ),
-          );
-        }
+        resultat = await _source.pointerArrivee();
       } else {
-        await _source.pointerDepart();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Départ enregistré avec succès !'),
-              backgroundColor: Color(0xFFF97316),
-            ),
-          );
-        }
+        resultat = await _source.pointerDepart();
       }
       await _actualiser();
-    } catch (e) {
+      if (mounted) {
+        final message = resultat['message']?.toString().trim() ?? '';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              message.isNotEmpty
+                  ? message
+                  : action == 'ARRIVEE'
+                  ? 'Arrivée enregistrée.'
+                  : 'Départ enregistré.',
+            ),
+            backgroundColor: action == 'ARRIVEE'
+                ? const Color(0xFF16A34A)
+                : const Color(0xFFF97316),
+          ),
+        );
+      }
+    } on ErreurApi catch (erreur) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.toString()),
+            content: Text(erreur.message),
             backgroundColor: const Color(0xFFDC2626),
           ),
         );
@@ -132,10 +139,50 @@ class _JournalPageState extends State<JournalPage> {
     }
   }
 
+  Future<void> _marquerFeedbackLu(String uuid) async {
+    if (uuid.isEmpty || _feedbacksLectureEnCours.contains(uuid)) return;
+    setState(() => _feedbacksLectureEnCours.add(uuid));
+    try {
+      final resultat = await _source.marquerFeedbackLu(uuid);
+      await _actualiser();
+      if (mounted) {
+        final message = resultat['message']?.toString().trim() ?? '';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              message.isNotEmpty ? message : 'Feedback marqué comme lu.',
+            ),
+          ),
+        );
+      }
+    } on ErreurApi catch (erreur) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(erreur.message),
+            backgroundColor: const Color(0xFFDC2626),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _feedbacksLectureEnCours.remove(uuid));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
+    final fondPage = modeSombre
+        ? const Color(0xFF0F172A)
+        : const Color(0xFFF8FAFC);
+    final separateurCouleur = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFE2E8F0);
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: fondPage,
       appBar: EnTeteJournal(
         nombreTachesAujourdhui: _nombreTachesAujourdhui,
         onOuvrirChat: () => Navigator.of(
@@ -174,7 +221,7 @@ class _JournalPageState extends State<JournalPage> {
                 },
               ),
             ),
-            const Divider(height: 1, color: Color(0xFFE2E8F0)),
+            Divider(height: 1, color: separateurCouleur),
 
             // Contenu de l'onglet actif
             Expanded(
@@ -188,7 +235,7 @@ class _JournalPageState extends State<JournalPage> {
                       ),
                     );
                   }
-                  final reponses = snapshot.data ?? [{}, {}, {}, {}, {}];
+                  final reponses = snapshot.data ?? [{}, {}, {}, {}, {}, {}];
                   final journalData = reponses.isNotEmpty
                       ? reponses[0]
                       : <String, dynamic>{};
@@ -204,6 +251,9 @@ class _JournalPageState extends State<JournalPage> {
                   final tachesData = reponses.length > 4
                       ? reponses[4]
                       : <String, dynamic>{};
+                  final feedbacksData = reponses.length > 5
+                      ? reponses[5]
+                      : <String, dynamic>{};
 
                   return RefreshIndicator(
                     color: const Color(0xFF1D61F2),
@@ -211,7 +261,10 @@ class _JournalPageState extends State<JournalPage> {
                     child: switch (_indexOnglet) {
                       0 => _buildOngletMesTaches(tachesData),
                       1 => _buildOngletPresences(presencesData, pointageData),
-                      2 => _buildOngletEvaluations(evaluationsData),
+                      2 => _buildOngletEvaluations(
+                        evaluationsData,
+                        feedbacksData,
+                      ),
                       3 => _buildOngletJournal(journalData),
                       _ => const SizedBox.shrink(),
                     },
@@ -230,6 +283,15 @@ class _JournalPageState extends State<JournalPage> {
   // ==========================================
   Widget _buildOngletMesTaches(Map<String, dynamic> tachesData) {
     final items = _items(tachesData['items']);
+    final itemsDateSelectionnee = items.where((tache) {
+      final date = DateTime.tryParse(
+        (tache['due_date'] ?? tache['date_echeance'])?.toString() ?? '',
+      );
+      return date != null &&
+          date.year == _dateSelectionneeTaches.year &&
+          date.month == _dateSelectionneeTaches.month &&
+          date.day == _dateSelectionneeTaches.day;
+    }).toList();
     final points = <int, Color>{};
     for (final tache in items) {
       final date = DateTime.tryParse(
@@ -250,13 +312,7 @@ class _JournalPageState extends State<JournalPage> {
         // Sélecteur de calendrier mois entier Janvier 2026
         CalendrierMoisEntier(
           dateSelectionnee: _dateSelectionneeTaches,
-          pointsCouleursParDate: ConfigurationApi.utiliserDonneesMockees
-              ? const {
-                  14: Color(0xFFF97316),
-                  15: Color(0xFF1D61F2),
-                  18: Color(0xFF16A34A),
-                }
-              : points,
+          pointsCouleursParDate: points,
           onDateSelectionnee: (date) {
             setState(() => _dateSelectionneeTaches = date);
           },
@@ -272,7 +328,9 @@ class _JournalPageState extends State<JournalPage> {
               style: GoogleFonts.inter(
                 fontSize: 17,
                 fontWeight: FontWeight.w800,
-                color: const Color(0xFF0F172A),
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white
+                    : const Color(0xFF0F172A),
               ),
             ),
             GestureDetector(
@@ -297,8 +355,8 @@ class _JournalPageState extends State<JournalPage> {
 
         const SizedBox(height: 14),
 
-        if (items.isNotEmpty)
-          for (final t in items.take(4)) ...[
+        if (itemsDateSelectionnee.isNotEmpty)
+          for (final t in itemsDateSelectionnee.take(4)) ...[
             CarteEcheanceTache(
               horaireTexte: _heureTache(t),
               sousHoraireTexte: '',
@@ -311,11 +369,23 @@ class _JournalPageState extends State<JournalPage> {
               tagCouleurFond: const Color(0xFFE0F2FE),
               tagCouleurTexte: const Color(0xFF0284C7),
               titre: (t['titre'] ?? t['title'])?.toString() ?? '',
-              onTap: () {},
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => MesTachesPage(
+                      assignmentUuid:
+                          (t['assignment_uuid'] ??
+                                  _map(t['assignment'])['uuid'])
+                              ?.toString(),
+                    ),
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 12),
           ]
-        else if (ConfigurationApi.utiliserDonneesMockees) ...[
+        else if (ConfigurationApi.utiliserDonneesMockees &&
+            tachesData.containsKey('__legacy_ui_preview')) ...[
           CarteEcheanceTache(
             horaireTexte: 'Toute la',
             sousHoraireTexte: 'journée',
@@ -335,7 +405,12 @@ class _JournalPageState extends State<JournalPage> {
             titre: 'Saisie du journal clinique quotidien',
             onTap: () => setState(() => _indexOnglet = 3),
           ),
-        ] else ...[_etatVide("Vous n'avez aucune tâche assignée.")],
+        ] else ...[
+          _etatVide(
+            "Vous n'avez aucune tâche assignée.",
+            icone: Iconsax.task_square,
+          ),
+        ],
       ],
     );
   }
@@ -360,13 +435,19 @@ class _JournalPageState extends State<JournalPage> {
     final attendance = _map(punch['attendance']);
 
     if (items.isEmpty && rotation.isEmpty && attendance.isEmpty) {
-      return _listeEtatVide("Vous n'avez aucune présence ni rotation active.");
+      return _listeEtatVide(
+        "Vous n'avez aucune présence ni rotation active.",
+        icone: Iconsax.calendar_tick,
+      );
     }
 
     final nomService =
-        (rotation['unit_name'] ?? rotation['title'])?.toString() ?? '';
+        (rotation['unit_name'] ?? rotation['service_name'] ?? rotation['title'])
+            ?.toString() ??
+        '';
     final canPunch = punch['can_punch'] == true;
     final nextAction = punch['next_action']?.toString() ?? '';
+    final actionSupportee = nextAction == 'ARRIVEE' || nextAction == 'DEPART';
     final estArrivee = nextAction == 'ARRIVEE';
     final lastPunchAt =
         (attendance['heure_depart'] ??
@@ -392,6 +473,13 @@ class _JournalPageState extends State<JournalPage> {
         stats?['absent']?.toString() ?? stats?['absences']?.toString() ?? '0';
     final gardes = stats?['guard']?.toString() ?? '0';
 
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
+    final fondCarte = modeSombre ? const Color(0xFF1E293B) : Colors.white;
+    final bordureCouleur = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFE2E8F0);
+    final texteCouleur = modeSombre ? Colors.white : const Color(0xFF0F172A);
+
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
@@ -400,14 +488,16 @@ class _JournalPageState extends State<JournalPage> {
         Container(
           width: double.infinity,
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: fondCarte,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-            boxShadow: const [
+            border: Border.all(color: bordureCouleur),
+            boxShadow: [
               BoxShadow(
-                color: Color(0x05000000),
+                color: modeSombre
+                    ? const Color(0x30000000)
+                    : const Color(0x05000000),
                 blurRadius: 10,
-                offset: Offset(0, 2),
+                offset: const Offset(0, 2),
               ),
             ],
           ),
@@ -432,7 +522,9 @@ class _JournalPageState extends State<JournalPage> {
                       vertical: 4.5,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFDCFCE7),
+                      color: modeSombre
+                          ? const Color(0xFF14532D)
+                          : const Color(0xFFDCFCE7),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -440,7 +532,9 @@ class _JournalPageState extends State<JournalPage> {
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: const Color(0xFF16A34A),
+                        color: modeSombre
+                            ? const Color(0xFF4ADE80)
+                            : const Color(0xFF16A34A),
                       ),
                     ),
                   ),
@@ -452,7 +546,7 @@ class _JournalPageState extends State<JournalPage> {
                 style: GoogleFonts.inter(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
-                  color: const Color(0xFF0F172A),
+                  color: texteCouleur,
                 ),
               ),
               const SizedBox(height: 16),
@@ -476,7 +570,7 @@ class _JournalPageState extends State<JournalPage> {
                         style: GoogleFonts.inter(
                           fontSize: 16.5,
                           fontWeight: FontWeight.w800,
-                          color: const Color(0xFF0F172A),
+                          color: texteCouleur,
                         ),
                       ),
                     ],
@@ -510,7 +604,7 @@ class _JournalPageState extends State<JournalPage> {
                 width: double.infinity,
                 height: 48,
                 child: FilledButton.icon(
-                  onPressed: (!canPunch || _pointageEnCours)
+                  onPressed: (!canPunch || !actionSupportee || _pointageEnCours)
                       ? null
                       : () => _actionnerPointage(nextAction),
                   icon: _pointageEnCours
@@ -561,7 +655,7 @@ class _JournalPageState extends State<JournalPage> {
           style: GoogleFonts.inter(
             fontSize: 17,
             fontWeight: FontWeight.w800,
-            color: const Color(0xFF0F172A),
+            color: modeSombre ? Colors.white : const Color(0xFF0F172A),
           ),
         ),
 
@@ -693,18 +787,26 @@ class _JournalPageState extends State<JournalPage> {
     required String titre,
     required Widget valeurWidget,
   }) {
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
+    final fondCarte = modeSombre ? const Color(0xFF1E293B) : Colors.white;
+    final bordureCouleur = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFE2E8F0);
+
     return Container(
       height: 94,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: fondCarte,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: const [
+        border: Border.all(color: bordureCouleur),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x05000000),
+            color: modeSombre
+                ? const Color(0x30000000)
+                : const Color(0x05000000),
             blurRadius: 10,
-            offset: Offset(0, 2),
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -730,17 +832,29 @@ class _JournalPageState extends State<JournalPage> {
   // ==========================================
   // ONGLET 3 : EVALUATIONS (Image 3)
   // ==========================================
-  Widget _buildOngletEvaluations(Map<String, dynamic> evaluationsData) {
+  Widget _buildOngletEvaluations(
+    Map<String, dynamic> evaluationsData,
+    Map<String, dynamic> feedbacksData,
+  ) {
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
+    final fondCarte = modeSombre ? const Color(0xFF1E293B) : Colors.white;
+    final bordureCouleur = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFE2E8F0);
+    final texteCouleur = modeSombre ? Colors.white : const Color(0xFF0F172A);
+
     final items = _items(evaluationsData['items']);
-    if (items.isEmpty && !ConfigurationApi.utiliserDonneesMockees) {
-      return _listeEtatVide("Vous n'avez aucune évaluation disponible.");
+    final feedbacks = _items(feedbacksData['items']);
+    if (items.isEmpty && feedbacks.isEmpty) {
+      return _listeEtatVide(
+        "Vous n'avez aucune évaluation ou aucun feedback disponible.",
+        icone: Iconsax.award,
+      );
     }
     final stats = evaluationsData['stats'] is Map
         ? Map<String, dynamic>.from(evaluationsData['stats'] as Map)
         : null;
-    final moyenneScore =
-        stats?['average'] ??
-        (ConfigurationApi.utiliserDonneesMockees ? '16.8' : null);
+    final moyenneScore = stats?['average'];
     final moyenneNumerique = double.tryParse(moyenneScore?.toString() ?? '');
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -750,14 +864,16 @@ class _JournalPageState extends State<JournalPage> {
         Container(
           width: double.infinity,
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: fondCarte,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-            boxShadow: const [
+            border: Border.all(color: bordureCouleur),
+            boxShadow: [
               BoxShadow(
-                color: Color(0x05000000),
+                color: modeSombre
+                    ? const Color(0x30000000)
+                    : const Color(0x05000000),
                 blurRadius: 10,
-                offset: Offset(0, 2),
+                offset: const Offset(0, 2),
               ),
             ],
           ),
@@ -791,7 +907,9 @@ class _JournalPageState extends State<JournalPage> {
                     style: GoogleFonts.inter(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: const Color(0xFF16A34A),
+                      color: modeSombre
+                          ? const Color(0xFF4ADE80)
+                          : const Color(0xFF16A34A),
                     ),
                   ),
                 ],
@@ -800,8 +918,10 @@ class _JournalPageState extends State<JournalPage> {
               Container(
                 width: 60,
                 height: 60,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFE0F2FE),
+                decoration: BoxDecoration(
+                  color: modeSombre
+                      ? const Color(0xFF0C4A6E)
+                      : const Color(0xFFE0F2FE),
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
@@ -810,7 +930,9 @@ class _JournalPageState extends State<JournalPage> {
                   style: GoogleFonts.inter(
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
-                    color: const Color(0xFF0284C7),
+                    color: modeSombre
+                        ? const Color(0xFF38BDF8)
+                        : const Color(0xFF0284C7),
                   ),
                 ),
               ),
@@ -820,13 +942,30 @@ class _JournalPageState extends State<JournalPage> {
 
         const SizedBox(height: 22),
 
+        if (feedbacks.isNotEmpty) ...[
+          Text(
+            'Retours des encadreurs (${feedbacks.length})',
+            style: GoogleFonts.inter(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              color: texteCouleur,
+            ),
+          ),
+          const SizedBox(height: 14),
+          for (final feedback in feedbacks) ...[
+            _buildCarteFeedback(feedback),
+            const SizedBox(height: 14),
+          ],
+          const SizedBox(height: 8),
+        ],
+
         // Titre Fiches d'évaluations
         Text(
-          'Fiches d\'évaluations (${items.isNotEmpty ? items.length : 2})',
+          'Fiches d\'évaluations (${items.length})',
           style: GoogleFonts.inter(
             fontSize: 17,
             fontWeight: FontWeight.w800,
-            color: const Color(0xFF0F172A),
+            color: texteCouleur,
           ),
         ),
 
@@ -848,12 +987,13 @@ class _JournalPageState extends State<JournalPage> {
                 appreciation:
                     (ev['appreciation'] ?? ev['comment'])?.toString() ?? '',
                 dateTexte:
-                    (ev['validated_at'] ?? ev['finalized_at'])?.toString() ??
+                    (ev['finalized_at'] ?? ev['validated_at'])?.toString() ??
                     '',
                 donneesEvaluation: ev,
               ),
             )
-        else ...[
+        else if (ConfigurationApi.utiliserDonneesMockees &&
+            evaluationsData.containsKey('__legacy_ui_preview')) ...[
           // Carte 1 : FIN DE ROTATION
           _buildCarteEvaluation(
             tagLibelle: 'FIN DE ROTATION',
@@ -897,17 +1037,29 @@ class _JournalPageState extends State<JournalPage> {
     required String dateTexte,
     Map<String, dynamic>? donneesEvaluation,
   }) {
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
+    final fondCarte = modeSombre ? const Color(0xFF1E293B) : Colors.white;
+    final bordureCouleur = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFE2E8F0);
+    final texteCouleur = modeSombre ? Colors.white : const Color(0xFF0F172A);
+    final separateurCouleur = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFF1F5F9);
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: fondCarte,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: const [
+        border: Border.all(color: bordureCouleur),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x05000000),
+            color: modeSombre
+                ? const Color(0x30000000)
+                : const Color(0x05000000),
             blurRadius: 10,
-            offset: Offset(0, 2),
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -939,7 +1091,9 @@ class _JournalPageState extends State<JournalPage> {
                 style: GoogleFonts.inter(
                   fontSize: 15.5,
                   fontWeight: FontWeight.w800,
-                  color: const Color(0xFF16A34A),
+                  color: modeSombre
+                      ? const Color(0xFF4ADE80)
+                      : const Color(0xFF16A34A),
                 ),
               ),
             ],
@@ -953,7 +1107,7 @@ class _JournalPageState extends State<JournalPage> {
             style: GoogleFonts.inter(
               fontSize: 16,
               fontWeight: FontWeight.w800,
-              color: const Color(0xFF0F172A),
+              color: texteCouleur,
             ),
           ),
 
@@ -976,7 +1130,7 @@ class _JournalPageState extends State<JournalPage> {
                   style: GoogleFonts.inter(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w700,
-                    color: const Color(0xFF0F172A),
+                    color: texteCouleur,
                   ),
                 ),
               ],
@@ -991,14 +1145,16 @@ class _JournalPageState extends State<JournalPage> {
             style: GoogleFonts.inter(
               fontSize: 12.5,
               fontWeight: FontWeight.w500,
-              color: const Color(0xFF64748B),
+              color: modeSombre
+                  ? const Color(0xFFCBD5E1)
+                  : const Color(0xFF64748B),
               fontStyle: FontStyle.italic,
               height: 1.35,
             ),
           ),
 
           const SizedBox(height: 12),
-          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          Divider(height: 1, color: separateurCouleur),
           const SizedBox(height: 10),
 
           // Footer : Évalué le + Voir les détails
@@ -1048,13 +1204,160 @@ class _JournalPageState extends State<JournalPage> {
     );
   }
 
+  Widget _buildCarteFeedback(Map<String, dynamic> feedback) {
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
+    final fondCarte = modeSombre ? const Color(0xFF1E293B) : Colors.white;
+    final bordureCouleur = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFE2E8F0);
+    final texteCouleur = modeSombre ? Colors.white : const Color(0xFF0F172A);
+    final type = feedback['type']?.toString().toUpperCase() ?? '';
+    final couleurs = _couleursFeedback(type);
+    final lu = feedback['seen'] == true;
+    final actionLecture = _map(_map(feedback['actions'])['read']);
+    final peutMarquerLu = actionLecture['allowed'] == true;
+    final uuid = feedback['uuid']?.toString() ?? '';
+    final lectureEnCours = _feedbacksLectureEnCours.contains(uuid);
+    final auteur = feedback['author_name']?.toString() ?? '';
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: fondCarte,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: bordureCouleur),
+        boxShadow: [
+          BoxShadow(
+            color: modeSombre
+                ? const Color(0x30000000)
+                : const Color(0x05000000),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: couleurs.$1,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  type.replaceAll('_', ' '),
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: couleurs.$2,
+                  ),
+                ),
+              ),
+              Text(
+                lu ? 'LU' : 'NOUVEAU',
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: lu ? const Color(0xFF94A3B8) : const Color(0xFF1D61F2),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            feedback['title']?.toString() ?? '',
+            style: GoogleFonts.inter(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: texteCouleur,
+            ),
+          ),
+          if (auteur.isNotEmpty) ...[
+            const SizedBox(height: 5),
+            Text(
+              'Encadreur : $auteur',
+              style: GoogleFonts.inter(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF94A3B8),
+              ),
+            ),
+          ],
+          const SizedBox(height: 10),
+          Text(
+            feedback['comment']?.toString() ?? '',
+            style: GoogleFonts.inter(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
+              color: modeSombre
+                  ? const Color(0xFFCBD5E1)
+                  : const Color(0xFF64748B),
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Divider(
+            height: 1,
+            color: modeSombre
+                ? const Color(0xFF334155)
+                : const Color(0xFFF1F5F9),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  feedback['published_at']?.toString() ??
+                      feedback['date']?.toString() ??
+                      '',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFF94A3B8),
+                  ),
+                ),
+              ),
+              if (peutMarquerLu && uuid.isNotEmpty)
+                GestureDetector(
+                  onTap: lectureEnCours ? null : () => _marquerFeedbackLu(uuid),
+                  child: Text(
+                    lectureEnCours ? 'Enregistrement...' : 'Marquer comme lu',
+                    style: GoogleFonts.inter(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF1D61F2),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  (Color, Color) _couleursFeedback(String type) => switch (type) {
+    'ENCOURAGEMENT' => (const Color(0xFFDCFCE7), const Color(0xFF16A34A)),
+    'A_AMELIORER' => (const Color(0xFFFFF7ED), const Color(0xFFEA580C)),
+    'AVERTISSEMENT' => (const Color(0xFFFEE2E2), const Color(0xFFDC2626)),
+    _ => (const Color(0xFFE0F2FE), const Color(0xFF0284C7)),
+  };
+
   // ==========================================
   // ONGLET 4 : JOURNAL (Image 4)
   // ==========================================
   Widget _buildOngletJournal(Map<String, dynamic> journalData) {
     final items = _items(journalData['items']);
-    if (items.isEmpty && !ConfigurationApi.utiliserDonneesMockees) {
-      return _listeEtatVide("Vous n'avez aucun journal enregistré.");
+    if (items.isEmpty) {
+      return _listeEtatVide(
+        "Vous n'avez aucun journal enregistré.",
+        icone: Iconsax.book,
+      );
     }
     final stats = _map(journalData['stats']);
     final total = _entier(stats['total']);
@@ -1063,9 +1366,7 @@ class _JournalPageState extends State<JournalPage> {
         _entier(stats['validated']) +
         _entier(stats['rejected']);
     final progression = total > 0 ? termines / total : 0.0;
-    final journauxFiltres = ConfigurationApi.utiliserDonneesMockees
-        ? const <Map<String, dynamic>>[]
-        : items.where(_journalCorrespondAuFiltre).toList();
+    final journauxFiltres = items.where(_journalCorrespondAuFiltre).toList();
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -1144,11 +1445,7 @@ class _JournalPageState extends State<JournalPage> {
                 physics: const BouncingScrollPhysics(),
                 child: Row(
                   children: [
-                    _buildFiltreJournalChip(
-                      ConfigurationApi.utiliserDonneesMockees
-                          ? 'Aujourd\'hui (5)'
-                          : 'Aujourd\'hui',
-                    ),
+                    _buildFiltreJournalChip('Aujourd\'hui'),
                     const SizedBox(width: 8),
                     _buildFiltreJournalChip('À venir'),
                     const SizedBox(width: 8),
@@ -1178,31 +1475,34 @@ class _JournalPageState extends State<JournalPage> {
 
         const SizedBox(height: 16),
 
-        if (!ConfigurationApi.utiliserDonneesMockees && journauxFiltres.isEmpty)
-          _etatVide('Aucun journal ne correspond à ce filtre.'),
+        if (journauxFiltres.isEmpty)
+          _etatVide(
+            'Aucun journal ne correspond à ce filtre.',
+            icone: Iconsax.search_status,
+          ),
 
-        if (!ConfigurationApi.utiliserDonneesMockees)
-          for (final journal in journauxFiltres) ...[
-            _buildCarteActiviteJournal(
-              tagPriorite: _categorieJournal(journal),
-              tagPrioriteBg: const Color(0xFFF3E8FF),
-              tagPrioriteTexte: const Color(0xFF7E22CE),
-              statutLibelle:
-                  journal['status']?.toString().replaceAll('_', ' ') ?? '',
-              statutBg: const Color(0xFFE0F2FE),
-              statutTexte: const Color(0xFF0284C7),
-              titre:
-                  (journal['learning'] ?? journal['summary'])?.toString() ?? '',
-              description: journal['summary']?.toString() ?? '',
-              echeanceTexte: journal['date']?.toString() ?? '',
-              actionTexte: journal['editable'] == true ? 'Corriger' : 'Ouvrir',
-              actionCouleur: const Color(0xFF1D61F2),
-              donneesJournal: journal,
-            ),
-            const SizedBox(height: 14),
-          ],
+        for (final journal in journauxFiltres) ...[
+          _buildCarteActiviteJournal(
+            tagPriorite: _categorieJournal(journal),
+            tagPrioriteBg: const Color(0xFFF3E8FF),
+            tagPrioriteTexte: const Color(0xFF7E22CE),
+            statutLibelle:
+                journal['status']?.toString().replaceAll('_', ' ') ?? '',
+            statutBg: const Color(0xFFE0F2FE),
+            statutTexte: const Color(0xFF0284C7),
+            titre:
+                (journal['learning'] ?? journal['summary'])?.toString() ?? '',
+            description: journal['summary']?.toString() ?? '',
+            echeanceTexte: journal['date']?.toString() ?? '',
+            actionTexte: journal['editable'] == true ? 'Corriger' : 'Ouvrir',
+            actionCouleur: const Color(0xFF1D61F2),
+            donneesJournal: journal,
+          ),
+          const SizedBox(height: 14),
+        ],
 
-        if (ConfigurationApi.utiliserDonneesMockees) ...[
+        if (ConfigurationApi.utiliserDonneesMockees &&
+            journalData.containsKey('__legacy_ui_preview')) ...[
           // Carte 1 : HAUTE PRIORITÉ - En cours
           _buildCarteActiviteJournal(
             tagPriorite: 'HAUTE PRIORITÉ',
@@ -1241,16 +1541,25 @@ class _JournalPageState extends State<JournalPage> {
   }
 
   Widget _buildFiltreJournalChip(String titre) {
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
     final actif = _filtreJournal == titre;
+    final fondInactif = modeSombre ? const Color(0xFF1E293B) : Colors.white;
+    final bordureInactif = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFE2E8F0);
+    final texteInactif = modeSombre
+        ? const Color(0xFF94A3B8)
+        : const Color(0xFF64748B);
+
     return GestureDetector(
       onTap: () => setState(() => _filtreJournal = titre),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8.5),
         decoration: BoxDecoration(
-          color: actif ? const Color(0xFF1D61F2) : Colors.white,
+          color: actif ? const Color(0xFF1D61F2) : fondInactif,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: actif ? const Color(0xFF1D61F2) : const Color(0xFFE2E8F0),
+            color: actif ? const Color(0xFF1D61F2) : bordureInactif,
           ),
         ),
         child: Text(
@@ -1258,7 +1567,7 @@ class _JournalPageState extends State<JournalPage> {
           style: GoogleFonts.inter(
             fontSize: 13,
             fontWeight: actif ? FontWeight.w700 : FontWeight.w500,
-            color: actif ? Colors.white : const Color(0xFF64748B),
+            color: actif ? Colors.white : texteInactif,
           ),
         ),
       ),
@@ -1332,25 +1641,69 @@ class _JournalPageState extends State<JournalPage> {
   String _titreEvaluation(Map<String, dynamic> evaluation) {
     final unit = _map(evaluation['unit']);
     final campaign = _map(evaluation['campaign']);
-    return unit['name']?.toString() ?? campaign['title']?.toString() ?? '';
+    return unit['name']?.toString() ??
+        campaign['title']?.toString() ??
+        campaign['name']?.toString() ??
+        evaluation['campaign_title']?.toString() ??
+        '';
   }
 
-  Widget _etatVide(String message) => Center(
-    child: Padding(
-      padding: const EdgeInsets.symmetric(vertical: 32),
-      child: Text(
-        message,
-        textAlign: TextAlign.center,
-        style: GoogleFonts.inter(color: const Color(0xFF64748B)),
-      ),
-    ),
-  );
+  Widget _etatVide(String message, {IconData icone = Iconsax.document}) {
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
+    final couleurIcone = modeSombre
+        ? const Color(0xFF38BDF8)
+        : const Color(0xFF1D61F2);
+    final couleurFondIcone = modeSombre
+        ? const Color(0x2238BDF8)
+        : const Color(0x141D61F2);
+    final couleurTexte = modeSombre
+        ? const Color(0xFF94A3B8)
+        : const Color(0xFF64748B);
 
-  Widget _listeEtatVide(String message) => ListView(
-    physics: const AlwaysScrollableScrollPhysics(),
-    padding: const EdgeInsets.all(32),
-    children: [_etatVide(message)],
-  );
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: couleurFondIcone,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icone, size: 34, color: couleurIcone),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 14.5,
+                fontWeight: FontWeight.w600,
+                color: couleurTexte,
+                height: 1.4,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _listeEtatVide(String message, {IconData icone = Iconsax.document}) =>
+      LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(child: _etatVide(message, icone: icone)),
+          ),
+        ),
+      );
 
   Widget _buildCarteActiviteJournal({
     required String tagPriorite,
@@ -1366,17 +1719,32 @@ class _JournalPageState extends State<JournalPage> {
     required Color actionCouleur,
     Map<String, dynamic>? donneesJournal,
   }) {
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
+    final fondCarte = modeSombre ? const Color(0xFF1E293B) : Colors.white;
+    final bordureCouleur = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFE2E8F0);
+    final texteCouleur = modeSombre ? Colors.white : const Color(0xFF0F172A);
+    final descriptionCouleur = modeSombre
+        ? const Color(0xFF94A3B8)
+        : const Color(0xFF64748B);
+    final separateurCouleur = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFF1F5F9);
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: fondCarte,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: const [
+        border: Border.all(color: bordureCouleur),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x05000000),
+            color: modeSombre
+                ? const Color(0x30000000)
+                : const Color(0x05000000),
             blurRadius: 10,
-            offset: Offset(0, 2),
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -1429,7 +1797,7 @@ class _JournalPageState extends State<JournalPage> {
             style: GoogleFonts.inter(
               fontSize: 15.5,
               fontWeight: FontWeight.w800,
-              color: const Color(0xFF0F172A),
+              color: texteCouleur,
             ),
           ),
 
@@ -1441,12 +1809,12 @@ class _JournalPageState extends State<JournalPage> {
             style: GoogleFonts.inter(
               fontSize: 13,
               fontWeight: FontWeight.w500,
-              color: const Color(0xFF64748B),
+              color: descriptionCouleur,
             ),
           ),
 
           const SizedBox(height: 12),
-          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          Divider(height: 1, color: separateurCouleur),
           const SizedBox(height: 10),
 
           // Footer : Échéance + Action
@@ -1500,6 +1868,11 @@ class _JournalPageState extends State<JournalPage> {
     );
   }
 }
+
+String _dateApi(DateTime date) =>
+    '${date.year.toString().padLeft(4, '0')}-'
+    '${date.month.toString().padLeft(2, '0')}-'
+    '${date.day.toString().padLeft(2, '0')}';
 
 List<Map<String, dynamic>> _items(Object? valeur) => valeur is List
     ? valeur

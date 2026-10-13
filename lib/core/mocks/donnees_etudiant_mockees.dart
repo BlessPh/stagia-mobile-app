@@ -1,8 +1,13 @@
 import '../network/endpoints_api.dart';
 import 'depot_mock_etudiant.dart';
+import 'scenario_etudiant_ui.dart';
 
 abstract final class DonneesEtudiantMockees {
   static Map<String, dynamic> pourEndpoint(String endpoint) {
+    final donneesScenario = ScenarioEtudiantUi.pourEndpoint(endpoint);
+    if (donneesScenario != null) {
+      return Map<String, dynamic>.from(donneesScenario);
+    }
     if (endpoint == EndpointsApi.tableauDeBordEtudiant) {
       return {
         ...tableauDeBord,
@@ -25,8 +30,9 @@ abstract final class DonneesEtudiantMockees {
           'temporary': items
               .where((e) => e['statut'] == 'RESERVEE_TEMPORAIREMENT')
               .length,
-          'waiting_payment':
-              items.where((e) => e['statut'] == 'EN_ATTENTE_PAIEMENT').length,
+          'waiting_payment': items
+              .where((e) => e['statut'] == 'EN_ATTENTE_PAIEMENT')
+              .length,
           'confirmed': items.where((e) => e['statut'] == 'CONFIRMEE').length,
           'expired': items.where((e) => e['statut'] == 'EXPIREE').length,
         },
@@ -39,20 +45,18 @@ abstract final class DonneesEtudiantMockees {
         'stats': {
           'total': items.length,
           'brouillon': items
-              .where((e) =>
-                  e['status'] == 'BROUILLON' || e['statut'] == 'BROUILLON')
+              .where(
+                (e) => e['status'] == 'BROUILLON' || e['statut'] == 'BROUILLON',
+              )
               .length,
           'soumis': items
-              .where(
-                  (e) => e['status'] == 'SOUMIS' || e['statut'] == 'SOUMIS')
+              .where((e) => e['status'] == 'SOUMIS' || e['statut'] == 'SOUMIS')
               .length,
           'valide': items
-              .where(
-                  (e) => e['status'] == 'VALIDE' || e['statut'] == 'VALIDE')
+              .where((e) => e['status'] == 'VALIDE' || e['statut'] == 'VALIDE')
               .length,
           'rejete': items
-              .where(
-                  (e) => e['status'] == 'REJETE' || e['statut'] == 'REJETE')
+              .where((e) => e['status'] == 'REJETE' || e['statut'] == 'REJETE')
               .length,
         },
         'can_add': true,
@@ -60,7 +64,8 @@ abstract final class DonneesEtudiantMockees {
     }
     if (endpoint == EndpointsApi.documentsEtudiant) {
       final itemsCandidatures = DepotMockEtudiant.documents;
-      final itemsOfficiels = (documents['items'] as List?)
+      final itemsOfficiels =
+          (documents['items'] as List?)
               ?.whereType<Map>()
               .map(Map<String, dynamic>.from)
               .toList() ??
@@ -129,8 +134,8 @@ abstract final class DonneesEtudiantMockees {
             'app_version': '1.0.0',
             'active': true,
             'last_seen_at': DateTime.now().toIso8601String(),
-          }
-        ]
+          },
+        ],
       };
     }
     return Map<String, dynamic>.from(switch (endpoint) {
@@ -150,7 +155,6 @@ abstract final class DonneesEtudiantMockees {
       _ => <String, dynamic>{},
     });
   }
-
 
   static const profil = <String, dynamic>{
     'user': {
@@ -468,10 +472,7 @@ abstract final class DonneesEtudiantMockees {
           'expires_at': '2026-09-19 18:30:00',
           'confirmed_at': null,
         },
-        'application': {
-          'uuid': 'app-candidature-001',
-          'status': 'SOUMISE',
-        },
+        'application': {'uuid': 'app-candidature-001', 'status': 'SOUMISE'},
         'admission': {
           'exists': false,
           'uuid': null,
@@ -545,14 +546,8 @@ abstract final class DonneesEtudiantMockees {
           'code': 'ENT-001',
           'name': 'Cliniques Universitaires de Kinshasa',
         },
-        'university': {
-          'code': 'UNIKIN',
-          'name': 'Université de Kinshasa',
-        },
-        'unit': {
-          'code': 'UN-001',
-          'name': 'Service de Chirurgie Générale',
-        },
+        'university': {'code': 'UNIKIN', 'name': 'Université de Kinshasa'},
+        'unit': {'code': 'UN-001', 'name': 'Service de Chirurgie Générale'},
       },
     ],
     'stats': {
@@ -589,10 +584,7 @@ abstract final class DonneesEtudiantMockees {
           'code': 'ENT-001',
           'name': 'Cliniques Universitaires de Kinshasa',
         },
-        'unit': {
-          'code': 'UN-001',
-          'name': 'Service de Chirurgie Générale',
-        },
+        'unit': {'code': 'UN-001', 'name': 'Service de Chirurgie Générale'},
       },
       {
         'uuid': 'att-024',
@@ -611,10 +603,7 @@ abstract final class DonneesEtudiantMockees {
           'code': 'ENT-001',
           'name': 'Cliniques Universitaires de Kinshasa',
         },
-        'unit': {
-          'code': 'UN-001',
-          'name': 'Service de Chirurgie Générale',
-        },
+        'unit': {'code': 'UN-001', 'name': 'Service de Chirurgie Générale'},
       },
       {
         'uuid': 'att-023',
@@ -633,10 +622,7 @@ abstract final class DonneesEtudiantMockees {
           'code': 'ENT-001',
           'name': 'Cliniques Universitaires de Kinshasa',
         },
-        'unit': {
-          'code': 'UN-001',
-          'name': 'Service de Chirurgie Générale',
-        },
+        'unit': {'code': 'UN-001', 'name': 'Service de Chirurgie Générale'},
       },
       {
         'uuid': 'att-022',
@@ -655,10 +641,7 @@ abstract final class DonneesEtudiantMockees {
           'code': 'ENT-001',
           'name': 'Cliniques Universitaires de Kinshasa',
         },
-        'unit': {
-          'code': 'UN-001',
-          'name': 'Service de Chirurgie Générale',
-        },
+        'unit': {'code': 'UN-001', 'name': 'Service de Chirurgie Générale'},
       },
     ],
     'stats': {
@@ -703,10 +686,7 @@ abstract final class DonneesEtudiantMockees {
           'code': 'ENT-001',
           'name': 'Cliniques Universitaires de Kinshasa',
         },
-        'unit': {
-          'code': 'UN-001',
-          'name': 'Service de Chirurgie Générale',
-        },
+        'unit': {'code': 'UN-001', 'name': 'Service de Chirurgie Générale'},
         'hospital_name': 'Cliniques Universitaires de Kinshasa',
         'unit_name': 'Service de Chirurgie Générale',
         'evaluator_name': 'Dr. Jean Mukendi',
@@ -778,10 +758,7 @@ abstract final class DonneesEtudiantMockees {
       'code': 'ENT-001',
       'name': 'Cliniques Universitaires de Kinshasa',
     },
-    'payment_gateway': {
-      'integrated': false,
-      'next_action': 'AWAIT_PAYMENT',
-    },
+    'payment_gateway': {'integrated': false, 'next_action': 'AWAIT_PAYMENT'},
   };
 
   static const paiementSync = <String, dynamic>{

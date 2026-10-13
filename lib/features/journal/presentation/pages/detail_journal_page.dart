@@ -42,7 +42,11 @@ class DetailJournalPage extends StatelessWidget {
                 (donneesApi ? '' : statutTexte))
             .toString()
             .toUpperCase();
-    final bool estValideReel = statutReel == 'VALIDE' || statutReel == 'VALIDÉ';
+    final bool estValideReel = const {
+      'VALIDEE',
+      'VALIDE',
+      'VALIDÉ',
+    }.contains(statutReel);
 
     final dateReelle =
         donneesJournal?['date']?.toString() ?? (donneesApi ? '' : dateStage);

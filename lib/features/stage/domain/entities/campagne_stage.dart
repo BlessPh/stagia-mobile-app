@@ -5,10 +5,15 @@ class HopitalCampagne {
     required this.distanceKm,
     required this.placesDisponibles,
     this.participationId,
+    this.code = '',
+    this.capacite = 0,
+    this.placesUtilisees = 0,
     this.placesRestantes,
+    this.disponible = true,
     this.fraisRequis = false,
     this.montantFrais = 0,
     this.devise = '',
+    this.conditions,
     this.adresse,
     this.commune = '',
     this.ville = '',
@@ -21,13 +26,18 @@ class HopitalCampagne {
 
   final String id;
   final int? participationId;
+  final String code;
   final String nom;
   final double distanceKm;
+  final int capacite;
+  final int placesUtilisees;
   final int placesDisponibles;
   final int? placesRestantes;
+  final bool disponible;
   final bool fraisRequis;
-  final int montantFrais;
+  final double montantFrais;
   final String devise;
+  final String? conditions;
   final String? adresse;
   final String commune;
   final String ville;
@@ -39,10 +49,23 @@ class HopitalCampagne {
 
   int get placesRestantesEffectives => placesRestantes ?? placesDisponibles;
 
-  String get localisationCourte => '$commune, $ville';
+  bool get peutReserver => disponible && placesRestantesEffectives > 0;
 
-  String get distanceEtPlaces =>
-      '${distanceKm.toStringAsFixed(1)} km • $placesDisponibles places disponibles';
+  String get localisationCourte {
+    final valeurs = <String>[];
+    for (final element in [ville, commune]) {
+      final valeur = element.trim();
+      if (valeur.isNotEmpty && !valeurs.contains(valeur)) valeurs.add(valeur);
+    }
+    return valeurs.join(', ');
+  }
+
+  String get distanceEtPlaces {
+    final details = <String>[];
+    if (distanceKm > 0) details.add('${distanceKm.toStringAsFixed(1)} km');
+    details.add('$placesRestantesEffectives places disponibles');
+    return details.join(' • ');
+  }
 
   Map<String, dynamic> versMapOption({
     required String campagneId,
@@ -53,7 +76,7 @@ class HopitalCampagne {
     'cle_option': '$campagneId::$id',
     'etablissement': nom,
     'campagne': campagneTitre,
-    'localisation': adresse ?? '$commune, $ville · RDC',
+    'localisation': adresse ?? localisationCourte,
   };
 }
 
@@ -65,6 +88,11 @@ class CampagneStage {
     this.isD4 = true,
     this.autoriseReservationAutonome = true,
     this.modeReservation = 'SELF_RESERVATION',
+    this.typeStageCode = '',
+    this.typeStageLibelle = '',
+    this.promotionCode = '',
+    this.promotionNom = '',
+    this.niveau = '',
     required this.titre,
     required this.sousTitre,
     required this.dateDebut,
@@ -74,6 +102,7 @@ class CampagneStage {
     required this.modalite,
     required this.statut,
     required this.nombreHopitaux,
+    this.nombreHopitauxDisponibles,
     required this.estEligible,
     this.messageEligibilite = '',
     required this.consignes,
@@ -87,6 +116,11 @@ class CampagneStage {
   final bool isD4;
   final bool autoriseReservationAutonome;
   final String modeReservation;
+  final String typeStageCode;
+  final String typeStageLibelle;
+  final String promotionCode;
+  final String promotionNom;
+  final String niveau;
   final String titre;
   final String sousTitre;
   final String dateDebut;
@@ -96,6 +130,7 @@ class CampagneStage {
   final String modalite;
   final String statut;
   final int nombreHopitaux;
+  final int? nombreHopitauxDisponibles;
   final bool estEligible;
   final String messageEligibilite;
   final List<String> consignes;
@@ -109,6 +144,11 @@ class CampagneStage {
     isD4: isD4,
     autoriseReservationAutonome: autoriseReservationAutonome,
     modeReservation: modeReservation,
+    typeStageCode: typeStageCode,
+    typeStageLibelle: typeStageLibelle,
+    promotionCode: promotionCode,
+    promotionNom: promotionNom,
+    niveau: niveau,
     titre: titre,
     sousTitre: sousTitre,
     dateDebut: dateDebut,
@@ -118,6 +158,7 @@ class CampagneStage {
     modalite: modalite,
     statut: nouveauStatut,
     nombreHopitaux: nombreHopitaux,
+    nombreHopitauxDisponibles: nombreHopitauxDisponibles,
     estEligible: estEligible,
     messageEligibilite: messageEligibilite,
     consignes: consignes,

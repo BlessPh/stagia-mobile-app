@@ -45,6 +45,10 @@ dependencies:
   cupertino_icons: ^1.0.8
   font_awesome_flutter: ^11.0.0
   shimmer: ^4.0.0
+  iconsax: ^0.0.8
+  photo_manager: ^3.12.0
+  image_picker: ^1.2.4
+  photo_manager_image_provider: ^2.2.0
 
 dev_dependencies:
   flutter_test:

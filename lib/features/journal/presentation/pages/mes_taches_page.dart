@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/network/client_api_http.dart';
 import '../../../../core/network/configuration_api.dart';
+import '../../../../core/network/reponse_api.dart';
 import '../../../../core/network/source_etudiant_distante.dart';
 import '../../../notifications/presentation/pages/notifications_page.dart';
 
@@ -27,7 +28,7 @@ class _MesTachesPageState extends State<MesTachesPage> {
   }
 
   Future<Map<String, dynamic>> _charger() =>
-      _source.taches(assignmentUuid: widget.assignmentUuid);
+      _source.taches(assignmentUuid: widget.assignmentUuid, perPage: 100);
 
   Future<void> _actualiser() async {
     final futur = _charger();
@@ -37,18 +38,24 @@ class _MesTachesPageState extends State<MesTachesPage> {
 
   Future<void> _demarrer(String uuid) async {
     try {
-      await _source.demarrerTache(uuid);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Tâche démarrée avec succès !')),
-        );
-      }
-      await _actualiser();
-    } catch (e) {
+      final resultat = await _source.demarrerTache(uuid);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur: $e'),
+            content: Text(
+              resultat['message']?.toString().trim().isNotEmpty == true
+                  ? resultat['message'].toString()
+                  : 'Tâche démarrée.',
+            ),
+          ),
+        );
+      }
+      await _actualiser();
+    } on ErreurApi catch (erreur) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(erreur.message),
             backgroundColor: const Color(0xFFDC2626),
           ),
         );
@@ -85,10 +92,13 @@ class _MesTachesPageState extends State<MesTachesPage> {
         ],
       ),
     );
-    if (valide != true) return;
+    if (valide != true) {
+      commentCtrl.dispose();
+      return;
+    }
 
     try {
-      await _source.terminerTache(
+      final resultat = await _source.terminerTache(
         uuid,
         commentaire: commentCtrl.text.trim().isNotEmpty
             ? commentCtrl.text.trim()
@@ -96,19 +106,88 @@ class _MesTachesPageState extends State<MesTachesPage> {
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Tâche terminée avec succès !')),
+          SnackBar(
+            content: Text(
+              resultat['message']?.toString().trim().isNotEmpty == true
+                  ? resultat['message'].toString()
+                  : 'Tâche terminée.',
+            ),
+          ),
         );
       }
       await _actualiser();
-    } catch (e) {
+    } on ErreurApi catch (erreur) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur: $e'),
+            content: Text(erreur.message),
             backgroundColor: const Color(0xFFDC2626),
           ),
         );
       }
+    } finally {
+      commentCtrl.dispose();
+    }
+  }
+
+  Future<void> _commenter(String uuid) async {
+    final commentCtrl = TextEditingController();
+    final valide = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          'Commenter la tâche',
+          style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 17),
+        ),
+        content: TextField(
+          controller: commentCtrl,
+          decoration: const InputDecoration(
+            labelText: 'Commentaire',
+            hintText: 'Ajoutez votre commentaire...',
+          ),
+          maxLines: 3,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Envoyer'),
+          ),
+        ],
+      ),
+    );
+    if (valide != true) {
+      commentCtrl.dispose();
+      return;
+    }
+
+    try {
+      final resultat = await _source.commenterTache(uuid, commentCtrl.text);
+      if (mounted) {
+        final message = resultat['message']?.toString().trim() ?? '';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              message.isNotEmpty ? message : 'Commentaire enregistré.',
+            ),
+          ),
+        );
+      }
+      await _actualiser();
+    } on ErreurApi catch (erreur) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(erreur.message),
+            backgroundColor: const Color(0xFFDC2626),
+          ),
+        );
+      }
+    } finally {
+      commentCtrl.dispose();
     }
   }
 
@@ -176,6 +255,69 @@ class _MesTachesPageState extends State<MesTachesPage> {
       'actionLibelle': 'Consulter',
     },
   ];
+
+  Map<String, dynamic> _presentationTache(
+    Map<String, dynamic> tache, {
+    required bool historique,
+  }) {
+    final priorite =
+        (tache['priority'] ?? tache['priorite'])?.toString().toUpperCase() ??
+        '';
+    final statut =
+        (tache['status'] ?? tache['statut'])?.toString().toUpperCase() ?? '';
+    final actions = _map(tache['actions']);
+    final peutDemarrer = _map(actions['start'])['allowed'] == true;
+    final peutCommenter = _map(actions['comment'])['allowed'] == true;
+    final peutTerminer = _map(actions['complete'])['allowed'] == true;
+    final couleursPriorite = _couleursPriorite(priorite);
+    final couleursStatut = _couleursStatut(statut);
+
+    return <String, dynamic>{
+      'uuid': tache['uuid'],
+      'priorite': priorite.replaceAll('_', ' '),
+      'prioriteBg': couleursPriorite.$1,
+      'prioriteCouleur': couleursPriorite.$2,
+      'statut': statut.replaceAll('_', ' '),
+      'statutBg': couleursStatut.$1,
+      'statutCouleur': couleursStatut.$2,
+      'titre': (tache['title'] ?? tache['titre'])?.toString() ?? '',
+      'retour': historique
+          ? tache['supervisor_comment'] ?? tache['commentaire_encadreur']
+          : null,
+      'echeance':
+          (tache['due_date'] ?? tache['date_echeance'])?.toString() ?? '',
+      'infoLigne': historique
+          ? (tache['completed_at'] ??
+                        tache['validated_at'] ??
+                        tache['updated_at'])
+                    ?.toString() ??
+                ''
+          : null,
+      'action': peutDemarrer
+          ? 'Démarrer'
+          : peutTerminer
+          ? 'Terminer la tâche'
+          : null,
+      'peutCommenter': peutCommenter,
+    };
+  }
+
+  (Color, Color) _couleursPriorite(String priorite) => switch (priorite) {
+    'URGENTE' => (const Color(0xFFFEE2E2), const Color(0xFFDC2626)),
+    'HAUTE' => (const Color(0xFFFFF7ED), const Color(0xFFEA580C)),
+    'NORMALE' => (const Color(0xFFE0F2FE), const Color(0xFF0284C7)),
+    _ => (const Color(0xFFF1F5F9), const Color(0xFF64748B)),
+  };
+
+  (Color, Color) _couleursStatut(String statut) => switch (statut) {
+    'A_FAIRE' => (const Color(0xFFFEF3C7), const Color(0xFFD97706)),
+    'EN_COURS' => (const Color(0xFFE0F2FE), const Color(0xFF0284C7)),
+    'A_REVOIR' => (const Color(0xFFFFF7ED), const Color(0xFFEA580C)),
+    'TERMINEE' ||
+    'VALIDEE' => (const Color(0xFFDCFCE7), const Color(0xFF16A34A)),
+    'ANNULEE' => (const Color(0xFFF1F5F9), const Color(0xFF64748B)),
+    _ => (const Color(0xFFF1F5F9), const Color(0xFF64748B)),
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -267,33 +409,7 @@ class _MesTachesPageState extends State<MesTachesPage> {
                     final statut = t['statut'] ?? t['status'];
                     return statut == 'A_FAIRE' || statut == 'EN_COURS';
                   })
-                  .map(
-                    (t) => {
-                      'uuid': t['uuid'],
-                      'priorite': (t['priorite'] ?? t['priority'] ?? '')
-                          .toString()
-                          .toUpperCase(),
-                      'prioriteBg': const Color(0xFFFFF7ED),
-                      'prioriteCouleur': const Color(0xFFEA580C),
-                      'statut': (t['statut'] ?? t['status'] ?? '')
-                          .toString()
-                          .replaceAll('_', ' '),
-                      'statutBg': (t['statut'] ?? t['status']) == 'EN_COURS'
-                          ? const Color(0xFFE0F2FE)
-                          : const Color(0xFFFEF3C7),
-                      'statutCouleur':
-                          (t['statut'] ?? t['status']) == 'EN_COURS'
-                          ? const Color(0xFF0284C7)
-                          : const Color(0xFFD97706),
-                      'titre': (t['titre'] ?? t['title'])?.toString() ?? '',
-                      'echeance':
-                          (t['date_echeance'] ?? t['due_date'])?.toString() ??
-                          '',
-                      'action': (t['statut'] ?? t['status']) == 'EN_COURS'
-                          ? 'Terminer la tâche'
-                          : 'Démarrer',
-                    },
-                  )
+                  .map((t) => _presentationTache(t, historique: false))
                   .toList();
 
               sourceHistorique = apiItems
@@ -301,30 +417,7 @@ class _MesTachesPageState extends State<MesTachesPage> {
                     final statut = t['statut'] ?? t['status'];
                     return statut != 'A_FAIRE' && statut != 'EN_COURS';
                   })
-                  .map(
-                    (t) => {
-                      'uuid': t['uuid'],
-                      'priorite': (t['priorite'] ?? t['priority'] ?? '')
-                          .toString()
-                          .toUpperCase(),
-                      'prioriteBg': const Color(0xFFF3E8FF),
-                      'prioriteCouleur': const Color(0xFF7E22CE),
-                      'statut': (t['statut'] ?? t['status'] ?? '')
-                          .toString()
-                          .replaceAll('_', ' '),
-                      'statutBg': const Color(0xFFDCFCE7),
-                      'statutCouleur': const Color(0xFF16A34A),
-                      'titre': (t['titre'] ?? t['title'])?.toString() ?? '',
-                      'retour':
-                          t['commentaire_encadreur'] ??
-                          t['comment'] ??
-                          t['feedback'],
-                      'infoLigne':
-                          (t['completed_at'] ?? t['updated_at'])?.toString() ??
-                          '',
-                      'actionLibelle': 'Consulter',
-                    },
-                  )
+                  .map((t) => _presentationTache(t, historique: true))
                   .toList();
             } else {
               sourceEnCours = ConfigurationApi.utiliserDonneesMockees
@@ -411,6 +504,9 @@ class _MesTachesPageState extends State<MesTachesPage> {
   }
 
   Widget _buildCarteTache(Map<String, dynamic> t) {
+    final uuid = t['uuid']?.toString() ?? '';
+    final action = t['action']?.toString() ?? '';
+    final peutCommenter = t['peutCommenter'] == true;
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -520,46 +616,49 @@ class _MesTachesPageState extends State<MesTachesPage> {
 
           // Footer : Info / Échéance + Action
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                (t['infoLigne'] ?? t['echeance']) as String,
-                style: GoogleFonts.inter(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w500,
-                  color: const Color(0xFF94A3B8),
-                ),
-              ),
-              GestureDetector(
-                onTap: () {
-                  final uuid = t['uuid']?.toString();
-                  final action = t['actionLibelle'] ?? t['action'];
-                  if (uuid != null) {
-                    if (action == 'Démarrer') {
-                      _demarrer(uuid);
-                      return;
-                    } else if (action == 'Terminer la tâche') {
-                      _terminer(uuid);
-                      return;
-                    }
-                  }
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(SnackBar(content: Text('Action: $action')));
-                },
+              Expanded(
                 child: Text(
-                  (t['actionLibelle'] ?? t['action']) as String,
+                  (t['infoLigne'] ?? t['echeance']) as String,
                   style: GoogleFonts.inter(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w700,
-                    color:
-                        (t['actionLibelle'] == 'Consulter' ||
-                            t['action'] == 'Consulter')
-                        ? const Color(0xFF64748B)
-                        : const Color(0xFF1D61F2),
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFF94A3B8),
                   ),
                 ),
               ),
+              if (uuid.isNotEmpty && peutCommenter) ...[
+                GestureDetector(
+                  onTap: () => _commenter(uuid),
+                  child: Text(
+                    'Commenter',
+                    style: GoogleFonts.inter(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF64748B),
+                    ),
+                  ),
+                ),
+                if (action.isNotEmpty) const SizedBox(width: 14),
+              ],
+              if (uuid.isNotEmpty && action.isNotEmpty)
+                GestureDetector(
+                  onTap: () {
+                    if (action == 'Démarrer') {
+                      _demarrer(uuid);
+                    } else if (action == 'Terminer la tâche') {
+                      _terminer(uuid);
+                    }
+                  },
+                  child: Text(
+                    action,
+                    style: GoogleFonts.inter(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF1D61F2),
+                    ),
+                  ),
+                ),
             ],
           ),
         ],
@@ -567,3 +666,6 @@ class _MesTachesPageState extends State<MesTachesPage> {
     );
   }
 }
+
+Map<String, dynamic> _map(Object? valeur) =>
+    valeur is Map ? Map<String, dynamic>.from(valeur) : <String, dynamic>{};

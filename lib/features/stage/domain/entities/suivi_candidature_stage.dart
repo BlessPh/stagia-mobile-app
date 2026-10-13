@@ -9,6 +9,19 @@ class SuiviCandidatureStage {
     required this.nomHopital,
     required this.estTermine,
     this.reservationUuid,
+    this.reservationStatus,
+    this.applicationStatus,
+    this.canCancel = false,
+    this.cancelEndpoint,
+    this.placementExists = false,
+    this.placementStatus,
+    this.admissionExists = false,
+    this.admissionUuid,
+    this.admissionStatus,
+    this.assignmentExists = false,
+    this.assignmentUuid,
+    this.assignmentStatus,
+    this.workflowMessage,
   });
 
   final CampagneStage campagne;
@@ -18,6 +31,19 @@ class SuiviCandidatureStage {
   final String nomHopital;
   final bool estTermine;
   final String? reservationUuid;
+  final String? reservationStatus;
+  final String? applicationStatus;
+  final bool canCancel;
+  final String? cancelEndpoint;
+  final bool placementExists;
+  final String? placementStatus;
+  final bool admissionExists;
+  final String? admissionUuid;
+  final String? admissionStatus;
+  final bool assignmentExists;
+  final String? assignmentUuid;
+  final String? assignmentStatus;
+  final String? workflowMessage;
 
   factory SuiviCandidatureStage.depuisAdmission(Map<String, dynamic> json) {
     final campagneApi = _map(json['campaign']);
@@ -26,15 +52,21 @@ class SuiviCandidatureStage {
     final statut = json['workflow_status']?.toString().toUpperCase() ?? '';
     final debut = campagneApi['start_date']?.toString() ?? '';
     final fin = campagneApi['end_date']?.toString() ?? '';
-    final code = campagneApi['code']?.toString() ?? '';
-    final nomHopital = hopital['name']?.toString() ?? '';
-    final messageApi = json['workflow_message']?.toString().trim() ?? '';
+    final code = (campagneApi['code'] ?? json['campaign_code'])?.toString() ?? '';
+    final nomHopital = (hopital['name'] ?? json['hospital_name'])?.toString() ?? '';
+    final messageApi = (json['workflow_message'] ?? _map(json['workflow'])['message'])?.toString().trim() ?? '';
+    final actions = _map(json['actions']);
+    final cancelAction = _map(actions['cancel']);
+
+    final placement = _map(json['placement']);
+    final admission = _map(json['admission']);
+    final assignment = _map(json['assignment']);
 
     return SuiviCandidatureStage(
       campagne: CampagneStage(
         id: code,
         code: code,
-        titre: campagneApi['title']?.toString() ?? 'Candidature de stage',
+        titre: (campagneApi['title'] ?? json['campaign_title'])?.toString() ?? 'Candidature de stage',
         sousTitre: nomHopital,
         dateDebut: debut,
         dateFin: fin,
@@ -58,7 +90,20 @@ class SuiviCandidatureStage {
           : 'Votre candidature est en cours de traitement.',
       nomHopital: nomHopital,
       estTermine: statutsTermines.contains(statut),
-      reservationUuid: reservation['uuid']?.toString(),
+      reservationUuid: (reservation['uuid'] ?? json['reservation_uuid'])?.toString(),
+      reservationStatus: (reservation['status'] ?? json['reservation_status'])?.toString(),
+      applicationStatus: json['application_status']?.toString(),
+      canCancel: cancelAction['allowed'] == true,
+      cancelEndpoint: cancelAction['endpoint']?.toString(),
+      placementExists: placement['exists'] == true,
+      placementStatus: placement['status']?.toString(),
+      admissionExists: admission['exists'] == true,
+      admissionUuid: admission['uuid']?.toString() ?? json['admission_uuid']?.toString(),
+      admissionStatus: admission['status']?.toString(),
+      assignmentExists: assignment['exists'] == true,
+      assignmentUuid: assignment['uuid']?.toString() ?? json['assignment_uuid']?.toString(),
+      assignmentStatus: assignment['status']?.toString(),
+      workflowMessage: messageApi,
     );
   }
 
@@ -67,14 +112,42 @@ class SuiviCandidatureStage {
     CampagneStage campagne,
   ) {
     final statut =
-        (json['workflow_status'] ?? json['statut'] ?? json['status'])
+        (json['workflow_status'] ??
+                _map(json['workflow'])['status'] ??
+                json['statut'] ??
+                json['application_status'] ??
+                json['status'])
             ?.toString()
             .toUpperCase() ??
         '';
     final nomHopital =
-        (json['hospital_name'] ?? json['entreprise'])?.toString() ?? '';
-    final message = json['workflow_message']?.toString().trim() ?? '';
+        (json['hospital_name'] ??
+                _map(json['hospital'])['name'] ??
+                json['entreprise'])
+            ?.toString() ??
+        '';
+    final message = (json['workflow_message'] ??
+            _map(json['workflow'])['message'])
+        ?.toString()
+        .trim() ??
+        '';
     final libelle = libellePour(statut);
+    final resUuid = (json['reservation_uuid'] ??
+            _map(json['reservation'])['uuid'] ??
+            json['uuid'])
+        ?.toString();
+    final resStatus = (json['reservation_status'] ??
+            _map(json['reservation'])['status'])
+        ?.toString();
+    final appStatus = (json['application_status'] ??
+            _map(json['application'])['status'] ??
+            json['statut'])
+        ?.toString();
+    final actions = _map(json['actions']);
+    final cancelAction = _map(actions['cancel']);
+    final placement = _map(json['placement']);
+    final admission = _map(json['admission']);
+    final assignment = _map(json['assignment']);
 
     return SuiviCandidatureStage(
       campagne: campagne.avecStatut(libelle),
@@ -85,7 +158,22 @@ class SuiviCandidatureStage {
           : 'Votre candidature a bien été enregistrée.',
       nomHopital: nomHopital,
       estTermine: statutsTermines.contains(statut),
-      reservationUuid: (json['reservation_uuid'] ?? json['uuid'])?.toString(),
+      reservationUuid: resUuid,
+      reservationStatus: resStatus,
+      applicationStatus: appStatus,
+      canCancel: cancelAction['allowed'] == true ||
+          (resStatus == 'RESERVEE_TEMPORAIREMENT' &&
+              statut == 'DECISION_UNIVERSITAIRE_EN_ATTENTE'),
+      cancelEndpoint: cancelAction['endpoint']?.toString(),
+      placementExists: placement['exists'] == true || json['placement'] != null,
+      placementStatus: placement['status']?.toString(),
+      admissionExists: admission['exists'] == true || json['admission_uuid'] != null,
+      admissionUuid: admission['uuid']?.toString() ?? json['admission_uuid']?.toString(),
+      admissionStatus: admission['status']?.toString(),
+      assignmentExists: assignment['exists'] == true || json['assignment_uuid'] != null,
+      assignmentUuid: assignment['uuid']?.toString() ?? json['assignment_uuid']?.toString(),
+      assignmentStatus: assignment['status']?.toString() ?? json['assignment_status']?.toString(),
+      workflowMessage: message,
     );
   }
 
@@ -110,6 +198,19 @@ class SuiviCandidatureStage {
       nomHopital: nomHopital,
       estTermine: estTermine,
       reservationUuid: reservationUuid,
+      reservationStatus: reservationStatus,
+      applicationStatus: applicationStatus,
+      canCancel: canCancel,
+      cancelEndpoint: cancelEndpoint,
+      placementExists: placementExists,
+      placementStatus: placementStatus,
+      admissionExists: admissionExists,
+      admissionUuid: admissionUuid,
+      admissionStatus: admissionStatus,
+      assignmentExists: assignmentExists,
+      assignmentUuid: assignmentUuid,
+      assignmentStatus: assignmentStatus,
+      workflowMessage: workflowMessage,
     );
   }
 

@@ -10,6 +10,10 @@ import '../../data/datasources/source_campagne_mock.dart';
 import '../../data/datasources/source_stage_distante.dart';
 import '../../domain/entities/campagne_stage.dart';
 
+import 'dart:async';
+import '../../../../core/services/sse_notifications_service.dart';
+import '../../../../core/network/source_etudiant_distante.dart';
+
 class ReservationPage extends StatefulWidget {
   const ReservationPage({this.campagne, this.hopital, super.key});
 
@@ -22,23 +26,23 @@ class ReservationPage extends StatefulWidget {
 
 class _ReservationPageState extends State<ReservationPage> {
   final _source = SourceStageDistante(ClientApiHttp());
+  final _sourceEtudiant = SourceEtudiantDistante(ClientApiHttp());
   late final CampagneStage _campagne;
   late final HopitalCampagne _hopital;
 
-  String _periodeSelectionnee = 'Matin (7h-13h)';
   final TextEditingController _motivationController = TextEditingController();
   bool _conditionsAcceptees = true;
   bool _enCoursDeSoumission = false;
-
-  final List<String> _periodesDisponibles = const [
-    'Matin (7h-13h)',
-    'Après-midi (13h-18h)',
-    'Garde (Nuit 18h-8h)',
-  ];
+  Map<String, dynamic>? _counts;
+  StreamSubscription? _sseSubscription;
 
   @override
   void initState() {
     super.initState();
+    _chargerCounts();
+    _sseSubscription = SseNotificationsService.instance.fluxCompteurs.listen((counts) {
+      if (mounted) setState(() => _counts = counts);
+    });
     _campagne =
         widget.campagne ??
         (ConfigurationApi.utiliserDonneesMockees
@@ -51,10 +55,21 @@ class _ReservationPageState extends State<ReservationPage> {
             : ConfigurationApi.utiliserDonneesMockees
             ? SourceCampagneMock.campagnePrincipale.hopitaux.first
             : throw StateError('Aucun hôpital disponible.'));
+    _conditionsAcceptees = _hopital.conditions == null;
+  }
+
+  Future<void> _chargerCounts() async {
+    try {
+      final res = await _sourceEtudiant.notificationCounts();
+      if (mounted) {
+        setState(() => _counts = res);
+      }
+    } catch (_) {}
   }
 
   @override
   void dispose() {
+    _sseSubscription?.cancel();
     _motivationController.dispose();
     super.dispose();
   }
@@ -66,6 +81,15 @@ class _ReservationPageState extends State<ReservationPage> {
           content: Text(
             'Le placement de cette campagne est géré par votre université.',
           ),
+          backgroundColor: Color(0xFFEF4444),
+        ),
+      );
+      return;
+    }
+    if (!_hopital.peutReserver) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Aucune place ne peut être réservée dans cet hôpital.'),
           backgroundColor: Color(0xFFEF4444),
         ),
       );
@@ -120,8 +144,7 @@ class _ReservationPageState extends State<ReservationPage> {
         cleOption: '${_campagne.id}::${_hopital.id}',
         campagneTitre: _campagne.titre,
         etablissementNom: _hopital.nom,
-        localisation:
-            _hopital.adresse ?? '${_hopital.commune}, ${_hopital.ville}',
+        localisation: _hopital.adresse ?? _hopital.localisationCourte,
       );
 
       if (!mounted) return;
@@ -160,6 +183,7 @@ class _ReservationPageState extends State<ReservationPage> {
     final reservationCreee = donnees['created'] != false;
     final expiration = donnees['expires_at']?.toString() ?? '';
     final statut = donnees['reservation_status']?.toString() ?? '';
+    final workflowStatut = donnees['workflow_status']?.toString() ?? '';
 
     showModalBottomSheet<void>(
       context: context,
@@ -220,7 +244,9 @@ class _ReservationPageState extends State<ReservationPage> {
                   color: const Color(0xFF64748B),
                 ),
               ),
-              if (reference.isNotEmpty || statut.isNotEmpty) ...[
+              if (reference.isNotEmpty ||
+                  statut.isNotEmpty ||
+                  workflowStatut.isNotEmpty) ...[
                 const SizedBox(height: 14),
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -236,6 +262,7 @@ class _ReservationPageState extends State<ReservationPage> {
                     [
                       if (reference.isNotEmpty) 'Référence : $reference',
                       if (statut.isNotEmpty) statut,
+                      if (workflowStatut.isNotEmpty) workflowStatut,
                     ].join(' · '),
                     textAlign: TextAlign.center,
                     style: GoogleFonts.inter(
@@ -290,80 +317,6 @@ class _ReservationPageState extends State<ReservationPage> {
     );
   }
 
-  void _ouvrirSelectionPeriode() {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return Container(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 38,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE2E8F0),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                'Période préférée',
-                style: GoogleFonts.inter(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                  color: const Color(0xFF0F172A),
-                ),
-              ),
-              const SizedBox(height: 14),
-              ..._periodesDisponibles.map((periode) {
-                final estChoisi = periode == _periodeSelectionnee;
-                return ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(
-                    Icons.access_time_rounded,
-                    color: estChoisi
-                        ? const Color(0xFF1D61F2)
-                        : const Color(0xFF64748B),
-                  ),
-                  title: Text(
-                    periode,
-                    style: GoogleFonts.inter(
-                      fontSize: 15,
-                      fontWeight: estChoisi ? FontWeight.w700 : FontWeight.w500,
-                      color: estChoisi
-                          ? const Color(0xFF1D61F2)
-                          : const Color(0xFF0F172A),
-                    ),
-                  ),
-                  trailing: estChoisi
-                      ? const Icon(
-                          Icons.check_rounded,
-                          color: Color(0xFF1D61F2),
-                        )
-                      : null,
-                  onTap: () {
-                    setState(() => _periodeSelectionnee = periode);
-                    Navigator.of(ctx).pop();
-                  },
-                );
-              }),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -379,25 +332,7 @@ class _ReservationPageState extends State<ReservationPage> {
 
             const SizedBox(height: 22),
 
-            // 2. CHAMP PÉRIODE PRÉFÉRÉE
-            Text(
-              'Période préférée',
-              style: GoogleFonts.inter(
-                fontSize: 14.5,
-                fontWeight: FontWeight.w800,
-                color: const Color(0xFF0F172A),
-              ),
-            ),
-            const SizedBox(height: 8),
-            _ChampSelecteur(
-              icone: Icons.access_time_rounded,
-              valeur: _periodeSelectionnee,
-              onTap: _ouvrirSelectionPeriode,
-            ),
-
-            const SizedBox(height: 18),
-
-            // 3. CHAMP MOTIVATION (OPTIONNEL)
+            // 2. CHAMP MOTIVATION (OPTIONNEL)
             Row(
               children: [
                 Text(
@@ -434,7 +369,8 @@ class _ReservationPageState extends State<ReservationPage> {
                   color: const Color(0xFF0F172A),
                 ),
                 decoration: InputDecoration(
-                  hintText: 'Expliquez brièvement votre choix de service...',
+                  hintText:
+                      'Expliquez brièvement votre choix de cet établissement...',
                   hintStyle: GoogleFonts.inter(
                     fontSize: 13.5,
                     color: const Color(0xFF94A3B8),
@@ -447,58 +383,60 @@ class _ReservationPageState extends State<ReservationPage> {
 
             const SizedBox(height: 20),
 
-            // 4. CARTE RÉSUMÉ FINANCIER
-            _CarteResumeFinancier(campagne: _campagne),
+            // 3. CARTE RÉSUMÉ FINANCIER
+            _CarteResumeFinancier(hopital: _hopital),
 
             const SizedBox(height: 18),
 
-            // 5. CASE À COCHER CONDITIONS
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: Checkbox(
-                    value: _conditionsAcceptees,
-                    activeColor: const Color(0xFF1D61F2),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(5),
+            // 4. CONDITIONS FOURNIES PAR L'API
+            if (_hopital.conditions != null)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: Checkbox(
+                      value: _conditionsAcceptees,
+                      activeColor: const Color(0xFF1D61F2),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      onChanged: (val) =>
+                          setState(() => _conditionsAcceptees = val ?? false),
                     ),
-                    onChanged: (val) =>
-                        setState(() => _conditionsAcceptees = val ?? false),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => setState(
-                      () => _conditionsAcceptees = !_conditionsAcceptees,
-                    ),
-                    child: Text(
-                      'J\'accepte les conditions de stage et le règlement intérieur.',
-                      style: GoogleFonts.inter(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w500,
-                        color: const Color(0xFF475569),
-                        height: 1.35,
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(
+                        () => _conditionsAcceptees = !_conditionsAcceptees,
+                      ),
+                      child: Text(
+                        'J\'accepte les conditions suivantes : ${_hopital.conditions}',
+                        style: GoogleFonts.inter(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF475569),
+                          height: 1.35,
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
 
             const SizedBox(height: 22),
 
-            // 6. BOUTON CONFIRMER LA RÉSERVATION
+            // 5. BOUTON CONFIRMER LA RÉSERVATION
             SizedBox(
               width: double.infinity,
               height: 52,
               child: FilledButton(
                 onPressed:
                     _enCoursDeSoumission ||
-                        !_campagne.autoriseReservationAutonome
+                        !_campagne.autoriseReservationAutonome ||
+                        !_hopital.peutReserver
                     ? null
                     : _confirmerReservation,
                 style: FilledButton.styleFrom(
@@ -530,10 +468,10 @@ class _ReservationPageState extends State<ReservationPage> {
 
             const SizedBox(height: 10),
 
-            // Mention de validation sous 48h
+            // Étape suivante du workflow API
             Center(
               child: Text(
-                'Votre réservation sera soumise à validation sous 48h',
+                'Votre réservation sera transmise à votre université pour décision.',
                 style: GoogleFonts.inter(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
@@ -548,6 +486,9 @@ class _ReservationPageState extends State<ReservationPage> {
   }
 
   PreferredSizeWidget _buildAppBar(BuildContext context) {
+    final unreadNotifs =
+        int.tryParse(_counts?['notifications']?.toString() ?? '0') ?? 0;
+
     return AppBar(
       backgroundColor: const Color(0xFFF8FAFC),
       surfaceTintColor: Colors.transparent,
@@ -576,11 +517,14 @@ class _ReservationPageState extends State<ReservationPage> {
           children: [
             IconButton(
               tooltip: 'Notifications',
-              onPressed: () => Navigator.of(context, rootNavigator: true).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const NotificationsPage(),
-                ),
-              ),
+              onPressed: () async {
+                await Navigator.of(context, rootNavigator: true).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const NotificationsPage(),
+                  ),
+                );
+                _chargerCounts();
+              },
               icon: const Icon(
                 Icons.notifications_none_rounded,
                 color: Color(0xFF0F172A),
@@ -588,28 +532,29 @@ class _ReservationPageState extends State<ReservationPage> {
               ),
               visualDensity: VisualDensity.compact,
             ),
-            Positioned(
-              top: 5,
-              right: 6,
-              child: Container(
-                padding: const EdgeInsets.all(3),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFEF4444),
-                  shape: BoxShape.circle,
-                ),
-                constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                child: const Text(
-                  '5',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.w800,
-                    height: 1,
+            if (unreadNotifs > 0)
+              Positioned(
+                top: 5,
+                right: 6,
+                child: Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFEF4444),
+                    shape: BoxShape.circle,
+                  ),
+                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                  child: Text(
+                    '$unreadNotifs',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w800,
+                      height: 1,
+                    ),
                   ),
                 ),
               ),
-            ),
           ],
         ),
         const SizedBox(width: 8),
@@ -705,14 +650,21 @@ class _CarteVotreSelection extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      '${hopital.localisationCourte} • ${hopital.distanceKm.toStringAsFixed(1)} km',
-                      style: GoogleFonts.inter(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w500,
-                        color: const Color(0xFF64748B),
+                    if (hopital.localisationCourte.isNotEmpty ||
+                        hopital.distanceKm > 0)
+                      Text(
+                        [
+                          if (hopital.localisationCourte.isNotEmpty)
+                            hopital.localisationCourte,
+                          if (hopital.distanceKm > 0)
+                            '${hopital.distanceKm.toStringAsFixed(1)} km',
+                        ].join(' • '),
+                        style: GoogleFonts.inter(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF64748B),
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -747,64 +699,21 @@ class _CarteVotreSelection extends StatelessWidget {
 }
 
 // -------------------------------------------------------------
-// COMPOSANT CHAMP SELECTEUR (DROPDOWN MODERNE)
-// -------------------------------------------------------------
-class _ChampSelecteur extends StatelessWidget {
-  const _ChampSelecteur({
-    required this.icone,
-    required this.valeur,
-    required this.onTap,
-  });
-
-  final IconData icone;
-  final String valeur;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
-        ),
-        child: Row(
-          children: [
-            Icon(icone, color: const Color(0xFF64748B), size: 20),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                valeur,
-                style: GoogleFonts.inter(
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF0F172A),
-                ),
-              ),
-            ),
-            const Icon(
-              Icons.keyboard_arrow_down_rounded,
-              color: Color(0xFF64748B),
-              size: 22,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// -------------------------------------------------------------
 // CARTE RÉSUMÉ FINANCIER
 // -------------------------------------------------------------
 class _CarteResumeFinancier extends StatelessWidget {
-  const _CarteResumeFinancier({required this.campagne});
+  const _CarteResumeFinancier({required this.hopital});
 
-  final CampagneStage campagne;
+  final HopitalCampagne hopital;
+
+  String get _montant {
+    if (!hopital.fraisRequis) return 'Aucun frais requis';
+    if (hopital.montantFrais <= 0) return 'Montant non communiqué';
+    final valeur = hopital.montantFrais == hopital.montantFrais.roundToDouble()
+        ? hopital.montantFrais.toStringAsFixed(0)
+        : hopital.montantFrais.toStringAsFixed(2);
+    return '$valeur ${hopital.devise}'.trim();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -831,183 +740,35 @@ class _CarteResumeFinancier extends StatelessWidget {
                   color: const Color(0xFF0F172A),
                 ),
               ),
-              Text(
-                campagne.indemnite,
-                style: GoogleFonts.inter(
-                  fontSize: 16.5,
-                  fontWeight: FontWeight.w800,
-                  color: const Color(0xFF1D61F2),
+              Flexible(
+                child: Text(
+                  _montant,
+                  textAlign: TextAlign.end,
+                  style: GoogleFonts.inter(
+                    fontSize: 16.5,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF1D61F2),
+                  ),
                 ),
               ),
             ],
           ),
-
-          const SizedBox(height: 12),
-          Container(height: 1, color: const Color(0xFFF1F5F9)),
-          const SizedBox(height: 12),
-
-          // Ligne 1ère tranche
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    '1ère tranche ',
-                    style: GoogleFonts.inter(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w500,
-                      color: const Color(0xFF475569),
-                    ),
-                  ),
-                  Text(
-                    '(Acompte requis)',
-                    style: GoogleFonts.inter(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w400,
-                      color: const Color(0xFF94A3B8),
-                    ),
-                  ),
-                ],
+          if (hopital.conditions != null) ...[
+            const SizedBox(height: 12),
+            Container(height: 1, color: const Color(0xFFF1F5F9)),
+            const SizedBox(height: 12),
+            Text(
+              hopital.conditions!,
+              style: GoogleFonts.inter(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF64748B),
+                height: 1.4,
               ),
-              Text(
-                '75 000 FC',
-                style: GoogleFonts.inter(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: const Color(0xFF0F172A),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 8),
-
-          // Ligne 2ème tranche
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    '2ème tranche ',
-                    style: GoogleFonts.inter(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w500,
-                      color: const Color(0xFF475569),
-                    ),
-                  ),
-                  Text(
-                    '(Mi-parcours)',
-                    style: GoogleFonts.inter(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w400,
-                      color: const Color(0xFF94A3B8),
-                    ),
-                  ),
-                ],
-              ),
-              Text(
-                '75 000 FC',
-                style: GoogleFonts.inter(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: const Color(0xFF0F172A),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 14),
-          _LignePointillee(),
-          const SizedBox(height: 14),
-
-          // Moyens de paiement acceptés
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Moyens de paiement acceptés',
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: const Color(0xFF64748B),
-                ),
-              ),
-              Row(
-                children: [
-                  _BadgePaiement(
-                    child: const Icon(
-                      Icons.credit_card_rounded,
-                      size: 16,
-                      color: Color(0xFF64748B),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  _BadgePaiement(
-                    child: const Icon(
-                      Icons.account_balance_wallet_outlined,
-                      size: 16,
-                      color: Color(0xFF64748B),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  _BadgePaiement(
-                    child: const Icon(
-                      Icons.payments_outlined,
-                      size: 16,
-                      color: Color(0xFF64748B),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+            ),
+          ],
         ],
       ),
-    );
-  }
-}
-
-class _BadgePaiement extends StatelessWidget {
-  const _BadgePaiement({required this.child});
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(5),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: child,
-    );
-  }
-}
-
-class _LignePointillee extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        const double tiretLargeur = 4.0;
-        const double espaceLargeur = 3.0;
-        final int nombre =
-            (constraints.maxWidth / (tiretLargeur + espaceLargeur)).floor();
-
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: List.generate(nombre, (_) {
-            return Container(
-              width: tiretLargeur,
-              height: 1,
-              color: const Color(0xFFCBD5E1),
-            );
-          }),
-        );
-      },
     );
   }
 }

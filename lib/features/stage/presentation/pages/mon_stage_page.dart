@@ -7,10 +7,13 @@ import '../../../../core/network/source_etudiant_distante.dart';
 import '../../../../core/network/telechargeur_document_api.dart';
 import '../../../../core/widgets/contenu_adaptatif.dart';
 import '../../../../core/widgets/erreur_chargement_api.dart';
+import '../../data/mappers/mappeur_affectation_stage_api.dart';
 import '../widgets/onglets_stage.dart';
 
 class MonStagePage extends StatefulWidget {
-  const MonStagePage({super.key});
+  const MonStagePage({this.assignmentReference, super.key});
+
+  final String? assignmentReference;
   @override
   State<MonStagePage> createState() => _MonStagePageState();
 }
@@ -40,7 +43,8 @@ class _MonStagePageState extends State<MonStagePage> {
   }
 
   Future<void> _ouvrirDocument(Map<String, dynamic> document) async {
-    final endpoint = document['file_endpoint']?.toString() ??
+    final endpoint =
+        document['file_endpoint']?.toString() ??
         document['view_endpoint']?.toString() ??
         document['download_endpoint']?.toString() ??
         document['pdf_endpoint']?.toString();
@@ -60,7 +64,10 @@ class _MonStagePageState extends State<MonStagePage> {
           ? cheminLocal
           : await _telechargeur.telechargerPdf(
               endpoint: endpoint!,
-              nom: document['reference']?.toString() ?? document['title']?.toString() ?? 'document-stagia',
+              nom:
+                  document['reference']?.toString() ??
+                  document['title']?.toString() ??
+                  'document-stagia',
             );
       final resultat = await OpenFilex.open(chemin);
       if (!mounted || resultat.type == ResultType.done) return;
@@ -111,7 +118,7 @@ class _MonStagePageState extends State<MonStagePage> {
           final tousDocuments = [...documentsOfficiels, ...conventions];
 
           return _ContenuStage(
-            stage: stages.isEmpty ? null : stages.first,
+            stage: _selectionnerStage(stages),
             documents: tousDocuments,
             documentEnCours: _documentEnCours,
             onDocument: _ouvrirDocument,
@@ -121,6 +128,19 @@ class _MonStagePageState extends State<MonStagePage> {
       ),
     ),
   );
+
+  Map<String, dynamic>? _selectionnerStage(List<Map<String, dynamic>> stages) {
+    final reference = widget.assignmentReference?.trim() ?? '';
+    if (reference.isNotEmpty) {
+      for (final stage in stages) {
+        if (stage['assignment_uuid']?.toString() == reference ||
+            stage['assignment_id']?.toString() == reference) {
+          return stage;
+        }
+      }
+    }
+    return MappeurAffectationStageApi.selectionnerAffectationPrincipale(stages);
+  }
 }
 
 class _ContenuStage extends StatelessWidget {
@@ -141,6 +161,10 @@ class _ContenuStage extends StatelessWidget {
   Widget build(BuildContext context) {
     final marge = MediaQuery.sizeOf(context).width < 360 ? 14.0 : 18.0;
     final rotations = _rotationsDuStage(stage);
+    final hospital = _map(stage?['hospital']);
+    final campaign = _map(stage?['campaign']);
+    final department = _map(stage?['department']);
+    final period = _map(stage?['period']);
     return RefreshIndicator(
       color: const Color(0xFFFF7417),
       onRefresh: onRefresh,
@@ -160,24 +184,12 @@ class _ContenuStage extends StatelessWidget {
               lignes: [
                 _DonneeFiche(
                   'Statut',
-                  '${stage!['workflow_status'] ?? stage!['statut'] ?? '-'}',
+                  '${stage!['assignment_status'] ?? stage!['workflow_status'] ?? ''}',
                 ),
-                _DonneeFiche(
-                  'Établissement',
-                  '${stage!['hospital_name'] ?? '-'}',
-                ),
-                _DonneeFiche(
-                  'Campagne',
-                  '${stage!['campaign_title'] ?? '-'}',
-                ),
-                _DonneeFiche(
-                  'Groupe',
-                  '${stage!['group_name'] ?? stage!['groupe'] ?? '-'}',
-                ),
-                _DonneeFiche(
-                  'Période',
-                  '${stage!['date_debut'] ?? '-'} au ${stage!['date_fin'] ?? '-'}',
-                ),
+                _DonneeFiche('Établissement', '${hospital['name'] ?? ''}'),
+                _DonneeFiche('Campagne', '${campaign['title'] ?? ''}'),
+                _DonneeFiche('Département', '${department['name'] ?? ''}'),
+                _DonneeFiche('Période', _periodeTexte(period)),
               ],
             ),
             const SizedBox(height: 18),
@@ -230,20 +242,17 @@ class _CarteServiceRotation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final service =
-        rotation['service_name'] ??
-        rotation['unit_name'] ??
-        rotation['service'] ??
-        'Service $numero';
-    final encadreur =
-        rotation['supervisor_name'] ??
-        rotation['encadreur_name'] ??
-        rotation['encadreur'] ??
-        '-';
-    final debut = rotation['date_debut'] ?? rotation['start_date'] ?? '-';
-    final fin = rotation['date_fin'] ?? rotation['end_date'] ?? '-';
-    final statut =
-        rotation['workflow_status'] ?? rotation['statut'] ?? 'PLANIFIÉE';
+    final serviceMap = _map(rotation['service']);
+    final unitMap = _map(rotation['unit']);
+    final supervisorMap = _map(rotation['supervisor']);
+    final period = _map(rotation['period']);
+    final service = [
+      serviceMap['name']?.toString() ?? '',
+      unitMap['name']?.toString() ?? '',
+    ].where((valeur) => valeur.isNotEmpty).join(' • ');
+    final encadreur = supervisorMap['name']?.toString() ?? '';
+    final periode = _periodeTexte(period);
+    final statut = rotation['status']?.toString() ?? '';
 
     return Container(
       width: double.infinity,
@@ -259,20 +268,19 @@ class _CarteServiceRotation extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            service.toString(),
+            service,
             style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 14),
           _LigneService(libelle: 'Encadreur', valeur: encadreur.toString()),
           const SizedBox(height: 9),
-          _LigneService(libelle: 'Période', valeur: '$debut au $fin'),
+          _LigneService(libelle: 'Période', valeur: periode),
           const SizedBox(height: 14),
           Divider(
             height: 1,
-            color: Theme.of(context)
-                .colorScheme
-                .outlineVariant
-                .withValues(alpha: .45),
+            color: Theme.of(
+              context,
+            ).colorScheme.outlineVariant.withValues(alpha: .45),
           ),
           const SizedBox(height: 12),
           _LigneService(
@@ -514,10 +522,23 @@ List<Map<String, dynamic>> _items(Object? valeur) => valeur is List
 
 List<Map<String, dynamic>> _rotationsDuStage(Map<String, dynamic>? stage) {
   if (stage == null) return const [];
+  final planning = _map(stage['planning']);
   final parcours = stage['parcours'];
   final rotations =
+      planning['rotations'] ??
       stage['rotations'] ??
       stage['rotation_items'] ??
       (parcours is Map ? parcours['rotations'] : null);
   return _items(rotations);
+}
+
+Map<String, dynamic> _map(Object? valeur) =>
+    valeur is Map ? Map<String, dynamic>.from(valeur) : <String, dynamic>{};
+
+String _periodeTexte(Map<String, dynamic> periode) {
+  final debut = periode['start_date']?.toString() ?? '';
+  final fin = periode['end_date']?.toString() ?? '';
+  if (debut.isEmpty) return fin;
+  if (fin.isEmpty) return debut;
+  return '$debut au $fin';
 }

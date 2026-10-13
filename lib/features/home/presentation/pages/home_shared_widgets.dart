@@ -7,6 +7,7 @@ import '../../../../core/network/client_api_http.dart';
 import '../../../../core/network/source_etudiant_distante.dart';
 import '../../../messagerie/presentation/pages/messagerie_page.dart';
 import '../../../notifications/presentation/pages/notifications_page.dart';
+import 'package:iconsax/iconsax.dart';
 
 import 'dart:async';
 import '../../../../core/services/sse_notifications_service.dart';
@@ -79,7 +80,9 @@ class _EnTeteAccueilState extends State<EnTeteAccueil> {
     return AppBar(
       automaticallyImplyLeading: false,
       toolbarHeight: widget.preferredSize.height,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: modeSombre
+          ? const Color(0xFF0F172A)
+          : Theme.of(context).scaffoldBackgroundColor,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       title: Row(
@@ -94,7 +97,9 @@ class _EnTeteAccueilState extends State<EnTeteAccueil> {
                   widget.etudiant['avatar_url']?.toString().trim() ?? '';
               return CircleAvatar(
                 radius: 23,
-                backgroundColor: const Color(0xFFE2E8F0),
+                backgroundColor: modeSombre
+                    ? const Color(0xFF334155)
+                    : const Color(0xFFE2E8F0),
                 backgroundImage: photoValide
                     ? FileImage(File(photo))
                     : avatarDistant.isNotEmpty
@@ -102,9 +107,11 @@ class _EnTeteAccueilState extends State<EnTeteAccueil> {
                     : null,
                 child: photoValide || avatarDistant.isNotEmpty
                     ? null
-                    : const Icon(
+                    : Icon(
                         Icons.person_rounded,
-                        color: Color(0xFF64748B),
+                        color: modeSombre
+                            ? const Color(0xFFCBD5E1)
+                            : const Color(0xFF64748B),
                         size: 26,
                       ),
               );
@@ -125,7 +132,9 @@ class _EnTeteAccueilState extends State<EnTeteAccueil> {
                       style: GoogleFonts.inter(
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
-                        color: const Color(0xFF64748B),
+                        color: modeSombre
+                            ? const Color(0xFF94A3B8)
+                            : const Color(0xFF64748B),
                       ),
                     ),
                     const SizedBox(width: 4),
@@ -163,7 +172,7 @@ class _EnTeteAccueilState extends State<EnTeteAccueil> {
                   _chargerCounts();
                 },
                 icon: Icon(
-                  CupertinoIcons.chat_bubble_2,
+                  Iconsax.message,
                   color: modeSombre ? Colors.white : const Color(0xFF0F172A),
                   size: 24,
                 ),

@@ -16,26 +16,32 @@ class BarreRechercheStages extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
+    final fondBarre = modeSombre ? const Color(0xFF1E293B) : Colors.white;
+    final bordureCouleur = modeSombre ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final texteCouleur = modeSombre ? Colors.white : const Color(0xFF0F172A);
+    final sousTexteCouleur = const Color(0xFF94A3B8);
+
     return Container(
       height: 48,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: fondBarre,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: const [
+        border: Border.all(color: bordureCouleur),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x05000000),
+            color: modeSombre ? const Color(0x30000000) : const Color(0x05000000),
             blurRadius: 8,
-            offset: Offset(0, 2),
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
-          const Icon(
+          Icon(
             CupertinoIcons.search,
-            color: Color(0xFF94A3B8),
+            color: sousTexteCouleur,
             size: 20,
           ),
           const SizedBox(width: 10),
@@ -46,16 +52,20 @@ class BarreRechercheStages extends StatelessWidget {
               style: GoogleFonts.inter(
                 fontSize: 14.5,
                 fontWeight: FontWeight.w500,
-                color: const Color(0xFF0F172A),
+                color: texteCouleur,
               ),
               decoration: InputDecoration(
+                filled: true,
+                fillColor: fondBarre,
                 hintText: hintText,
                 hintStyle: GoogleFonts.inter(
                   fontSize: 14.5,
                   fontWeight: FontWeight.w400,
-                  color: const Color(0xFF94A3B8),
+                  color: sousTexteCouleur,
                 ),
                 border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
                 isDense: true,
                 contentPadding: EdgeInsets.zero,
               ),

@@ -7,6 +7,7 @@ import '../../../messagerie/domain/entities/discussion.dart';
 import '../../../messagerie/presentation/pages/chat_page.dart';
 import '../../../stage/presentation/pages/mes_stages_page.dart';
 import '../../../stage/presentation/pages/mon_stage_page.dart';
+import '../../../stage/presentation/pages/apercu_facture_page.dart';
 import '../../../../core/network/client_api_http.dart';
 import '../../../../core/network/source_etudiant_distante.dart';
 import '../../domain/entities/notification_item.dart';
@@ -125,7 +126,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
     switch (notification.cible.type) {
       case TypeCibleNotification.affectationStage:
         Navigator.of(context).push<void>(
-          MaterialPageRoute<void>(builder: (_) => const MonStagePage()),
+          MaterialPageRoute<void>(
+            builder: (_) => MonStagePage(
+              assignmentReference: notification.cible.identifiant,
+            ),
+          ),
         );
       case TypeCibleNotification.detailCampagne:
         Navigator.of(context).push<void>(
@@ -146,6 +151,13 @@ class _NotificationsPageState extends State<NotificationsPage> {
         Navigator.of(context).push<void>(
           MaterialPageRoute<void>(
             builder: (_) => ChatPage(discussion: discussion),
+          ),
+        );
+      case TypeCibleNotification.obligationPaiement:
+        final oblUuid = notification.cible.identifiant ?? '';
+        Navigator.of(context).push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => ApercuFacturePage(obligationUuid: oblUuid),
           ),
         );
       case TypeCibleNotification.journalTaches:

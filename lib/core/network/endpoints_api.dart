@@ -23,11 +23,14 @@ abstract final class EndpointsApi {
       '/student/reservations/$uuid/cancel';
   static const admissionEtudiant = '/student/admissions';
   static const paiementsEtudiant = '/student/payments';
+  static String detailPaiementEtudiant(String obligationUuid) =>
+      '/student/payments/$obligationUuid';
   static const initierPaiementEtudiant = '/student/payments/initiate';
   static const paiementSync = '/student/payments/sync';
 
   // Suivi de Stage & Présences
   static const stagesEtudiant = '/student/stages';
+  static const contexteExecution = '/student/execution-context';
   static const contextePointage = '/student/attendance/context';
   static const pointageArrivee = '/student/attendance/arrival';
   static const pointageDepart = '/student/attendance/departure';
@@ -40,15 +43,13 @@ abstract final class EndpointsApi {
 
   // Tâches de Stage
   static const tachesEtudiant = '/student/tasks';
-  static String demarrerTache(String uuid) =>
-      '/student/tasks/$uuid/start';
-  static String commenterTache(String uuid) =>
-      '/student/tasks/$uuid/comment';
-  static String terminerTache(String uuid) =>
-      '/student/tasks/$uuid/complete';
+  static String demarrerTache(String uuid) => '/student/tasks/$uuid/start';
+  static String commenterTache(String uuid) => '/student/tasks/$uuid/comment';
+  static String terminerTache(String uuid) => '/student/tasks/$uuid/complete';
 
   // Feedbacks & Évaluations
   static const feedbacksEtudiant = '/student/feedbacks';
+  static String lireFeedback(String uuid) => '/student/feedbacks/$uuid/read';
   static const evaluationsEtudiant = '/student/evaluations';
 
   // Documents
@@ -64,7 +65,10 @@ abstract final class EndpointsApi {
   static const documentsPersonnels = '/student/personal-documents';
   static String documentPersonnel(String uuid) =>
       '/student/personal-documents/$uuid';
-  static String fichierDocumentPersonnel(String uuid, {bool download = false}) =>
+  static String fichierDocumentPersonnel(
+    String uuid, {
+    bool download = false,
+  }) =>
       '/student/personal-documents/$uuid/file${download ? '?download=1' : ''}';
 
   static const regenererIdentifiantStagia = '/me.php';
@@ -163,4 +167,3 @@ abstract final class EndpointsApi {
   static String repondreInvitationCalendrier(String uuid) =>
       '/student/calendar/$uuid/response';
 }
-

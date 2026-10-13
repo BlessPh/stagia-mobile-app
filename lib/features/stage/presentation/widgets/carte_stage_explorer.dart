@@ -36,17 +36,24 @@ class CarteStageExplorer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
+    final couleurCarte = modeSombre ? const Color(0xFF1E293B) : Colors.white;
+    final couleurBordure = modeSombre ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final textePrincipal = modeSombre ? Colors.white : const Color(0xFF0F172A);
+    final texteSecondaire = modeSombre ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final separateur = modeSombre ? const Color(0xFF334155) : const Color(0xFFF1F5F9);
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: couleurCarte,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: const [
+        border: Border.all(color: couleurBordure),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x06000000),
+            color: modeSombre ? Colors.black.withValues(alpha: 0.25) : const Color(0x06000000),
             blurRadius: 12,
-            offset: Offset(0, 3),
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -63,7 +70,7 @@ class CarteStageExplorer extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: couleurFondInitiale,
+                  color: modeSombre ? couleurFondInitiale.withValues(alpha: 0.2) : couleurFondInitiale,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 alignment: Alignment.center,
@@ -72,7 +79,7 @@ class CarteStageExplorer extends StatelessWidget {
                   style: GoogleFonts.inter(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
-                    color: couleurTexteInitiale,
+                    color: modeSombre ? Colors.white : couleurTexteInitiale,
                   ),
                 ),
               ),
@@ -87,7 +94,7 @@ class CarteStageExplorer extends StatelessWidget {
                       style: GoogleFonts.inter(
                         fontSize: 15.5,
                         fontWeight: FontWeight.w800,
-                        color: const Color(0xFF0F172A),
+                        color: textePrincipal,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -109,7 +116,7 @@ class CarteStageExplorer extends StatelessWidget {
                   estFavori
                       ? CupertinoIcons.bookmark_fill
                       : CupertinoIcons.bookmark,
-                  color: const Color(0xFF2563EB),
+                  color: modeSombre ? const Color(0xFF38BDF8) : const Color(0xFF2563EB),
                   size: 22,
                 ),
               ),
@@ -124,7 +131,7 @@ class CarteStageExplorer extends StatelessWidget {
             style: GoogleFonts.inter(
               fontSize: 16,
               fontWeight: FontWeight.w800,
-              color: const Color(0xFF0F172A),
+              color: textePrincipal,
             ),
           ),
 
@@ -139,7 +146,7 @@ class CarteStageExplorer extends StatelessWidget {
                   vertical: 5,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE0F2FE),
+                  color: modeSombre ? const Color(0xFF0369A1).withValues(alpha: 0.25) : const Color(0xFFE0F2FE),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
@@ -147,17 +154,17 @@ class CarteStageExplorer extends StatelessWidget {
                   style: GoogleFonts.inter(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: const Color(0xFF0284C7),
+                    color: modeSombre ? const Color(0xFF38BDF8) : const Color(0xFF0284C7),
                   ),
                 ),
               ),
               const SizedBox(width: 8),
               Row(
                 children: [
-                  const Icon(
+                  Icon(
                     CupertinoIcons.clock,
                     size: 14,
-                    color: Color(0xFF64748B),
+                    color: texteSecondaire,
                   ),
                   const SizedBox(width: 4),
                   Text(
@@ -165,7 +172,7 @@ class CarteStageExplorer extends StatelessWidget {
                     style: GoogleFonts.inter(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
-                      color: const Color(0xFF64748B),
+                      color: texteSecondaire,
                     ),
                   ),
                 ],
@@ -176,7 +183,7 @@ class CarteStageExplorer extends StatelessWidget {
           const SizedBox(height: 14),
 
           // Ligne de séparation
-          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          Divider(height: 1, color: separateur),
 
           const SizedBox(height: 12),
 
@@ -199,7 +206,7 @@ class CarteStageExplorer extends StatelessWidget {
                   style: GoogleFonts.inter(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: const Color(0xFF1D61F2),
+                    color: modeSombre ? const Color(0xFF38BDF8) : const Color(0xFF1D61F2),
                   ),
                 ),
               ),

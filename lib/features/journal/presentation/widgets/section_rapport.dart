@@ -44,6 +44,15 @@ class _SectionRapportState extends State<SectionRapport> {
   @override
   Widget build(BuildContext context) {
     final marge = MediaQuery.sizeOf(context).width < 360 ? 14.0 : 18.0;
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
+    final fondCarte = modeSombre ? const Color(0xFF111C2E) : Colors.white;
+    final bordure = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFE2E8F0);
+    final textePrincipal = modeSombre ? Colors.white : const Color(0xFF0F172A);
+    final texteSecondaire = modeSombre
+        ? const Color(0xFF94A3B8)
+        : const Color(0xFF64748B);
     return ListView(
       padding: EdgeInsets.fromLTRB(marge, 16, marge, 28),
       children: [
@@ -54,15 +63,23 @@ class _SectionRapportState extends State<SectionRapport> {
         const SizedBox(height: 16),
         if (_rapport != null)
           Card(
+            color: fondCarte,
+            surfaceTintColor: Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: bordure),
+            ),
             child: ListTile(
               leading: const Icon(Icons.description, color: Color(0xFFFF7417)),
               title: Text(
                 _rapport!.name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: textePrincipal),
               ),
               subtitle: Text(
                 'Version $_version · ${_rapport!.extension?.toUpperCase() ?? 'DOCUMENT'}',
+                style: TextStyle(color: texteSecondaire),
               ),
               trailing: IconButton(
                 onPressed: _ouvrir,
@@ -72,16 +89,31 @@ class _SectionRapportState extends State<SectionRapport> {
           ),
         if (_statut == 'À corriger') ...[
           const SizedBox(height: 12),
-          const Card(
-            color: Color(0xFFFFF3E0),
+          Card(
+            color: modeSombre
+                ? const Color(0xFF3B2416)
+                : const Color(0xFFFFF3E0),
+            surfaceTintColor: Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: BorderSide(
+                color: modeSombre
+                    ? const Color(0xFF7C3A12)
+                    : const Color(0xFFFFD7B5),
+              ),
+            ),
             child: ListTile(
-              leading: Icon(
+              leading: const Icon(
                 Icons.rate_review_outlined,
                 color: Color(0xFFE85D00),
               ),
-              title: Text('Corrections demandées'),
+              title: Text(
+                'Corrections demandées',
+                style: TextStyle(color: textePrincipal),
+              ),
               subtitle: Text(
                 'Revoir la présentation des résultats et compléter la conclusion.',
+                style: TextStyle(color: texteSecondaire),
               ),
             ),
           ),
@@ -94,6 +126,12 @@ class _SectionRapportState extends State<SectionRapport> {
             _rapport == null
                 ? 'Importer le rapport'
                 : 'Déposer une nouvelle version',
+          ),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: modeSombre
+                ? const Color(0xFF93C5FD)
+                : const Color(0xFF1D61F2),
+            side: BorderSide(color: bordure),
           ),
         ),
         const SizedBox(height: 10),
@@ -120,13 +158,18 @@ class _BlocConsignes extends StatelessWidget {
   const _BlocConsignes();
   @override
   Widget build(BuildContext context) {
-    const couleurTexte = Colors.black;
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
+    final couleurTexte = modeSombre ? Colors.white : const Color(0xFF0F172A);
+    final fond = modeSombre ? const Color(0xFF111C2E) : Colors.white;
+    final bordure = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFE2E8F0);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: fond,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.black),
+        border: Border.all(color: bordure),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -164,13 +207,22 @@ class _EtatRapport extends StatelessWidget {
   final int version;
   @override
   Widget build(BuildContext context) {
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
+    final fond = modeSombre ? const Color(0xFF111C2E) : Colors.white;
+    final bordure = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFE2E8F0);
+    final textePrincipal = modeSombre ? Colors.white : const Color(0xFF0F172A);
+    final texteSecondaire = modeSombre
+        ? const Color(0xFF94A3B8)
+        : const Color(0xFF4B5563);
     return Container(
       constraints: const BoxConstraints(minHeight: 96),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: fond,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.black),
+        border: Border.all(color: bordure),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -188,8 +240,8 @@ class _EtatRapport extends StatelessWidget {
               children: [
                 Text(
                   'État du rapport',
-                  style: const TextStyle(
-                    color: Colors.black,
+                  style: TextStyle(
+                    color: textePrincipal,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
@@ -200,10 +252,7 @@ class _EtatRapport extends StatelessWidget {
                       : 'Version $version',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: const Color(0xFF4B5563),
-                    fontSize: 13,
-                  ),
+                  style: TextStyle(color: texteSecondaire, fontSize: 13),
                 ),
               ],
             ),
@@ -212,7 +261,21 @@ class _EtatRapport extends StatelessWidget {
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 110),
             child: Chip(
+              backgroundColor: modeSombre
+                  ? const Color(0xFF1E3A5F)
+                  : const Color(0xFFEFF6FF),
+              side: BorderSide(
+                color: modeSombre
+                    ? const Color(0xFF315F8C)
+                    : const Color(0xFFBFDBFE),
+              ),
               label: Text(statut, maxLines: 1, overflow: TextOverflow.ellipsis),
+              labelStyle: TextStyle(
+                color: modeSombre
+                    ? const Color(0xFFBFDBFE)
+                    : const Color(0xFF1D4ED8),
+                fontWeight: FontWeight.w700,
+              ),
               visualDensity: VisualDensity.compact,
             ),
           ),

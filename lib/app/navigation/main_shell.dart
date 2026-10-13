@@ -53,7 +53,11 @@ class _MainShellState extends State<MainShell> {
       const ProfilePage(),
     ];
 
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
+    final fondPage = modeSombre ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+
     return Scaffold(
+      backgroundColor: fondPage,
       body: IndexedStack(index: _currentIndex, children: pages),
       bottomNavigationBar: _afficherBarreNavigation
           ? BarreNavigationPrincipale(

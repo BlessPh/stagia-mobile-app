@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:iconsax/iconsax.dart';
 import '../../../../core/network/client_api_http.dart';
 import '../../../../core/network/source_etudiant_distante.dart';
 
@@ -69,9 +70,14 @@ class _EnTeteJournalState extends State<EnTeteJournal> {
     final unreadNotifs =
         int.tryParse(_counts?['notifications']?.toString() ?? '0') ?? 0;
 
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
+    final fondEnTete = modeSombre ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final texteCouleur = modeSombre ? Colors.white : const Color(0xFF0F172A);
+    final iconeCouleur = modeSombre ? const Color(0xFFE2E8F0) : const Color(0xFF0F172A);
+
     return AppBar(
       automaticallyImplyLeading: false,
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: fondEnTete,
       elevation: 0,
       surfaceTintColor: Colors.transparent,
       title: Text(
@@ -79,7 +85,7 @@ class _EnTeteJournalState extends State<EnTeteJournal> {
         style: GoogleFonts.inter(
           fontSize: 22,
           fontWeight: FontWeight.w800,
-          color: const Color(0xFF0F172A),
+          color: texteCouleur,
           letterSpacing: -0.3,
         ),
       ),
@@ -94,9 +100,9 @@ class _EnTeteJournalState extends State<EnTeteJournal> {
                 widget.onOuvrirChat();
                 _chargerCounts();
               },
-              icon: const Icon(
-                CupertinoIcons.chat_bubble_2,
-                color: Color(0xFF0F172A),
+              icon: Icon(
+                Iconsax.message,
+                color: iconeCouleur,
                 size: 24,
               ),
             ),
@@ -140,9 +146,9 @@ class _EnTeteJournalState extends State<EnTeteJournal> {
                 widget.onOuvrirNotifications();
                 _chargerCounts();
               },
-              icon: const Icon(
+              icon: Icon(
                 CupertinoIcons.bell,
-                color: Color(0xFF0F172A),
+                color: iconeCouleur,
                 size: 25,
               ),
             ),
@@ -183,9 +189,9 @@ class _EnTeteJournalState extends State<EnTeteJournal> {
             IconButton(
               tooltip: 'Tâches du jour',
               onPressed: widget.onOuvrirTaches,
-              icon: const Icon(
+              icon: Icon(
                 CupertinoIcons.calendar,
-                color: Color(0xFF0F172A),
+                color: iconeCouleur,
                 size: 24,
               ),
             ),

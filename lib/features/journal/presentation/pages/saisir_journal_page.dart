@@ -2,7 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/network/client_api_http.dart';
-import '../../../../core/network/configuration_api.dart';
+import '../../../../core/network/reponse_api.dart';
 import '../../../../core/network/source_etudiant_distante.dart';
 
 class SaisirJournalPage extends StatefulWidget {
@@ -32,8 +32,13 @@ class _SaisirJournalPageState extends State<SaisirJournalPage> {
   late final TextEditingController _apprentissageController;
   late final TextEditingController _difficultesController;
   String? _assignmentUuidApi;
+  String? _dateContexteApi;
+  String? _raisonBlocageJournal;
+  bool _contexteCharge = false;
+  bool _journalAutorise = false;
+  late final String _resumeInitial;
 
-  final List<Map<String, String>> _activitesCliniques = [];
+  final List<Map<String, dynamic>> _activitesCliniques = [];
 
   @override
   void initState() {
@@ -45,6 +50,7 @@ class _SaisirJournalPageState extends State<SaisirJournalPage> {
         ? donnees['date'].toString().trim()
         : _formaterDateDuJour(DateTime.now());
     _dateController = TextEditingController(text: date);
+    _resumeInitial = donnees['summary']?.toString() ?? '';
     _apprentissageController = TextEditingController(
       text: (donnees['learning'] ?? donnees['summary'])?.toString() ?? '',
     );
@@ -62,9 +68,14 @@ class _SaisirJournalPageState extends State<SaisirJournalPage> {
                 .toUpperCase() ??
             '',
         'titre': titre,
+        'category': activite['category']?.toString(),
+        'involvement_level': activite['involvement_level']?.toString(),
+        'description': activite['description']?.toString(),
+        'quantity': activite['quantity'],
+        'observation': activite['observation']?.toString(),
       });
     }
-    _chargerAffectationActive();
+    _chargerContexteExecution();
   }
 
   @override
@@ -120,6 +131,9 @@ class _SaisirJournalPageState extends State<SaisirJournalPage> {
                   _activitesCliniques.add({
                     'type': typeSelectionne!,
                     'titre': titreCtrl.text.trim(),
+                    ..._valeursActivite(typeSelectionne!),
+                    'description': titreCtrl.text.trim(),
+                    'quantity': 1,
                   });
                 });
               }
@@ -139,43 +153,128 @@ class _SaisirJournalPageState extends State<SaisirJournalPage> {
     final depuisJournal = assignment['uuid']?.toString().trim() ?? '';
     if (depuisJournal.isNotEmpty) return depuisJournal;
     if ((_assignmentUuidApi ?? '').isNotEmpty) return _assignmentUuidApi;
-    return ConfigurationApi.utiliserDonneesMockees
-        ? 'default-assignment'
-        : null;
+    return null;
   }
 
-  Future<void> _chargerAffectationActive() async {
-    if (ConfigurationApi.utiliserDonneesMockees ||
-        _assignmentUuidEffectif != null) {
-      return;
-    }
+  bool get _estNouveauJournal => (widget.logbookUuid ?? '').trim().isEmpty;
+
+  Map<String, dynamic> get _actionsJournal =>
+      _map(widget.donneesJournal?['actions']);
+
+  bool get _journalModifiable {
+    if (_estNouveauJournal) return _journalAutorise;
+    final action = _map(_actionsJournal['edit']);
+    return action.containsKey('allowed')
+        ? action['allowed'] == true
+        : widget.donneesJournal?['editable'] == true;
+  }
+
+  bool get _journalSoumissible {
+    if (_estNouveauJournal) return _journalAutorise;
+    final action = _map(_actionsJournal['submit']);
+    final soumissionDirecte = action.containsKey('allowed')
+        ? action['allowed'] == true
+        : widget.donneesJournal?['can_submit'] == true;
+    return soumissionDirecte || _journalModifiable;
+  }
+
+  bool get _saisieVerrouillee =>
+      widget.estLectureSeule || (!_estNouveauJournal && !_journalModifiable);
+
+  Future<void> _chargerContexteExecution() async {
+    final assignmentJournal = _map(widget.donneesJournal?['assignment']);
+    final reference = widget.assignmentUuid?.trim().isNotEmpty == true
+        ? widget.assignmentUuid!.trim()
+        : assignmentJournal['uuid']?.toString().trim();
+
     try {
-      final reponse = await _source.stages();
-      final stages = _items(reponse['items']);
-      for (final stage in stages) {
-        final statut = (stage['assignment_status'] ?? stage['workflow_status'])
-            ?.toString()
-            .toUpperCase();
-        if (statut == 'ACTIVE' || statut == 'EN_COURS') {
-          final uuid = stage['assignment_uuid']?.toString().trim() ?? '';
-          if (uuid.isNotEmpty && mounted) {
-            setState(() => _assignmentUuidApi = uuid);
-          }
-          return;
+      final reponse = await _source.contexteExecution(
+        assignmentUuid: reference?.isNotEmpty == true ? reference : null,
+      );
+      final context = _map(reponse['context']);
+      final execution = _map(reponse['execution']);
+      final punch = _map(reponse['punch']);
+      final assignment = _map(context['assignment']);
+      final actions = _map(context['actions']);
+      final actionJournal = _map(actions['logbook']);
+      final capabilities = _map(context['capabilities']);
+      final uuid = assignment['uuid']?.toString().trim() ?? '';
+      final dateApi = context['date']?.toString().trim() ?? '';
+      final autorise =
+          actionJournal['allowed'] == true && capabilities['logbook'] == true;
+
+      if (!mounted) return;
+      setState(() {
+        _assignmentUuidApi = uuid.isEmpty ? null : uuid;
+        _dateContexteApi = DateTime.tryParse(dateApi) == null ? null : dateApi;
+        _raisonBlocageJournal =
+            (context['reason'] ?? execution['reason'] ?? punch['reason'])
+                ?.toString();
+        _journalAutorise = autorise;
+        _contexteCharge = true;
+        final dateContexte = DateTime.tryParse(dateApi);
+        if (_estNouveauJournal && dateContexte != null) {
+          _dateController.text = _formaterDateDuJour(dateContexte);
         }
-      }
-    } catch (_) {
-      // L'absence de contexte sera expliquée au moment de l'enregistrement.
+      });
+    } on ErreurApi catch (erreur) {
+      if (!mounted) return;
+      setState(() {
+        _raisonBlocageJournal = erreur.message;
+        _journalAutorise = false;
+        _contexteCharge = true;
+      });
     }
+  }
+
+  bool _verifierAutorisationJournal({required bool soumettre}) {
+    if (!_estNouveauJournal) {
+      final autorise = soumettre ? _journalSoumissible : _journalModifiable;
+      if (autorise) return true;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Ce journal ne peut plus être modifié.'),
+          backgroundColor: Color(0xFFDC2626),
+        ),
+      );
+      return false;
+    }
+    if (_contexteCharge &&
+        _journalAutorise &&
+        _assignmentUuidEffectif != null) {
+      return true;
+    }
+    final message = !_contexteCharge
+        ? 'Vérification du contexte de stage en cours.'
+        : (_raisonBlocageJournal?.trim().isNotEmpty == true
+              ? _raisonBlocageJournal!.trim()
+              : 'Aucune rotation active ne permet de saisir un journal.');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: const Color(0xFFDC2626),
+      ),
+    );
+    return false;
   }
 
   List<Map<String, dynamic>> get _activitesPourApi => _activitesCliniques
       .where((activite) => (activite['titre'] ?? '').trim().isNotEmpty)
       .map(
         (activite) => <String, dynamic>{
-          'category': activite['type'] ?? '',
+          'category':
+              activite['category'] ??
+              _valeursActivite(activite['type']?.toString() ?? '')['category'],
           'activity': activite['titre'] ?? '',
-          'description': activite['titre'] ?? '',
+          'description': activite['description'] ?? activite['titre'] ?? '',
+          'involvement_level':
+              activite['involvement_level'] ??
+              _valeursActivite(
+                activite['type']?.toString() ?? '',
+              )['involvement_level'],
+          'quantity': activite['quantity'] ?? 1,
+          if ((activite['observation']?.toString().trim() ?? '').isNotEmpty)
+            'observation': activite['observation'].toString().trim(),
         },
       )
       .toList();
@@ -185,21 +284,41 @@ class _SaisirJournalPageState extends State<SaisirJournalPage> {
       final dateExistante = widget.donneesJournal?['date']?.toString() ?? '';
       if (DateTime.tryParse(dateExistante) != null) return dateExistante;
     }
-    return DateTime.now().toIso8601String().split('T').first;
+    return _dateContexteApi ??
+        DateTime.now().toIso8601String().split('T').first;
+  }
+
+  String get _resumePourApi {
+    if (!_estNouveauJournal && _resumeInitial.trim().isNotEmpty) {
+      return _resumeInitial.trim();
+    }
+    return _apprentissageController.text.trim();
   }
 
   @override
   Widget build(BuildContext context) {
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
+    final fondPage = modeSombre
+        ? const Color(0xFF0F172A)
+        : const Color(0xFFF8FAFC);
+    final fondCarte = modeSombre ? const Color(0xFF1E293B) : Colors.white;
+    final bordure = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFE2E8F0);
+    final textePrincipal = modeSombre ? Colors.white : const Color(0xFF0F172A);
+    final texteSecondaire = modeSombre
+        ? const Color(0xFFCBD5E1)
+        : const Color(0xFF475569);
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: fondPage,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF8FAFC),
+        backgroundColor: fondPage,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(
+          icon: Icon(
             CupertinoIcons.chevron_left,
-            color: Color(0xFF0F172A),
+            color: textePrincipal,
             size: 24,
           ),
           onPressed: () => Navigator.of(context).pop(),
@@ -209,7 +328,7 @@ class _SaisirJournalPageState extends State<SaisirJournalPage> {
           style: GoogleFonts.inter(
             fontSize: 18.5,
             fontWeight: FontWeight.w800,
-            color: const Color(0xFF0F172A),
+            color: textePrincipal,
           ),
         ),
       ),
@@ -224,15 +343,15 @@ class _SaisirJournalPageState extends State<SaisirJournalPage> {
               style: GoogleFonts.inter(
                 fontSize: 13.5,
                 fontWeight: FontWeight.w700,
-                color: const Color(0xFF0F172A),
+                color: textePrincipal,
               ),
             ),
             const SizedBox(height: 8),
             Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: fondCarte,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
+                border: Border.all(color: bordure),
               ),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
@@ -243,13 +362,13 @@ class _SaisirJournalPageState extends State<SaisirJournalPage> {
                     style: GoogleFonts.inter(
                       fontSize: 14.5,
                       fontWeight: FontWeight.w600,
-                      color: const Color(0xFF0F172A),
+                      color: textePrincipal,
                     ),
                   ),
-                  const Icon(
+                  Icon(
                     CupertinoIcons.calendar,
                     size: 20,
-                    color: Color(0xFF64748B),
+                    color: texteSecondaire,
                   ),
                 ],
               ),
@@ -263,24 +382,22 @@ class _SaisirJournalPageState extends State<SaisirJournalPage> {
               style: GoogleFonts.inter(
                 fontSize: 13.5,
                 fontWeight: FontWeight.w700,
-                color: const Color(0xFF0F172A),
+                color: textePrincipal,
               ),
             ),
             const SizedBox(height: 8),
             Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: fondCarte,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
+                border: Border.all(color: bordure),
               ),
               padding: const EdgeInsets.all(14),
               child: TextField(
                 controller: _apprentissageController,
+                readOnly: _saisieVerrouillee,
                 maxLines: 3,
-                style: GoogleFonts.inter(
-                  fontSize: 13.5,
-                  color: const Color(0xFF0F172A),
-                ),
+                style: GoogleFonts.inter(fontSize: 13.5, color: textePrincipal),
                 decoration: const InputDecoration(
                   border: InputBorder.none,
                   isDense: true,
@@ -297,24 +414,22 @@ class _SaisirJournalPageState extends State<SaisirJournalPage> {
               style: GoogleFonts.inter(
                 fontSize: 13.5,
                 fontWeight: FontWeight.w700,
-                color: const Color(0xFF0F172A),
+                color: textePrincipal,
               ),
             ),
             const SizedBox(height: 8),
             Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: fondCarte,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
+                border: Border.all(color: bordure),
               ),
               padding: const EdgeInsets.all(14),
               child: TextField(
                 controller: _difficultesController,
+                readOnly: _saisieVerrouillee,
                 maxLines: 3,
-                style: GoogleFonts.inter(
-                  fontSize: 13.5,
-                  color: const Color(0xFF0F172A),
-                ),
+                style: GoogleFonts.inter(fontSize: 13.5, color: textePrincipal),
                 decoration: const InputDecoration(
                   border: InputBorder.none,
                   isDense: true,
@@ -334,11 +449,11 @@ class _SaisirJournalPageState extends State<SaisirJournalPage> {
                   style: GoogleFonts.inter(
                     fontSize: 14.5,
                     fontWeight: FontWeight.w800,
-                    color: const Color(0xFF0F172A),
+                    color: textePrincipal,
                   ),
                 ),
                 GestureDetector(
-                  onTap: _ajouterActiviteDialog,
+                  onTap: _saisieVerrouillee ? null : _ajouterActiviteDialog,
                   child: Text(
                     '+ Ajouter',
                     style: GoogleFonts.inter(
@@ -364,9 +479,9 @@ class _SaisirJournalPageState extends State<SaisirJournalPage> {
                     vertical: 12,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: fondCarte,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    border: Border.all(color: bordure),
                   ),
                   child: Row(
                     children: [
@@ -376,28 +491,32 @@ class _SaisirJournalPageState extends State<SaisirJournalPage> {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE0F2FE),
+                          color: modeSombre
+                              ? const Color(0xFF0C4A6E)
+                              : const Color(0xFFE0F2FE),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          act['type']!,
+                          act['type']?.toString() ?? '',
                           style: GoogleFonts.inter(
                             fontSize: 10.5,
                             fontWeight: FontWeight.w800,
-                            color: const Color(0xFF0284C7),
+                            color: modeSombre
+                                ? const Color(0xFF7DD3FC)
+                                : const Color(0xFF0284C7),
                           ),
                         ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          act['titre']!,
+                          act['titre']?.toString() ?? '',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.inter(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
-                            color: const Color(0xFF0F172A),
+                            color: textePrincipal,
                           ),
                         ),
                       ),
@@ -408,7 +527,7 @@ class _SaisirJournalPageState extends State<SaisirJournalPage> {
 
             const SizedBox(height: 24),
 
-            if (!widget.estLectureSeule) ...[
+            if (!_saisieVerrouillee) ...[
               // Bouton Soumettre à l'encadreur (Bleu)
               SizedBox(
                 width: double.infinity,
@@ -417,6 +536,9 @@ class _SaisirJournalPageState extends State<SaisirJournalPage> {
                   onPressed: _envoiEnCours
                       ? null
                       : () async {
+                          if (!_verifierAutorisationJournal(soumettre: true)) {
+                            return;
+                          }
                           final messenger = ScaffoldMessenger.of(context);
                           final navigator = Navigator.of(context);
                           setState(() => _envoiEnCours = true);
@@ -424,41 +546,50 @@ class _SaisirJournalPageState extends State<SaisirJournalPage> {
                             // 1. Sauvegarder d'abord le brouillon
                             final assignUuid = _assignmentUuidEffectif;
                             if (assignUuid == null) {
-                              throw StateError(
-                                'Aucun stage actif ne permet de saisir un journal.',
+                              throw const ErreurApi(
+                                code: 'CONTEXTE_STAGE_ABSENT',
+                                message:
+                                    'Aucun stage actif ne permet de saisir un journal.',
                               );
                             }
                             final res = await _source.sauvegarderJournal(
                               assignmentUuid: assignUuid,
                               date: _datePourApi,
-                              summary: _apprentissageController.text.trim(),
+                              summary: _resumePourApi,
                               learning: _apprentissageController.text.trim(),
                               difficulties: _difficultesController.text.trim(),
                               activities: _activitesPourApi,
                               logbookUuid: widget.logbookUuid,
                             );
-                            final uuidJournal =
-                                res['uuid']?.toString() ??
-                                res['logbook_uuid']?.toString() ??
-                                widget.logbookUuid;
-                            if (uuidJournal != null) {
-                              await _source.soumettreJournal(
-                                logbookUuid: uuidJournal,
+                            final entree = _map(res['entry']);
+                            final uuidJournal = entree['uuid']?.toString();
+                            if (uuidJournal == null || uuidJournal.isEmpty) {
+                              throw const ErreurApi(
+                                code: 'DONNEES_API_INVALIDES',
+                                message:
+                                    'Le serveur n’a pas retourné le journal enregistré.',
                               );
                             }
+                            final soumission = await _source.soumettreJournal(
+                              logbookUuid: uuidJournal,
+                            );
+                            final message =
+                                soumission['message']?.toString().trim() ?? '';
                             messenger.showSnackBar(
-                              const SnackBar(
+                              SnackBar(
                                 content: Text(
-                                  'Journal soumis à l’encadreur avec succès !',
+                                  message.isNotEmpty
+                                      ? message
+                                      : 'Journal soumis à l’encadreur avec succès !',
                                 ),
-                                backgroundColor: Color(0xFF16A34A),
+                                backgroundColor: const Color(0xFF16A34A),
                               ),
                             );
                             navigator.pop(true);
-                          } catch (e) {
+                          } on ErreurApi catch (erreur) {
                             messenger.showSnackBar(
                               SnackBar(
-                                content: Text('Échec de la soumission: $e'),
+                                content: Text(erreur.message),
                                 backgroundColor: const Color(0xFFDC2626),
                               ),
                             );
@@ -503,37 +634,46 @@ class _SaisirJournalPageState extends State<SaisirJournalPage> {
                   onPressed: _envoiEnCours
                       ? null
                       : () async {
+                          if (!_verifierAutorisationJournal(soumettre: false)) {
+                            return;
+                          }
                           final messenger = ScaffoldMessenger.of(context);
                           final navigator = Navigator.of(context);
                           setState(() => _envoiEnCours = true);
                           try {
                             final assignUuid = _assignmentUuidEffectif;
                             if (assignUuid == null) {
-                              throw StateError(
-                                'Aucun stage actif ne permet de saisir un journal.',
+                              throw const ErreurApi(
+                                code: 'CONTEXTE_STAGE_ABSENT',
+                                message:
+                                    'Aucun stage actif ne permet de saisir un journal.',
                               );
                             }
-                            await _source.sauvegarderJournal(
+                            final resultat = await _source.sauvegarderJournal(
                               assignmentUuid: assignUuid,
                               date: _datePourApi,
-                              summary: _apprentissageController.text.trim(),
+                              summary: _resumePourApi,
                               learning: _apprentissageController.text.trim(),
                               difficulties: _difficultesController.text.trim(),
                               activities: _activitesPourApi,
                               logbookUuid: widget.logbookUuid,
                             );
+                            final message =
+                                resultat['message']?.toString().trim() ?? '';
                             messenger.showSnackBar(
-                              const SnackBar(
+                              SnackBar(
                                 content: Text(
-                                  'Journal enregistré en brouillon avec succès !',
+                                  message.isNotEmpty
+                                      ? message
+                                      : 'Journal enregistré en brouillon avec succès !',
                                 ),
                               ),
                             );
                             navigator.pop(true);
-                          } catch (e) {
+                          } on ErreurApi catch (erreur) {
                             messenger.showSnackBar(
                               SnackBar(
-                                content: Text('Échec de l\'enregistrement: $e'),
+                                content: Text(erreur.message),
                                 backgroundColor: const Color(0xFFDC2626),
                               ),
                             );
@@ -542,8 +682,8 @@ class _SaisirJournalPageState extends State<SaisirJournalPage> {
                           }
                         },
                   style: OutlinedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    side: const BorderSide(color: Color(0xFFE2E8F0)),
+                    backgroundColor: fondCarte,
+                    side: BorderSide(color: bordure),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
@@ -553,7 +693,7 @@ class _SaisirJournalPageState extends State<SaisirJournalPage> {
                     style: GoogleFonts.inter(
                       fontSize: 14.5,
                       fontWeight: FontWeight.w700,
-                      color: const Color(0xFF475569),
+                      color: texteSecondaire,
                     ),
                   ),
                 ),
@@ -593,3 +733,22 @@ List<Map<String, dynamic>> _items(Object? valeur) => valeur is List
 
 Map<String, dynamic> _map(Object? valeur) =>
     valeur is Map ? Map<String, dynamic>.from(valeur) : <String, dynamic>{};
+
+Map<String, dynamic> _valeursActivite(String libelle) =>
+    switch (libelle.toUpperCase()) {
+      'OBSERVATION' ||
+      'OBSERVE' => {'category': 'OBSERVATION', 'involvement_level': 'OBSERVE'},
+      'ASSISTANCE' || 'ASSISTE' => {
+        'category': 'PARTICIPATION',
+        'involvement_level': 'ASSISTE',
+      },
+      'RÉALISATION' || 'REALISATION' || 'REALISE_SUPERVISE' => {
+        'category': 'REALISATION',
+        'involvement_level': 'REALISE_SUPERVISE',
+      },
+      'REALISE_AUTONOME' => {
+        'category': 'REALISATION',
+        'involvement_level': 'REALISE_AUTONOME',
+      },
+      _ => {'category': 'AUTRE', 'involvement_level': ''},
+    };

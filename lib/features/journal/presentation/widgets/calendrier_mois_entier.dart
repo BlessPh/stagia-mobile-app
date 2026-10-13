@@ -21,6 +21,7 @@ class CalendrierMoisEntier extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
     final moisCourant = moisAffiche ?? DateTime(dateSelectionnee.year, dateSelectionnee.month);
     final premierJourMois = DateTime(moisCourant.year, moisCourant.month, 1);
     final nombreJoursMois = DateUtils.getDaysInMonth(moisCourant.year, moisCourant.month);
@@ -36,17 +37,24 @@ class CalendrierMoisEntier extends StatelessWidget {
     final titreMois = '${nomsMois[moisCourant.month - 1]} ${moisCourant.year}';
     const nomsJours = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 
+    final fondCarte = modeSombre ? const Color(0xFF1E293B) : Colors.white;
+    final bordureCouleur = modeSombre ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final titreCouleur = modeSombre ? Colors.white : const Color(0xFF0F172A);
+    final fondFleche = modeSombre ? const Color(0xFF334155) : const Color(0xFFE0F2FE);
+    final iconeFleche = modeSombre ? const Color(0xFF38BDF8) : const Color(0xFF0284C7);
+    final jourTexteInactif = modeSombre ? const Color(0xFFE2E8F0) : const Color(0xFF0F172A);
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: fondCarte,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: const [
+        border: Border.all(color: bordureCouleur),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x05000000),
+            color: modeSombre ? const Color(0x30000000) : const Color(0x05000000),
             blurRadius: 10,
-            offset: Offset(0, 2),
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -62,7 +70,7 @@ class CalendrierMoisEntier extends StatelessWidget {
                 style: GoogleFonts.inter(
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
-                  color: const Color(0xFF0F172A),
+                  color: titreCouleur,
                 ),
               ),
               Row(
@@ -72,15 +80,15 @@ class CalendrierMoisEntier extends StatelessWidget {
                     child: Container(
                       width: 28,
                       height: 28,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFE0F2FE),
+                      decoration: BoxDecoration(
+                        color: fondFleche,
                         shape: BoxShape.circle,
                       ),
                       alignment: Alignment.center,
-                      child: const Icon(
+                      child: Icon(
                         Icons.chevron_left_rounded,
                         size: 20,
-                        color: Color(0xFF0284C7),
+                        color: iconeFleche,
                       ),
                     ),
                   ),
@@ -90,15 +98,15 @@ class CalendrierMoisEntier extends StatelessWidget {
                     child: Container(
                       width: 28,
                       height: 28,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFE0F2FE),
+                      decoration: BoxDecoration(
+                        color: fondFleche,
                         shape: BoxShape.circle,
                       ),
                       alignment: Alignment.center,
-                      child: const Icon(
+                      child: Icon(
                         Icons.chevron_right_rounded,
                         size: 20,
-                        color: Color(0xFF0284C7),
+                        color: iconeFleche,
                       ),
                     ),
                   ),
@@ -170,7 +178,7 @@ class CalendrierMoisEntier extends StatelessWidget {
                         style: GoogleFonts.inter(
                           fontSize: 13,
                           fontWeight: estSelectionne ? FontWeight.w800 : FontWeight.w600,
-                          color: estSelectionne ? Colors.white : const Color(0xFF0F172A),
+                          color: estSelectionne ? Colors.white : jourTexteInactif,
                         ),
                       ),
                     ),

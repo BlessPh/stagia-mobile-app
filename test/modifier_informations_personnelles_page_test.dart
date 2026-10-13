@@ -49,7 +49,7 @@ void main() {
       final champs = tester.widgetList<TextFormField>(
         find.byType(TextFormField),
       );
-      expect(champs.every((champ) => champ.readOnly), isTrue);
+      expect(champs.every((champ) => champ.enabled == false), isTrue);
 
       // 4. Le seul bouton ferme la page sans modifier le profil.
       expect(find.text('Fermer'), findsOneWidget);

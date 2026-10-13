@@ -33,6 +33,11 @@ class TachePlanning {
   final String? noteRappel;
   final Color couleur;
 
+  bool get completee =>
+      statut.toLowerCase().contains('termin') ||
+      statut.toLowerCase().contains('valid') ||
+      statut.toLowerCase().contains('fait');
+
   TachePlanning copyWith({
     String? id,
     String? titre,
@@ -178,30 +183,71 @@ class TachePlanning {
     String nomHopital = '',
     DateTime? dateAffichee,
   }) {
+    final period = json['period'] is Map ? json['period'] as Map : const {};
+    final service = json['service'] is Map ? json['service'] as Map : const {};
+    final unit = json['unit'] is Map ? json['unit'] as Map : const {};
+    final supervisor = json['supervisor'] is Map
+        ? json['supervisor'] as Map
+        : const {};
+
     final debut =
-        DateTime.tryParse(json['date_debut']?.toString() ?? '') ??
+        DateTime.tryParse(
+          (period['start_date'] ?? json['date_debut'])?.toString() ?? '',
+        ) ??
         DateTime.now();
-    final fin = DateTime.tryParse(json['date_fin']?.toString() ?? '') ?? debut;
-    final unite = json['unit_name']?.toString() ?? '';
+    final fin =
+        DateTime.tryParse(
+          (period['end_date'] ?? json['date_fin'])?.toString() ?? '',
+        ) ??
+        debut;
+
+    final nomService =
+        (service['name'] ?? json['service_name'] ?? json['unit_name'] ?? '')
+            .toString();
+    final nomUnite = unit['name']?.toString();
+    final titreAffiche = nomUnite != null && nomUnite.isNotEmpty
+        ? '$nomService ($nomUnite)'
+        : nomService;
+
+    final nomSuperviseur = (supervisor['name'] ?? json['supervisor_name'] ?? '')
+        .toString();
+    final objectifs = (json['objectives'] ?? json['objectifs'] ?? '')
+        .toString();
+    final statutRotation = (json['status'] ?? json['statut'])?.toString() ?? '';
+
+    final estActif = statutRotation == 'ACTIVE' || statutRotation == 'EN_COURS';
+    final estTermine = statutRotation == 'TERMINEE';
 
     return TachePlanning(
       id:
+          json['uuid']?.toString() ??
           json['rotation_uuid']?.toString() ??
           json['rotation_id']?.toString() ??
+          json['id']?.toString() ??
           '',
-      titre: unite.isEmpty ? 'Rotation de stage' : unite,
+      titre: titreAffiche,
       date: dateAffichee ?? debut,
-      heureDebut: '',
-      heureFin: '',
+      heureDebut:
+          '${debut.day.toString().padLeft(2, '0')}/${debut.month.toString().padLeft(2, '0')}',
+      heureFin:
+          '${fin.day.toString().padLeft(2, '0')}/${fin.month.toString().padLeft(2, '0')}',
       type: 'Stage',
-      service: unite,
+      service: nomService,
       departement: nomHopital,
-      superviseur: json['supervisor_name']?.toString() ?? '',
-      description: json['objectifs']?.toString() ?? '',
-      lieu: nomHopital.isEmpty ? unite : '$unite • $nomHopital',
-      statut: json['statut']?.toString() ?? '',
+      superviseur: nomSuperviseur,
+      description: objectifs,
+      lieu: nomHopital.isEmpty ? titreAffiche : '$titreAffiche • $nomHopital',
+      statut: estActif
+          ? 'En cours'
+          : (estTermine
+                ? 'Terminée'
+                : (statutRotation == 'PLANIFIEE'
+                      ? 'Planifiée'
+                      : statutRotation)),
       noteRappel: 'Du ${_dateCourte(debut)} au ${_dateCourte(fin)}',
-      couleur: const Color(0xFF10B981),
+      couleur: estActif
+          ? const Color(0xFF2563EB)
+          : (estTermine ? const Color(0xFF16A34A) : const Color(0xFFF59E0B)),
     );
   }
 

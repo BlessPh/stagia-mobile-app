@@ -8,6 +8,11 @@ import '../../data/datasources/source_campagne_mock.dart';
 import '../../domain/entities/campagne_stage.dart';
 import 'reservation_page.dart';
 
+import 'dart:async';
+import '../../../../core/services/sse_notifications_service.dart';
+import '../../../../core/network/client_api_http.dart';
+import '../../../../core/network/source_etudiant_distante.dart';
+
 class HopitauxDisponiblesPage extends StatefulWidget {
   const HopitauxDisponiblesPage({
     this.campagne,
@@ -24,13 +29,20 @@ class HopitauxDisponiblesPage extends StatefulWidget {
 }
 
 class _HopitauxDisponiblesPageState extends State<HopitauxDisponiblesPage> {
+  final _sourceEtudiant = SourceEtudiantDistante(ClientApiHttp());
   late final CampagneStage _campagne;
   late HopitalCampagne _hopitalSelectionne;
   final MapController _mapController = MapController();
+  Map<String, dynamic>? _counts;
+  StreamSubscription? _sseSubscription;
 
   @override
   void initState() {
     super.initState();
+    _chargerCounts();
+    _sseSubscription = SseNotificationsService.instance.fluxCompteurs.listen((counts) {
+      if (mounted) setState(() => _counts = counts);
+    });
     _campagne =
         widget.campagne ??
         (ConfigurationApi.utiliserDonneesMockees
@@ -39,10 +51,28 @@ class _HopitauxDisponiblesPageState extends State<HopitauxDisponiblesPage> {
     _hopitalSelectionne =
         widget.hopitalInitial ??
         (_campagne.hopitaux.isNotEmpty
-            ? _campagne.hopitaux.first
+            ? _campagne.hopitaux.firstWhere(
+                (hopital) => hopital.peutReserver,
+                orElse: () => _campagne.hopitaux.first,
+              )
             : ConfigurationApi.utiliserDonneesMockees
             ? SourceCampagneMock.campagnePrincipale.hopitaux.first
             : throw StateError('Aucun hôpital disponible.'));
+  }
+
+  Future<void> _chargerCounts() async {
+    try {
+      final res = await _sourceEtudiant.notificationCounts();
+      if (mounted) {
+        setState(() => _counts = res);
+      }
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _sseSubscription?.cancel();
+    super.dispose();
   }
 
   void _selectionnerHopital(HopitalCampagne hopital) {
@@ -236,7 +266,9 @@ class _HopitauxDisponiblesPageState extends State<HopitauxDisponiblesPage> {
                           hopital: hopital,
                           estSelectionne: estSelectionne,
                           onSelectionner: () => _selectionnerHopital(hopital),
-                          onReserver: _campagne.autoriseReservationAutonome
+                          onReserver:
+                              _campagne.autoriseReservationAutonome &&
+                                  hopital.peutReserver
                               ? () {
                                   Navigator.of(context).push(
                                     MaterialPageRoute<void>(
@@ -280,7 +312,9 @@ class _HopitauxDisponiblesPageState extends State<HopitauxDisponiblesPage> {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: _FicheDetailHopital(
                       hopital: _hopitalSelectionne,
-                      onReserver: _campagne.autoriseReservationAutonome
+                      onReserver:
+                          _campagne.autoriseReservationAutonome &&
+                              _hopitalSelectionne.peutReserver
                           ? () {
                               Navigator.of(context).push(
                                 MaterialPageRoute<void>(
@@ -304,6 +338,9 @@ class _HopitauxDisponiblesPageState extends State<HopitauxDisponiblesPage> {
   }
 
   PreferredSizeWidget _buildAppBar(BuildContext context) {
+    final unreadNotifs =
+        int.tryParse(_counts?['notifications']?.toString() ?? '0') ?? 0;
+
     return AppBar(
       backgroundColor: const Color(0xFFF8FAFC),
       surfaceTintColor: Colors.transparent,
@@ -332,11 +369,14 @@ class _HopitauxDisponiblesPageState extends State<HopitauxDisponiblesPage> {
           children: [
             IconButton(
               tooltip: 'Notifications',
-              onPressed: () => Navigator.of(context, rootNavigator: true).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const NotificationsPage(),
-                ),
-              ),
+              onPressed: () async {
+                await Navigator.of(context, rootNavigator: true).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const NotificationsPage(),
+                  ),
+                );
+                _chargerCounts();
+              },
               icon: const Icon(
                 Icons.notifications_none_rounded,
                 color: Color(0xFF0F172A),
@@ -344,28 +384,29 @@ class _HopitauxDisponiblesPageState extends State<HopitauxDisponiblesPage> {
               ),
               visualDensity: VisualDensity.compact,
             ),
-            Positioned(
-              top: 5,
-              right: 6,
-              child: Container(
-                padding: const EdgeInsets.all(3),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFEF4444),
-                  shape: BoxShape.circle,
-                ),
-                constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                child: const Text(
-                  '5',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.w800,
-                    height: 1,
+            if (unreadNotifs > 0)
+              Positioned(
+                top: 5,
+                right: 6,
+                child: Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFEF4444),
+                    shape: BoxShape.circle,
+                  ),
+                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                  child: Text(
+                    '$unreadNotifs',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w800,
+                      height: 1,
+                    ),
                   ),
                 ),
               ),
-            ),
           ],
         ),
         const SizedBox(width: 8),
@@ -462,16 +503,22 @@ class _CarteHopitalHorizontal extends StatelessWidget {
             ),
 
             // Distance & Localisation
-            Text(
-              '${hopital.distanceKm.toStringAsFixed(1)} km • ${hopital.localisationCourte}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFF64748B),
+            if (hopital.distanceKm > 0 || hopital.localisationCourte.isNotEmpty)
+              Text(
+                [
+                  if (hopital.distanceKm > 0)
+                    '${hopital.distanceKm.toStringAsFixed(1)} km',
+                  if (hopital.localisationCourte.isNotEmpty)
+                    hopital.localisationCourte,
+                ].join(' • '),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: const Color(0xFF64748B),
+                ),
               ),
-            ),
 
             // Ligne d'actions : "Voir itinéraire" + Bouton "Réserver"
             Row(
@@ -507,7 +554,7 @@ class _CarteHopitalHorizontal extends StatelessWidget {
                         elevation: 0,
                       ),
                       child: Text(
-                        'Réserver',
+                        hopital.peutReserver ? 'Réserver' : 'Complet',
                         style: GoogleFonts.inter(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
@@ -562,105 +609,163 @@ class _FicheDetailHopital extends StatelessWidget {
               color: const Color(0xFF0F172A),
             ),
           ),
-          const SizedBox(height: 3),
-          Text(
-            hopital.description,
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: const Color(0xFF64748B),
-            ),
-          ),
-
-          const SizedBox(height: 14),
-
-          // Adresse
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(
-                Icons.location_on_outlined,
-                size: 18,
-                color: Color(0xFF64748B),
+          if (hopital.description.isNotEmpty) ...[
+            const SizedBox(height: 3),
+            Text(
+              hopital.description,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF64748B),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  hopital.adresse ?? '${hopital.commune}, ${hopital.ville}',
+            ),
+          ],
+          if ((hopital.adresse?.trim().isNotEmpty ?? false) ||
+              hopital.localisationCourte.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.location_on_outlined,
+                  size: 18,
+                  color: Color(0xFF64748B),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    (hopital.adresse?.trim().isNotEmpty ?? false)
+                        ? hopital.adresse!
+                        : hopital.localisationCourte,
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: const Color(0xFF475569),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (hopital.telephone.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(
+                  Icons.phone_outlined,
+                  size: 17,
+                  color: Color(0xFF64748B),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  hopital.telephone,
                   style: GoogleFonts.inter(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                     color: const Color(0xFF475569),
                   ),
                 ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 8),
-
-          // Téléphone
-          Row(
-            children: [
-              const Icon(
-                Icons.phone_outlined,
-                size: 17,
-                color: Color(0xFF64748B),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                hopital.telephone,
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: const Color(0xFF475569),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 16),
-
-          // Titre des services ouverts
+              ],
+            ),
+          ],
+          const SizedBox(height: 14),
           Text(
-            'SERVICES OUVERTS AUX STAGIAIRES',
+            '${hopital.placesRestantesEffectives} place(s) disponible(s) sur ${hopital.capacite}',
             style: GoogleFonts.inter(
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.6,
-              color: const Color(0xFF0F172A),
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: hopital.peutReserver
+                  ? const Color(0xFF15803D)
+                  : const Color(0xFFDC2626),
             ),
           ),
-
-          const SizedBox(height: 10),
-
-          // Badges des services
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: hopital.services.map((service) {
-              return Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6.5,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  service,
-                  style: GoogleFonts.inter(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF2563EB),
+          const SizedBox(height: 6),
+          Text(
+            hopital.fraisRequis
+                ? 'Frais requis : ${_formaterMontant(hopital.montantFrais)} ${hopital.devise}'
+                      .trim()
+                : 'Aucun frais requis',
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF475569),
+            ),
+          ),
+          if (hopital.conditions != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              hopital.conditions!,
+              style: GoogleFonts.inter(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF64748B),
+              ),
+            ),
+          ],
+          if (hopital.services.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text(
+              'SERVICES OUVERTS AUX STAGIAIRES',
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.6,
+                color: const Color(0xFF0F172A),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: hopital.services.map((service) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6.5,
                   ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    service,
+                    style: GoogleFonts.inter(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF2563EB),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: onReserver,
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF1D61F2),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-              );
-            }).toList(),
+              ),
+              child: Text(
+                hopital.peutReserver ? 'Réserver' : 'Aucune place disponible',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+              ),
+            ),
           ),
         ],
       ),
     );
+  }
+
+  String _formaterMontant(double montant) {
+    if (montant <= 0) return 'Montant non communiqué';
+    return montant == montant.roundToDouble()
+        ? montant.toStringAsFixed(0)
+        : montant.toStringAsFixed(2);
   }
 }

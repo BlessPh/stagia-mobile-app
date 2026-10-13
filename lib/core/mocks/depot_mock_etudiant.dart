@@ -7,23 +7,48 @@ abstract final class DepotMockEtudiant {
   static bool _campagnesConsultees = false;
   static final List<Map<String, dynamic>> _candidatures = [
     {
+      'uuid': '9fb326fc-38a9-4eed-96ef-c33dfe55cc83',
+      'application_status': 'ACCEPTEE',
+      'statut': 'ACCEPTEE',
+      'motivation': 'Je souhaite effectuer ce stage dans cet établissement.',
+      'refusal_reason': null,
+      'campaign_id': 39,
+      'campaign_code': 'CAM-000039',
+      'campaign_title': "Stage de fin d'année 2026",
+      'campaign_start': '2026-10-01',
+      'campaign_end': '2027-01-31',
+      'hospital_id': 8,
+      'hospital_name': 'Hôpital Général',
+      'reservation_uuid': '24e27142-f88d-4655-b7db-1ae4f27e39b0',
+      'reservation_status': 'EN_ATTENTE_PAIEMENT',
+      'placement': null,
+      'admission_uuid': null,
+      'assignment_uuid': null,
+      'assignment_status': null,
+      'completion_status': null,
+      'workflow_status': 'EN_ATTENTE_PAIEMENT',
+      'workflow_message':
+          'Votre réservation a été approuvée. Le paiement reste requis.',
+      'submitted_at': '2026-09-15 08:30:00',
+    },
+    {
       'uuid': 'app-candidature-001',
+      'application_status': 'SOUMISE',
       'statut': 'SOUMISE',
       'motivation': 'Je souhaite perfectionner ma pratique clinique.',
-      'motif_refus': null,
-      'submitted_at': '2026-09-15 08:30:00',
-      'responded_at': null,
+      'refusal_reason': null,
+      'campaign_id': 1,
       'campaign_code': 'CAM-STAGIA-001',
       'campaign_title': 'Campagne de stages professionnels 2026',
       'campaign_start': '2026-10-01',
       'campaign_end': '2027-01-31',
-      'hospital_code': 'ENT-001',
+      'hospital_id': 1,
       'hospital_name': 'Cliniques Universitaires de Kinshasa',
       'ville': 'Lemba',
       'province': 'Kinshasa',
       'reservation_uuid': 'STG-RES-84920',
       'reservation_status': 'RESERVEE_TEMPORAIREMENT',
-      'expires_at': '2026-09-19 18:30:00',
+      'expires_at': '2026-10-15 18:30:00',
       'confirmed_at': null,
       'admitted': false,
       'assignment_uuid': null,
@@ -31,34 +56,118 @@ abstract final class DepotMockEtudiant {
       'completion_status': null,
       'taux_presence': null,
       'note_finale': null,
-      'workflow_status': 'RESERVATION_TEMPORAIRE',
+      'workflow_status': 'DECISION_UNIVERSITAIRE_EN_ATTENTE',
+      'workflow_message':
+          "Votre réservation attend la décision de l'université.",
+      'submitted_at': '2026-09-20 09:00:00',
+      'actions': {
+        'cancel': {
+          'allowed': true,
+          'method': 'POST',
+          'endpoint':
+              '/api/v1/student/reservations/STG-RES-84920/cancel',
+        },
+      },
     },
   ];
   static final List<Map<String, dynamic>> _reservations = [
     {
+      'reservation': {
+        'uuid': '24e27142-f88d-4655-b7db-1ae4f27e39b0',
+        'status': 'EN_ATTENTE_PAIEMENT',
+        'expires_at': '2026-10-18 12:00:00',
+      },
+      'application': {
+        'uuid': '9fb326fc-38a9-4eed-96ef-c33dfe55cc83',
+        'status': 'ACCEPTEE',
+      },
+      'campaign': {
+        'id': 39,
+        'code': 'CAM-000039',
+        'title': "Stage de fin d'année 2026",
+      },
+      'hospital': {
+        'id': 8,
+        'name': 'Hôpital Général',
+      },
+      'payment': {
+        'required': true,
+        'status': 'PENDING',
+      },
+      'placement': null,
+      'admission': null,
+      'assignment': null,
+      'completion': null,
+      'workflow': {
+        'status': 'EN_ATTENTE_PAIEMENT',
+        'message':
+            'Votre réservation a été approuvée. Le paiement reste requis.',
+      },
+      'actions': {
+        'cancel': {
+          'allowed': false,
+          'method': 'POST',
+          'endpoint':
+              '/api/v1/student/reservations/24e27142-f88d-4655-b7db-1ae4f27e39b0/cancel',
+        },
+      },
+      // Compatibilité clés directes
+      'uuid': '24e27142-f88d-4655-b7db-1ae4f27e39b0',
+      'statut': 'EN_ATTENTE_PAIEMENT',
+      'application_uuid': '9fb326fc-38a9-4eed-96ef-c33dfe55cc83',
+      'campaign_code': 'CAM-000039',
+      'campaign_title': "Stage de fin d'année 2026",
+      'hospital_name': 'Hôpital Général',
+      'workflow_status': 'EN_ATTENTE_PAIEMENT',
+    },
+    {
+      'reservation': {
+        'uuid': 'STG-RES-84920',
+        'status': 'RESERVEE_TEMPORAIREMENT',
+        'expires_at': '2026-10-15 18:30:00',
+      },
+      'application': {
+        'uuid': 'app-candidature-001',
+        'status': 'SOUMISE',
+      },
+      'campaign': {
+        'id': 1,
+        'code': 'CAM-STAGIA-001',
+        'title': 'Campagne de stages professionnels 2026',
+      },
+      'hospital': {
+        'id': 1,
+        'name': 'Cliniques Universitaires de Kinshasa',
+      },
+      'payment': {
+        'required': false,
+        'status': 'NOT_REQUIRED',
+      },
+      'placement': null,
+      'admission': null,
+      'assignment': null,
+      'completion': null,
+      'workflow': {
+        'status': 'DECISION_UNIVERSITAIRE_EN_ATTENTE',
+        'message':
+            "Votre réservation attend la décision de l'université.",
+      },
+      'actions': {
+        'cancel': {
+          'allowed': true,
+          'method': 'POST',
+          'endpoint':
+              '/api/v1/student/reservations/STG-RES-84920/cancel',
+        },
+      },
+      // Compatibilité clés directes
       'uuid': 'STG-RES-84920',
       'statut': 'RESERVEE_TEMPORAIREMENT',
-      'expires_at': '2026-09-19 18:30:00',
-      'confirmed_at': null,
       'application_uuid': 'app-candidature-001',
-      'application_status': 'SOUMISE',
       'campaign_code': 'CAM-STAGIA-001',
       'campaign_title': 'Campagne de stages professionnels 2026',
-      'campaign_start': '2026-10-01',
-      'campaign_end': '2027-01-31',
-      'hospital_code': 'ENT-001',
       'hospital_name': 'Cliniques Universitaires de Kinshasa',
-      'ville': 'Lemba',
-      'province': 'Kinshasa',
-      'frais_requis': false,
-      'montant_frais': null,
-      'devise': null,
-      'admitted': false,
-      'assignment_uuid': null,
-      'assignment_status': null,
-      'completion_status': null,
-      'expired': false,
-      'workflow_status': 'EN_ATTENTE_VALIDATION',
+      'workflow_status': 'DECISION_UNIVERSITAIRE_EN_ATTENTE',
     },
   ];
 
@@ -319,6 +428,348 @@ abstract final class DepotMockEtudiant {
     _candidatures.insert(0, candidature);
     changements.value++;
     return Map<String, dynamic>.from(candidature);
+  }
+
+  static Map<String, dynamic> annulerReservation(String reservationUuid) {
+    for (final res in _reservations) {
+      final u = res['uuid'] ?? (res['reservation'] is Map ? res['reservation']['uuid'] : null);
+      if (u == reservationUuid) {
+        if (res['reservation'] is Map) {
+          res['reservation']['status'] = 'ANNULEE';
+        }
+        res['statut'] = 'ANNULEE';
+        if (res['workflow'] is Map) {
+          res['workflow']['status'] = 'ANNULEE';
+          res['workflow']['message'] = 'Votre réservation a été annulée.';
+        }
+        res['workflow_status'] = 'ANNULEE';
+        if (res['actions'] is Map && res['actions']['cancel'] is Map) {
+          res['actions']['cancel']['allowed'] = false;
+        }
+        break;
+      }
+    }
+    for (final cand in _candidatures) {
+      if (cand['reservation_uuid'] == reservationUuid || cand['uuid'] == reservationUuid) {
+        cand['reservation_status'] = 'ANNULEE';
+        cand['application_status'] = 'ANNULEE';
+        cand['statut'] = 'ANNULEE';
+        cand['workflow_status'] = 'ANNULEE';
+        cand['workflow_message'] = 'Votre réservation a été annulée.';
+        if (cand['actions'] is Map && cand['actions']['cancel'] is Map) {
+          cand['actions']['cancel']['allowed'] = false;
+        }
+        break;
+      }
+    }
+    changements.value++;
+    return {
+      'success': true,
+      'message': 'Réservation annulée.',
+      'data': {
+        'reservation_uuid': reservationUuid,
+        'reservation_status': 'ANNULEE',
+        'application_status': 'ANNULEE',
+        'idempotent': false,
+      },
+    };
+  }
+
+  static final List<Map<String, dynamic>> _obligations = [
+    {
+      'uuid': '109114cb-d48f-4220-8e67-0bc7469d6abd',
+      'reference': 'OBL-2026-000052',
+      'type': 'STAGE_RESERVATION',
+      'subject': {'type': 'STAGE_RESERVATION', 'key': '92'},
+      'label': 'Frais de réservation de stage',
+      'amount': 25,
+      'currency': 'USD',
+      'status': 'PENDING',
+      'amount_paid': 0,
+      'amount_remaining': 25,
+      'payment_status': 'NOT_STARTED',
+      'payable': true,
+      'payment_pending': false,
+      'due_at': null,
+      'payments': <Map<String, dynamic>>[],
+      'context': {
+        'type': 'STAGE_RESERVATION',
+        'reservation': {
+          'uuid': '24e27142-f88d-4655-b7db-1ae4f27e39b0',
+          'status': 'EN_ATTENTE_PAIEMENT',
+          'expires_at': null,
+        },
+        'application': {
+          'uuid': '9fb326fc-38a9-4eed-96ef-c33dfe55cc83',
+          'status': 'ACCEPTEE',
+        },
+        'campaign': {
+          'id': 39,
+          'uuid': 'campaign-uuid-39',
+          'code': 'CAM-000039',
+          'title': "Stage de fin d'année 2026",
+          'start_date': '2026-10-01',
+          'end_date': '2026-10-31',
+        },
+        'hospital': {
+          'id': 8,
+          'code': 'HOP-001',
+          'name': 'Hôpital Général',
+          'phone': '+243810000000',
+          'email': null,
+          'address': 'Avenue de la Santé, Kinshasa',
+          'city': 'Kinshasa',
+          'province': 'Kinshasa',
+        },
+        'invoice': {
+          'uuid': 'invoice-uuid-52',
+          'reference': 'FAC-STG-00000052',
+          'amount': 25,
+          'currency': 'USD',
+          'status': 'EMISE',
+          'issued_at': '2026-10-08 10:00:00',
+          'due_at': null,
+          'paid_at': null,
+        },
+      },
+      'actions': {
+        'initiate': {
+          'allowed': true,
+          'method': 'POST',
+          'path': '/api/v1/student/payments/initiate',
+          'required_body': ['obligation_uuid', 'channel', 'phone_number'],
+          'required_header': 'Idempotency-Key',
+        },
+        'sync': {
+          'allowed': false,
+          'method': 'POST',
+          'path': '/api/v1/student/payments/sync',
+          'body': {'obligation_uuid': '109114cb-d48f-4220-8e67-0bc7469d6abd'},
+        },
+      },
+    },
+  ];
+
+  static Map<String, dynamic> listePaiements() {
+    final obligationsList = _obligations.map(Map<String, dynamic>.from).toList();
+    final itemsList = <Map<String, dynamic>>[
+      {
+        'application_uuid': '9fb326fc-38a9-4eed-96ef-c33dfe55cc83',
+        'reservation_uuid': '24e27142-f88d-4655-b7db-1ae4f27e39b0',
+        'reservation_status': _obligations.first['status'] == 'PAID'
+            ? 'CONFIRMEE'
+            : 'EN_ATTENTE_PAIEMENT',
+        'campaign': {
+          'id': 39,
+          'code': 'CAM-000039',
+          'title': "Stage de fin d'année 2026",
+        },
+        'hospital': {
+          'id': 8,
+          'name': 'Hôpital Général',
+        },
+        'payment_required': true,
+        'payment_allowed': _obligations.first['payable'] == true,
+        'payment_status': _obligations.first['payment_status'],
+        'amount_required': _obligations.first['amount'],
+        'amount_validated': _obligations.first['amount_paid'],
+        'amount_remaining': _obligations.first['amount_remaining'],
+        'currency': _obligations.first['currency'],
+        'invoice': (_obligations.first['context'] as Map?)?['invoice'] ?? {},
+        'obligation': _obligations.first,
+        'payments': _obligations.first['payments'],
+      },
+    ];
+
+    final payableCount = obligationsList.where((o) => o['payable'] == true).length;
+    final paidCount = obligationsList.where((o) => o['status'] == 'PAID').length;
+    final pendingCount = obligationsList.where((o) => o['payment_pending'] == true).length;
+
+    return {
+      'items': itemsList,
+      'obligations': obligationsList,
+      'obligation_stats': {
+        'total': obligationsList.length,
+        'payable': payableCount,
+        'pending': pendingCount,
+        'paid': paidCount,
+        'failed': 0,
+        'cancelled': 0,
+        'expired': 0,
+      },
+      'stats': {
+        'total': itemsList.length,
+        'payable': payableCount,
+        'paid': paidCount,
+        'pending': pendingCount,
+        'failed': 0,
+        'free': 0,
+      },
+      'channels': {
+        'MPESA': 'M-Pesa',
+        'ORANGE_MONEY': 'Orange Money',
+        'AIRTEL_MONEY': 'Airtel Money',
+        'AFRIMONEY': 'Afrimoney',
+        'BANQUE': 'Banque',
+        'CARTE': 'Carte bancaire',
+      },
+    };
+  }
+
+  static Map<String, dynamic> detailObligation(String obligationUuid) {
+    for (final obl in _obligations) {
+      if (obl['uuid'] == obligationUuid || obl['reference'] == obligationUuid) {
+        return {
+          'obligation': Map<String, dynamic>.from(obl),
+        };
+      }
+    }
+    // Si non trouvé, retourne la première ou crée une structure par défaut
+    if (_obligations.isNotEmpty) {
+      return {
+        'obligation': Map<String, dynamic>.from(_obligations.first),
+      };
+    }
+    return {'obligation': <String, dynamic>{}};
+  }
+
+  static Map<String, dynamic> initierPaiement({
+    required String obligationUuid,
+    required String channel,
+    required String phoneNumber,
+    String? idempotencyKey,
+  }) {
+    Map<String, dynamic>? targetObligation;
+    for (final obl in _obligations) {
+      if (obl['uuid'] == obligationUuid || obl['reference'] == obligationUuid) {
+        targetObligation = obl;
+        break;
+      }
+    }
+    targetObligation ??= _obligations.first;
+
+    final payUuid = 'pay-mock-${DateTime.now().millisecondsSinceEpoch}';
+    final ref = 'PAY-2026-${DateTime.now().millisecondsSinceEpoch % 100000}';
+    final montant = targetObligation['amount_remaining'] ?? 25;
+    final devise = targetObligation['currency'] ?? 'USD';
+
+    final paiement = <String, dynamic>{
+      'created': true,
+      'idempotent': false,
+      'uuid': payUuid,
+      'reference': ref,
+      'transaction_reference': 'MP-${DateTime.now().millisecondsSinceEpoch % 1000000}',
+      'amount': montant,
+      'currency': devise,
+      'channel': channel,
+      'operator': channel == 'MPESA'
+          ? 'VODACOM'
+          : channel == 'ORANGE_MONEY'
+              ? 'ORANGE'
+              : channel == 'AIRTEL_MONEY'
+                  ? 'AIRTEL'
+                  : 'AFRICELL',
+      'status': 'INITIE',
+      'phone_number': phoneNumber,
+      'initiated_at': DateTime.now().toIso8601String().substring(0, 19).replaceAll('T', ' '),
+    };
+
+    targetObligation['payment_pending'] = true;
+    targetObligation['payment_status'] = 'PENDING';
+    (targetObligation['payments'] as List).add(paiement);
+
+    if (targetObligation['actions'] is Map) {
+      final act = targetObligation['actions'] as Map;
+      if (act['sync'] is Map) {
+        act['sync']['allowed'] = true;
+      }
+    }
+
+    changements.value++;
+
+    return {
+      'payment': paiement,
+      'obligation': {
+        'uuid': targetObligation['uuid'],
+        'reference': targetObligation['reference'],
+        'status': targetObligation['status'],
+        'amount': targetObligation['amount'],
+        'currency': targetObligation['currency'],
+      },
+      'reservation_uuid': '24e27142-f88d-4655-b7db-1ae4f27e39b0',
+    };
+  }
+
+  static Map<String, dynamic> synchroniserPaiement({
+    required String obligationUuid,
+  }) {
+    Map<String, dynamic>? targetObligation;
+    for (final obl in _obligations) {
+      if (obl['uuid'] == obligationUuid || obl['reference'] == obligationUuid) {
+        targetObligation = obl;
+        break;
+      }
+    }
+    targetObligation ??= _obligations.first;
+
+    // Simulation du passage au statut validé / payé
+    targetObligation['status'] = 'PAID';
+    targetObligation['payment_status'] = 'PAID';
+    targetObligation['payment_pending'] = false;
+    targetObligation['payable'] = false;
+    final montantTotal = targetObligation['amount'] ?? 25;
+    targetObligation['amount_paid'] = montantTotal;
+    targetObligation['amount_remaining'] = 0;
+
+    // Mise à jour de la facture dans le contexte
+    if (targetObligation['context'] is Map &&
+        (targetObligation['context'] as Map)['invoice'] is Map) {
+      ((targetObligation['context'] as Map)['invoice'] as Map)['status'] = 'PAYEE';
+      ((targetObligation['context'] as Map)['invoice'] as Map)['paid_at'] =
+          DateTime.now().toIso8601String().substring(0, 19).replaceAll('T', ' ');
+    }
+
+    // Mise à jour de la réservation
+    for (final res in _reservations) {
+      if (res['uuid'] == '24e27142-f88d-4655-b7db-1ae4f27e39b0') {
+        res['statut'] = 'CONFIRMEE';
+        res['workflow_status'] = 'PLACEMENT_UNIVERSITAIRE_EN_ATTENTE';
+        if (res['payment'] is Map) {
+          res['payment']['status'] = 'PAID';
+        }
+        if (res['workflow'] is Map) {
+          res['workflow']['status'] = 'PLACEMENT_UNIVERSITAIRE_EN_ATTENTE';
+          res['workflow']['message'] =
+              'Paiement validé. Votre réservation attend son placement universitaire.';
+        }
+        break;
+      }
+    }
+
+    // Mise à jour de la candidature
+    for (final cand in _candidatures) {
+      if (cand['reservation_uuid'] == '24e27142-f88d-4655-b7db-1ae4f27e39b0') {
+        cand['reservation_status'] = 'CONFIRMEE';
+        cand['workflow_status'] = 'PLACEMENT_UNIVERSITAIRE_EN_ATTENTE';
+        cand['workflow_message'] =
+            'Paiement validé. Votre réservation attend son placement universitaire.';
+        break;
+      }
+    }
+
+    changements.value++;
+
+    return {
+      'reservation_uuid': '24e27142-f88d-4655-b7db-1ae4f27e39b0',
+      'reservation_status': 'CONFIRMEE',
+      'payment_status': 'PAID',
+      'invoice_status': 'PAYEE',
+      'amount_required': montantTotal,
+      'amount_validated': montantTotal,
+      'amount_remaining': 0,
+      'currency': targetObligation['currency'] ?? 'USD',
+      'placement_pending': true,
+    };
   }
 
   static void ajouterActivite({

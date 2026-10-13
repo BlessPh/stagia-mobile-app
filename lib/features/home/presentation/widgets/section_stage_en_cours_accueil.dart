@@ -31,6 +31,21 @@ class SectionStageEnCoursAccueil extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
+    final fondCarte = modeSombre ? const Color(0xFF1E293B) : Colors.white;
+    final fondSecondaire = modeSombre
+        ? const Color(0xFF0F172A)
+        : const Color(0xFFF1F5F9);
+    final bordure = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFE2E8F0);
+    final textePrincipal = modeSombre ? Colors.white : const Color(0xFF0F172A);
+    final texteRenforce = modeSombre
+        ? const Color(0xFFE2E8F0)
+        : const Color(0xFF1E293B);
+    final texteSecondaire = modeSombre
+        ? const Color(0xFF94A3B8)
+        : const Color(0xFF64748B);
     final progression = totalJours > 0
         ? (joursEffectues / totalJours).clamp(0.0, 1.0)
         : 0.0;
@@ -48,7 +63,7 @@ class SectionStageEnCoursAccueil extends StatelessWidget {
               style: GoogleFonts.inter(
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
-                color: const Color(0xFF0F172A),
+                color: textePrincipal,
               ),
             ),
             Container(
@@ -57,7 +72,9 @@ class SectionStageEnCoursAccueil extends StatelessWidget {
                 vertical: 4.5,
               ),
               decoration: BoxDecoration(
-                color: const Color(0xFFE0F2FE),
+                color: modeSombre
+                    ? const Color(0xFF0C4A6E)
+                    : const Color(0xFFE0F2FE),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
@@ -65,7 +82,9 @@ class SectionStageEnCoursAccueil extends StatelessWidget {
                 style: GoogleFonts.inter(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: const Color(0xFF0284C7),
+                  color: modeSombre
+                      ? const Color(0xFF7DD3FC)
+                      : const Color(0xFF0284C7),
                 ),
               ),
             ),
@@ -83,12 +102,14 @@ class SectionStageEnCoursAccueil extends StatelessWidget {
             child: Container(
               width: double.infinity,
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: fondCarte,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-                boxShadow: const [
+                border: Border.all(color: bordure),
+                boxShadow: [
                   BoxShadow(
-                    color: Color(0x0A000000),
+                    color: modeSombre
+                        ? const Color(0x33000000)
+                        : const Color(0x0A000000),
                     blurRadius: 16,
                     offset: Offset(0, 4),
                   ),
@@ -123,7 +144,7 @@ class SectionStageEnCoursAccueil extends StatelessWidget {
                           style: GoogleFonts.inter(
                             fontSize: 17.5,
                             fontWeight: FontWeight.w800,
-                            color: const Color(0xFF0F172A),
+                            color: textePrincipal,
                           ),
                         ),
 
@@ -135,7 +156,7 @@ class SectionStageEnCoursAccueil extends StatelessWidget {
                             Container(
                               padding: const EdgeInsets.all(4),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFF1F5F9),
+                                color: fondSecondaire,
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: const Icon(
@@ -151,7 +172,7 @@ class SectionStageEnCoursAccueil extends StatelessWidget {
                                 style: GoogleFonts.inter(
                                   fontSize: 14.5,
                                   fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF1E293B),
+                                  color: texteRenforce,
                                 ),
                               ),
                             ),
@@ -169,7 +190,7 @@ class SectionStageEnCoursAccueil extends StatelessWidget {
                               style: GoogleFonts.inter(
                                 fontSize: 12.5,
                                 fontWeight: FontWeight.w500,
-                                color: const Color(0xFF64748B),
+                                color: texteSecondaire,
                               ),
                             ),
                             Text(
@@ -177,7 +198,7 @@ class SectionStageEnCoursAccueil extends StatelessWidget {
                               style: GoogleFonts.inter(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w800,
-                                color: const Color(0xFF0F172A),
+                                color: textePrincipal,
                               ),
                             ),
                           ],
@@ -191,7 +212,7 @@ class SectionStageEnCoursAccueil extends StatelessWidget {
                           child: LinearProgressIndicator(
                             value: progression,
                             minHeight: 7,
-                            backgroundColor: const Color(0xFFE2E8F0),
+                            backgroundColor: bordure,
                             valueColor: const AlwaysStoppedAnimation<Color>(
                               Color(0xFF6366F1),
                             ),
@@ -226,7 +247,7 @@ class SectionStageEnCoursAccueil extends StatelessWidget {
                               style: GoogleFonts.inter(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
-                                color: const Color(0xFF0F172A),
+                                color: textePrincipal,
                               ),
                             ),
                           ],
@@ -234,96 +255,88 @@ class SectionStageEnCoursAccueil extends StatelessWidget {
 
                         const SizedBox(height: 10),
 
-                        // Service actuel
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.medical_services_outlined,
-                              size: 18,
-                              color: Color(0xFF3B82F6),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Service actuel : $serviceActuel',
-                                style: GoogleFonts.inter(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF0F172A),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 10),
-
-                        // Jours restants dans ce service
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.calendar_today_outlined,
-                              size: 18,
-                              color: Color(0xFF3B82F6),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '$joursRestantsService jours restants dans ce service',
-                              style: GoogleFonts.inter(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w600,
-                                color: const Color(0xFF0F172A),
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 16),
-
-                        // Séparateur fin
-                        const Divider(height: 1, color: Color(0xFFF1F5F9)),
-
-                        const SizedBox(height: 12),
-
-                        // Encadreur (avatar + infos)
-                        Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 17,
-                              backgroundColor: const Color(0xFFE2E8F0),
-                              backgroundImage: const AssetImage(
-                                'assets/images/avatar_etudiant.jpg',
-                              ),
-                              child: const Icon(
-                                Icons.person,
+                        if (serviceActuel.isNotEmpty) ...[
+                          // Service actuel
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.medical_services_outlined,
                                 size: 18,
-                                color: Color(0xFF64748B),
+                                color: Color(0xFF3B82F6),
                               ),
-                            ),
-                            const SizedBox(width: 10),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Encadreur',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w500,
-                                    color: const Color(0xFF94A3B8),
-                                  ),
-                                ),
-                                Text(
-                                  nomEncadreur,
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Service actuel : $serviceActuel',
                                   style: GoogleFonts.inter(
                                     fontSize: 13.5,
                                     fontWeight: FontWeight.w700,
-                                    color: const Color(0xFF0F172A),
+                                    color: textePrincipal,
                                   ),
                                 ),
-                              ],
-                            ),
-                          ],
-                        ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.calendar_today_outlined,
+                                size: 18,
+                                color: Color(0xFF3B82F6),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '$joursRestantsService jours restants dans ce service',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: textePrincipal,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                        if (nomEncadreur.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          Divider(height: 1, color: bordure),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 17,
+                                backgroundColor: bordure,
+                                child: Icon(
+                                  Icons.person,
+                                  size: 18,
+                                  color: texteSecondaire,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Encadreur',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w500,
+                                      color: const Color(0xFF94A3B8),
+                                    ),
+                                  ),
+                                  Text(
+                                    nomEncadreur,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: textePrincipal,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),

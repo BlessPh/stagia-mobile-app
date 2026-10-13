@@ -3,7 +3,8 @@ import '../../../../core/network/endpoints_api.dart';
 import '../../../../core/network/configuration_api.dart';
 import '../../../../core/network/reponse_api.dart';
 import '../../../../core/mocks/donnees_etudiant_mockees.dart';
-import '../../../../core/mocks/depot_mock_etudiant.dart';
+import '../../../../core/mocks/scenario_etudiant_ui.dart';
+import '../mappers/mappeur_affectation_stage_api.dart';
 
 class SourceStageDistante {
   const SourceStageDistante(this._client);
@@ -100,12 +101,46 @@ class SourceStageDistante {
     return _normaliserListe(reponse['data']);
   }
 
-  Future<Map<String, dynamic>> stages() async {
+  Future<Map<String, dynamic>> stages({
+    dynamic status,
+    dynamic rotationStatus,
+    dynamic campaignId,
+    dynamic hospitalId,
+    String? dateFrom,
+    String? dateTo,
+    dynamic include,
+  }) async {
     if (ConfigurationApi.utiliserDonneesMockees) {
-      return DonneesEtudiantMockees.pourEndpoint(EndpointsApi.stagesEtudiant);
+      return MappeurAffectationStageApi.normaliserReponse(
+        DonneesEtudiantMockees.pourEndpoint(EndpointsApi.stagesEtudiant),
+      );
     }
 
-    final reponse = await _client.get(EndpointsApi.stagesEtudiant);
+    final parametres = <String, dynamic>{
+      if (status != null)
+        'status': status is List ? status.join(',') : status.toString(),
+      if (rotationStatus != null)
+        'rotation_status': rotationStatus is List
+            ? rotationStatus.join(',')
+            : rotationStatus.toString(),
+      if (campaignId != null)
+        'campaign_id': campaignId is List
+            ? campaignId.join(',')
+            : campaignId.toString(),
+      if (hospitalId != null)
+        'hospital_id': hospitalId is List
+            ? hospitalId.join(',')
+            : hospitalId.toString(),
+      'date_from': ?dateFrom,
+      'date_to': ?dateTo,
+      if (include != null)
+        'include': include is List ? include.join(',') : include.toString(),
+    };
+
+    final reponse = await _client.get(
+      EndpointsApi.stagesEtudiant,
+      parametres: parametres.isEmpty ? null : parametres,
+    );
     if (reponse['success'] != true) {
       throw ErreurApi(
         code: 'REPONSE_API_REFUSEE',
@@ -113,7 +148,9 @@ class SourceStageDistante {
         details: reponse['data'],
       );
     }
-    return _normaliserListe(reponse['data']);
+    return MappeurAffectationStageApi.normaliserReponse(
+      _normaliserListe(reponse['data']),
+    );
   }
 
   Future<Map<String, dynamic>> reserver({
@@ -127,15 +164,11 @@ class SourceStageDistante {
     String? localisation,
   }) async {
     if (ConfigurationApi.utiliserDonneesMockees) {
-      return DepotMockEtudiant.ajouterReservation(
+      return ScenarioEtudiantUi.creerReservation(
         campaignId: campaignId,
         academicEnrollmentId: academicEnrollmentId,
         participationId: participationId,
         motivation: motivation,
-        cleOption: cleOption,
-        campagneTitre: campagneTitre,
-        etablissementNom: etablissementNom,
-        localisation: localisation,
       );
     }
 
@@ -195,8 +228,16 @@ class SourceStageDistante {
   Future<Map<String, dynamic>> confirmerReservation(String reservationUuid) =>
       _client.post(EndpointsApi.confirmerReservationEtudiant(reservationUuid));
 
-  Future<Map<String, dynamic>> annulerReservation(String reservationUuid) =>
-      _client.post(EndpointsApi.annulerReservationEtudiant(reservationUuid));
+  Future<Map<String, dynamic>> annulerReservation(
+    String reservationUuid,
+  ) async {
+    if (ConfigurationApi.utiliserDonneesMockees) {
+      return ScenarioEtudiantUi.annulerReservation(reservationUuid);
+    }
+    return _client.post(
+      EndpointsApi.annulerReservationEtudiant(reservationUuid),
+    );
+  }
 
   /// Construit la liste canonique consommée par l'application mobile.
   ///

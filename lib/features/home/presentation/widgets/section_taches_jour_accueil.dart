@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../../core/network/configuration_api.dart';
-import '../../../planning/data/datasources/source_planning_mock.dart';
 import '../../../planning/domain/entities/tache_planning.dart';
 import '../../../planning/presentation/pages/detail_tache_page.dart';
 import '../../../planning/presentation/pages/planning_page.dart';
@@ -26,17 +24,7 @@ class SectionTachesJourAccueil extends StatelessWidget {
     }
     final now = DateTime.now();
     final dateNow = DateTime(now.year, now.month, now.day);
-    if (now.year == 2026 && now.month == 9) {
-      return dateNow;
-    }
-    if (ConfigurationApi.utiliserDonneesMockees &&
-        SourcePlanningMock.dateContientTaches(dateNow)) {
-      return dateNow;
-    }
-    // Date de référence par défaut dans la période mockée
-    return ConfigurationApi.utiliserDonneesMockees
-        ? DateTime(2026, 9, 17)
-        : dateNow;
+    return dateNow;
   }
 
   bool _memeJour(DateTime a, DateTime b) =>
@@ -65,6 +53,8 @@ class SectionTachesJourAccueil extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
+    final textePrincipal = modeSombre ? Colors.white : const Color(0xFF0F172A);
     final aujourdHui = _determinerDateReference();
     final demain = aujourdHui.add(const Duration(days: 1));
     final apresDemain = aujourdHui.add(const Duration(days: 2));
@@ -80,8 +70,6 @@ class SectionTachesJourAccueil extends StatelessWidget {
       tachesAujourdHui = tachesPersonnalisees!
           .where((t) => _memeJour(t.date, aujourdHui))
           .toList();
-    } else if (ConfigurationApi.utiliserDonneesMockees) {
-      tachesAujourdHui = SourcePlanningMock.obtenirTachesPourDate(aujourdHui);
     } else {
       tachesAujourdHui = const [];
     }
@@ -97,8 +85,6 @@ class SectionTachesJourAccueil extends StatelessWidget {
         tachesDemain = tachesPersonnalisees!
             .where((t) => _memeJour(t.date, demain))
             .toList();
-      } else if (ConfigurationApi.utiliserDonneesMockees) {
-        tachesDemain = SourcePlanningMock.obtenirTachesPourDate(demain);
       } else {
         tachesDemain = const [];
       }
@@ -110,10 +96,7 @@ class SectionTachesJourAccueil extends StatelessWidget {
       } else {
         // 3. Pas de tâche demain -> Tâches à venir (après demain)
         final List<TachePlanning> poolTaches =
-            tachesPersonnalisees ??
-            (ConfigurationApi.utiliserDonneesMockees
-                ? SourcePlanningMock.toutesLesTaches()
-                : const <TachePlanning>[]);
+            tachesPersonnalisees ?? const <TachePlanning>[];
 
         final tachesFutures =
             poolTaches.where((t) {
@@ -157,7 +140,7 @@ class SectionTachesJourAccueil extends StatelessWidget {
               style: GoogleFonts.inter(
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
-                color: const Color(0xFF0F172A),
+                color: textePrincipal,
               ),
             ),
             InkWell(
@@ -200,34 +183,67 @@ class SectionTachesJourAccueil extends StatelessWidget {
     TachePlanning tache, {
     bool afficherDate = false,
   }) {
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
+    final fondCarte = modeSombre ? const Color(0xFF1E293B) : Colors.white;
+    final separateur = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFF1F5F9);
+    final textePrincipal = modeSombre ? Colors.white : const Color(0xFF0F172A);
+    final texteSecondaire = modeSombre
+        ? const Color(0xFF94A3B8)
+        : const Color(0xFF64748B);
     Color fondBadge;
     Color texteBadge;
 
     switch (tache.type) {
       case 'Chirurgie':
-        fondBadge = const Color(0xFFEFF6FF);
-        texteBadge = const Color(0xFF2563EB);
+        fondBadge = modeSombre
+            ? const Color(0xFF1E3A5F)
+            : const Color(0xFFEFF6FF);
+        texteBadge = modeSombre
+            ? const Color(0xFF93C5FD)
+            : const Color(0xFF2563EB);
         break;
       case 'Projet':
-        fondBadge = const Color(0xFFFAF5FF);
-        texteBadge = const Color(0xFF9333EA);
+        fondBadge = modeSombre
+            ? const Color(0xFF3B255A)
+            : const Color(0xFFFAF5FF);
+        texteBadge = modeSombre
+            ? const Color(0xFFD8B4FE)
+            : const Color(0xFF9333EA);
         break;
       case 'Examen':
-        fondBadge = const Color(0xFFFFF7ED);
-        texteBadge = const Color(0xFFEA580C);
+        fondBadge = modeSombre
+            ? const Color(0xFF431C0D)
+            : const Color(0xFFFFF7ED);
+        texteBadge = modeSombre
+            ? const Color(0xFFFDBA74)
+            : const Color(0xFFEA580C);
         break;
       case 'Garde':
-        fondBadge = const Color(0xFFFEF2F2);
-        texteBadge = const Color(0xFFDC2626);
+        fondBadge = modeSombre
+            ? const Color(0xFF4C1D24)
+            : const Color(0xFFFEF2F2);
+        texteBadge = modeSombre
+            ? const Color(0xFFFCA5A5)
+            : const Color(0xFFDC2626);
         break;
       case 'Cours':
-        fondBadge = const Color(0xFFEFF6FF);
-        texteBadge = const Color(0xFF3B82F6);
+        fondBadge = modeSombre
+            ? const Color(0xFF1E3A5F)
+            : const Color(0xFFEFF6FF);
+        texteBadge = modeSombre
+            ? const Color(0xFF93C5FD)
+            : const Color(0xFF3B82F6);
         break;
       case 'Stage':
       default:
-        fondBadge = const Color(0xFFF0FDF4);
-        texteBadge = const Color(0xFF16A34A);
+        fondBadge = modeSombre
+            ? const Color(0xFF14532D)
+            : const Color(0xFFF0FDF4);
+        texteBadge = modeSombre
+            ? const Color(0xFF86EFAC)
+            : const Color(0xFF16A34A);
         break;
     }
 
@@ -240,11 +256,14 @@ class SectionTachesJourAccueil extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: fondCarte,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: const [
+        border: Border.all(color: separateur),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x08000000),
+            color: modeSombre
+                ? const Color(0x33000000)
+                : const Color(0x08000000),
             blurRadius: 12,
             offset: Offset(0, 4),
           ),
@@ -279,7 +298,7 @@ class SectionTachesJourAccueil extends StatelessWidget {
                         style: GoogleFonts.inter(
                           fontSize: 15,
                           fontWeight: FontWeight.w800,
-                          color: const Color(0xFF0F172A),
+                          color: textePrincipal,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -300,7 +319,7 @@ class SectionTachesJourAccueil extends StatelessWidget {
                   width: 1,
                   height: 38,
                   margin: const EdgeInsets.symmetric(horizontal: 12),
-                  color: const Color(0xFFF1F5F9),
+                  color: separateur,
                 ),
 
                 // Contenu : Badge, Lieu et Titre
@@ -337,7 +356,7 @@ class SectionTachesJourAccueil extends StatelessWidget {
                               style: GoogleFonts.inter(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
-                                color: const Color(0xFF64748B),
+                                color: texteSecondaire,
                               ),
                             ),
                           ),
@@ -360,7 +379,7 @@ class SectionTachesJourAccueil extends StatelessWidget {
                         style: GoogleFonts.inter(
                           fontSize: 14.5,
                           fontWeight: FontWeight.w700,
-                          color: const Color(0xFF0F172A),
+                          color: textePrincipal,
                         ),
                       ),
                     ],

@@ -1,7 +1,10 @@
 abstract final class ConfigurationApi {
   /// Bascule principale : quand true, l'application utilise les mocks.
   /// Quand false, l'application interagit avec les endpoints réels de l'API PHP.
-  static const utiliserDonneesMockees = false;
+  static const utiliserDonneesMockees = bool.fromEnvironment(
+    'USE_MOCK_DATA',
+    defaultValue: false,
+  );
 
   /// Utilisé par les sources d'authentification pour déterminer le mode actif.
   static bool get utiliserAuthentificationApi => !utiliserDonneesMockees;

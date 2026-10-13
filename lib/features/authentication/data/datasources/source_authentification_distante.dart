@@ -1,4 +1,5 @@
 import '../../../../core/mocks/donnees_etudiant_mockees.dart';
+import '../../../../core/mocks/scenario_etudiant_ui.dart';
 import '../../../../core/network/client_api.dart';
 import '../../../../core/network/configuration_api.dart';
 import '../../../../core/network/endpoints_api.dart';
@@ -44,6 +45,14 @@ class SourceAuthentificationDistante {
       // Données mockées strictement conformes au schéma LoginResponse
       final estEmail = idNettoye.contains('@');
       final estCode = idNettoye.toUpperCase().startsWith('STG-');
+      final utilisateur = Map<String, dynamic>.from(
+        ScenarioEtudiantUi.profile['user'] as Map,
+      );
+      final etudiant = Map<String, dynamic>.from(
+        ScenarioEtudiantUi.profile['student'] as Map,
+      );
+      if (estEmail) utilisateur['email'] = idNettoye;
+      if (estCode) etudiant['stagia_code'] = idNettoye;
 
       return <String, dynamic>{
         'access_token':
@@ -53,26 +62,8 @@ class SourceAuthentificationDistante {
         'token_type': 'Bearer',
         'expires_in': 3600,
         'refresh_expires_in': 2592000,
-        'user': <String, dynamic>{
-          'id': 30,
-          'identifiant': 'etu.kalonji',
-          'nom': 'KALONJI',
-          'postnom': 'MUKENDI',
-          'prenom': 'Alfred',
-          'email': estEmail ? idNettoye : 'alfred.kalonji@stagia.cd',
-          'actif': true,
-          'statut_compte': 'ACTIF',
-          'role': {'code': 'STAGIAIRE', 'nom': 'Stagiaire'},
-          'roles': ['STAGIAIRE'],
-        },
-        'student': <String, dynamic>{
-          'id': 30,
-          'stagia_code': estCode ? idNettoye : 'STG-ETU-00000030',
-          'nom': 'KALONJI',
-          'postnom': 'MUKENDI',
-          'prenom': 'Alfred',
-          'statut': 'ACTIF',
-        },
+        'user': utilisateur,
+        'student': etudiant,
       };
     }
 
@@ -154,7 +145,9 @@ class SourceAuthentificationDistante {
     if (reponse['success'] != true) {
       throw ErreurApi(
         code: 'PROFIL_REFUSE',
-        message: reponse['message']?.toString() ?? 'Impossible de récupérer le profil.',
+        message:
+            reponse['message']?.toString() ??
+            'Impossible de récupérer le profil.',
         details: reponse['data'],
       );
     }

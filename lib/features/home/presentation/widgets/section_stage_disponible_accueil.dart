@@ -35,6 +35,15 @@ class SectionStageDisponibleAccueil extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
+    final fondCarte = modeSombre ? const Color(0xFF1E293B) : Colors.white;
+    final bordure = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFF1F5F9);
+    final textePrincipal = modeSombre ? Colors.white : const Color(0xFF0F172A);
+    final texteSecondaire = modeSombre
+        ? const Color(0xFF94A3B8)
+        : const Color(0xFF64748B);
     final infoCampagne =
         campagne ??
         (ConfigurationApi.utiliserDonneesMockees
@@ -49,15 +58,27 @@ class SectionStageDisponibleAccueil extends StatelessWidget {
         statutNormalise.contains('expir');
     final paiementRequis = statutNormalise.contains('paiement');
     final couleurSuivi = statutCritique
-        ? const Color(0xFFDC2626)
+        ? (modeSombre ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626))
         : paiementRequis
-        ? const Color(0xFFEA580C)
-        : const Color(0xFF2563EB);
+        ? (modeSombre ? const Color(0xFFFDBA74) : const Color(0xFFEA580C))
+        : (modeSombre ? const Color(0xFF93C5FD) : const Color(0xFF2563EB));
     final fondSuivi = statutCritique
-        ? const Color(0xFFFEE2E2)
+        ? (modeSombre ? const Color(0xFF4C1D24) : const Color(0xFFFEE2E2))
         : paiementRequis
-        ? const Color(0xFFFFEDD5)
-        : const Color(0xFFDBEAFE);
+        ? (modeSombre ? const Color(0xFF431C0D) : const Color(0xFFFFEDD5))
+        : (modeSombre ? const Color(0xFF1E3A5F) : const Color(0xFFDBEAFE));
+    final fondBadgeCompteur = modeSombre
+        ? const Color(0xFF0C4A6E)
+        : const Color(0xFFE0F2FE);
+    final texteBadgeCompteur = modeSombre
+        ? const Color(0xFF7DD3FC)
+        : const Color(0xFF0284C7);
+    final fondStatutOuvert = modeSombre
+        ? const Color(0xFF14532D)
+        : const Color(0xFFDCFCE7);
+    final texteStatutOuvert = modeSombre
+        ? const Color(0xFF86EFAC)
+        : const Color(0xFF15803D);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -71,7 +92,7 @@ class SectionStageDisponibleAccueil extends StatelessWidget {
               style: GoogleFonts.inter(
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
-                color: const Color(0xFF0F172A),
+                color: textePrincipal,
               ),
             ),
             Container(
@@ -80,7 +101,7 @@ class SectionStageDisponibleAccueil extends StatelessWidget {
                 vertical: 4.5,
               ),
               decoration: BoxDecoration(
-                color: const Color(0xFFE0F2FE),
+                color: fondBadgeCompteur,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
@@ -88,7 +109,7 @@ class SectionStageDisponibleAccueil extends StatelessWidget {
                 style: GoogleFonts.inter(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: const Color(0xFF0284C7),
+                  color: texteBadgeCompteur,
                 ),
               ),
             ),
@@ -101,12 +122,14 @@ class SectionStageDisponibleAccueil extends StatelessWidget {
         Container(
           width: double.infinity,
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: fondCarte,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFF1F5F9)),
-            boxShadow: const [
+            border: Border.all(color: bordure),
+            boxShadow: [
               BoxShadow(
-                color: Color(0x0A000000),
+                color: modeSombre
+                    ? const Color(0x33000000)
+                    : const Color(0x0A000000),
                 blurRadius: 16,
                 offset: Offset(0, 4),
               ),
@@ -126,7 +149,7 @@ class SectionStageDisponibleAccueil extends StatelessWidget {
                       style: GoogleFonts.inter(
                         fontSize: 17.5,
                         fontWeight: FontWeight.w800,
-                        color: const Color(0xFF0F172A),
+                        color: textePrincipal,
                       ),
                     ),
 
@@ -155,7 +178,7 @@ class SectionStageDisponibleAccueil extends StatelessWidget {
                                 style: GoogleFonts.inter(
                                   fontSize: 14.5,
                                   fontWeight: FontWeight.w800,
-                                  color: const Color(0xFF0F172A),
+                                  color: textePrincipal,
                                   height: 1.25,
                                 ),
                               ),
@@ -183,7 +206,7 @@ class SectionStageDisponibleAccueil extends StatelessWidget {
                                 style: GoogleFonts.inter(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w800,
-                                  color: const Color(0xFF0F172A),
+                                  color: textePrincipal,
                                 ),
                               ),
                             ],
@@ -205,7 +228,7 @@ class SectionStageDisponibleAccueil extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: estSuiviCandidature
                                 ? fondSuivi
-                                : const Color(0xFFDCFCE7),
+                                : fondStatutOuvert,
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
@@ -215,21 +238,28 @@ class SectionStageDisponibleAccueil extends StatelessWidget {
                               fontWeight: FontWeight.w700,
                               color: estSuiviCandidature
                                   ? couleurSuivi
-                                  : const Color(0xFF15803D),
+                                  : texteStatutOuvert,
                             ),
                           ),
                         ),
                         if (afficherNombreHopitaux) ...[
                           const SizedBox(width: 10),
-                          Text(
-                            '${infoCampagne.nombreHopitaux} '
-                            '${infoCampagne.nombreHopitaux == 1 ? 'hôpital' : 'hôpitaux'} '
-                            'disponible${infoCampagne.nombreHopitaux == 1 ? '' : 's'}',
-                            style: GoogleFonts.inter(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                              color: const Color(0xFF64748B),
-                            ),
+                          Builder(
+                            builder: (context) {
+                              final nombre =
+                                  infoCampagne.nombreHopitauxDisponibles ??
+                                  infoCampagne.nombreHopitaux;
+                              return Text(
+                                '$nombre '
+                                '${nombre == 1 ? 'hôpital' : 'hôpitaux'} '
+                                'disponible${nombre == 1 ? '' : 's'}',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: texteSecondaire,
+                                ),
+                              );
+                            },
                           ),
                         ],
                       ],

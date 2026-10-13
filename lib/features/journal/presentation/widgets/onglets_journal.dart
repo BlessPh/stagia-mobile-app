@@ -13,12 +13,13 @@ class OngletsJournal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
     return Row(
       children: [
-        _buildOnglet(index: 0, titre: 'Mes tâches', actif: indexActif == 0),
-        _buildOnglet(index: 1, titre: 'Présences', actif: indexActif == 1),
-        _buildOnglet(index: 2, titre: 'Evaluations', actif: indexActif == 2),
-        _buildOnglet(index: 3, titre: 'Journal', actif: indexActif == 3),
+        _buildOnglet(index: 0, titre: 'Mes tâches', actif: indexActif == 0, modeSombre: modeSombre),
+        _buildOnglet(index: 1, titre: 'Présences', actif: indexActif == 1, modeSombre: modeSombre),
+        _buildOnglet(index: 2, titre: 'Evaluations', actif: indexActif == 2, modeSombre: modeSombre),
+        _buildOnglet(index: 3, titre: 'Journal', actif: indexActif == 3, modeSombre: modeSombre),
       ],
     );
   }
@@ -27,7 +28,11 @@ class OngletsJournal extends StatelessWidget {
     required int index,
     required String titre,
     required bool actif,
+    required bool modeSombre,
   }) {
+    final couleurActive = modeSombre ? const Color(0xFF38BDF8) : const Color(0xFF1D61F2);
+    final couleurInactive = modeSombre ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
     return Expanded(
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -45,7 +50,7 @@ class OngletsJournal extends StatelessWidget {
                 style: GoogleFonts.inter(
                   fontSize: 14,
                   fontWeight: actif ? FontWeight.w700 : FontWeight.w500,
-                  color: actif ? const Color(0xFF1D61F2) : const Color(0xFF64748B),
+                  color: actif ? couleurActive : couleurInactive,
                 ),
               ),
             ),
@@ -54,7 +59,7 @@ class OngletsJournal extends StatelessWidget {
               height: 3,
               width: actif ? 38 : 0,
               decoration: BoxDecoration(
-                color: actif ? const Color(0xFF1D61F2) : Colors.transparent,
+                color: actif ? couleurActive : Colors.transparent,
                 borderRadius: BorderRadius.circular(3),
               ),
             ),

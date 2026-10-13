@@ -52,10 +52,18 @@ class BarreNavigationPrincipale extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
     final bottomPadding = MediaQuery.paddingOf(context).bottom;
     const barHeight = 64.0;
     const protrusion = 18.0;
     final totalHeight = barHeight + protrusion + bottomPadding;
+
+    // Couleurs distinctes selon le mode clair / sombre
+    final fondBarre = modeSombre ? const Color(0xFF1E2129) : Colors.white;
+    final couleurBordure = modeSombre ? const Color(0xFF2C3240) : const Color(0xFFF1F5F9);
+    final ombreBarre = modeSombre
+        ? const Color(0x60000000)
+        : const Color(0x14000000);
 
     return SizedBox(
       height: totalHeight,
@@ -64,28 +72,34 @@ class BarreNavigationPrincipale extends StatelessWidget {
         clipBehavior: Clip.none,
         alignment: Alignment.bottomCenter,
         children: [
-          // 1. Fond blanc collé en bas avec coins arrondis en haut et ombre douce
+          // 1. Fond collé en bas avec coins arrondis et ombre
           Positioned(
             left: 0,
             right: 0,
             bottom: 0,
             height: barHeight + bottomPadding,
             child: Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
+              decoration: BoxDecoration(
+                color: fondBarre,
+                border: Border(
+                  top: BorderSide(
+                    color: couleurBordure,
+                    width: 1.0,
+                  ),
+                ),
                 boxShadow: [
                   BoxShadow(
-                    color: Color(0x14000000),
+                    color: ombreBarre,
                     blurRadius: 18,
-                    offset: Offset(0, -4),
+                    offset: const Offset(0, -4),
                   ),
                 ],
               ),
               padding: EdgeInsets.only(bottom: bottomPadding),
               child: Row(
                 children: [
-                  Expanded(child: _buildItem(0, context)),
-                  Expanded(child: _buildItem(1, context)),
+                  Expanded(child: _buildItem(0, context, modeSombre)),
+                  Expanded(child: _buildItem(1, context, modeSombre)),
                   Expanded(
                     child: InkWell(
                       onTap: () => _declencherAjout(context),
@@ -94,8 +108,8 @@ class BarreNavigationPrincipale extends StatelessWidget {
                       child: const SizedBox.expand(),
                     ),
                   ),
-                  Expanded(child: _buildItem(2, context)),
-                  Expanded(child: _buildItem(3, context)),
+                  Expanded(child: _buildItem(2, context, modeSombre)),
+                  Expanded(child: _buildItem(3, context, modeSombre)),
                 ],
               ),
             ),
@@ -119,14 +133,32 @@ class BarreNavigationPrincipale extends StatelessWidget {
                     child: Container(
                       width: 52,
                       height: 52,
-                      decoration: const BoxDecoration(
-                        color: AppTheme.noir,
+                      decoration: BoxDecoration(
+                        gradient: modeSombre
+                            ? const LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  Color(0xFFFF7417),
+                                  Color(0xFFE85D00),
+                                ],
+                              )
+                            : null,
+                        color: modeSombre ? null : AppTheme.noir,
                         shape: BoxShape.circle,
+                        border: Border.all(
+                          color: modeSombre
+                              ? const Color(0xFF1E2129)
+                              : Colors.white,
+                          width: 3.5,
+                        ),
                         boxShadow: [
                           BoxShadow(
-                            color: Color(0x38000000),
-                            blurRadius: 12,
-                            offset: Offset(0, 5),
+                            color: modeSombre
+                                ? const Color(0x66FF7417)
+                                : const Color(0x38000000),
+                            blurRadius: modeSombre ? 14 : 12,
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),
@@ -148,11 +180,15 @@ class BarreNavigationPrincipale extends StatelessWidget {
     );
   }
 
-  Widget _buildItem(int index, BuildContext context) {
+  Widget _buildItem(int index, BuildContext context, bool modeSombre) {
     final destination = _destinations[index];
     final selectionnee = index == indexActuel;
-    const couleurActive = AppTheme.orangePrincipal;
-    const couleurInactive = AppTheme.noir;
+    final couleurActive = modeSombre
+        ? const Color(0xFFFF944D)
+        : AppTheme.orangePrincipal;
+    final couleurInactive = modeSombre
+        ? const Color(0xFF94A3B8)
+        : const Color(0xFF475569);
 
     return Semantics(
       selected: selectionnee,
@@ -160,7 +196,7 @@ class BarreNavigationPrincipale extends StatelessWidget {
       button: true,
       child: InkWell(
         onTap: () => onDestinationSelectionnee(index),
-        splashColor: couleurActive.withValues(alpha: 0.08),
+        splashColor: couleurActive.withValues(alpha: 0.12),
         highlightColor: Colors.transparent,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -189,7 +225,7 @@ class BarreNavigationPrincipale extends StatelessWidget {
               child: Container(
                 width: 4,
                 height: 4,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: couleurActive,
                   shape: BoxShape.circle,
                 ),

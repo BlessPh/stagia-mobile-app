@@ -1,4 +1,5 @@
 import '../../domain/entities/campagne_stage.dart';
+import '../../../../core/mocks/scenario_etudiant_ui.dart';
 
 abstract final class SourceCampagneMock {
   static const campagnePrincipale = CampagneStage(
@@ -56,12 +57,7 @@ abstract final class SourceCampagneMock {
         adresse: 'Avenue Wangata, Kinshasa',
         telephone: '+243 81 987 65 43',
         description: 'Hôpital général de référence et d’enseignement',
-        services: [
-          'Médecine Interne',
-          'Chirurgie',
-          'Pédiatrie',
-          'Urgences',
-        ],
+        services: ['Médecine Interne', 'Chirurgie', 'Pédiatrie', 'Urgences'],
         latitude: -4.3168,
         longitude: 15.3082,
       ),
@@ -76,11 +72,7 @@ abstract final class SourceCampagneMock {
         adresse: 'Avenue Monkole, Mont-Ngafula',
         telephone: '+243 89 555 44 33',
         description: 'Centre médico-chirurgical universitaire',
-        services: [
-          'Pédiatrie',
-          'Gynécologie-Obstétrique',
-          'Chirurgie',
-        ],
+        services: ['Pédiatrie', 'Gynécologie-Obstétrique', 'Chirurgie'],
         latitude: -4.4137,
         longitude: 15.2652,
       ),
@@ -95,78 +87,88 @@ abstract final class SourceCampagneMock {
         adresse: 'Campus UNIKIN, Lemba',
         telephone: '+243 82 111 22 33',
         description: 'Hôpital universitaire de référence tertiaire',
-        services: [
-          'Chirurgie',
-          'Médecine Interne',
-          'Pédiatrie',
-          'Cardiologie',
-        ],
+        services: ['Chirurgie', 'Médecine Interne', 'Pédiatrie', 'Cardiologie'],
         latitude: -4.4172,
         longitude: 15.3090,
       ),
     ],
   );
 
-  static CampagneStage obtenirCampagneOuverte() => campagnePrincipale;
+  static CampagneStage obtenirCampagneOuverte() {
+    final campagnes = ScenarioEtudiantUi.stageOptions['campaigns'];
+    if (campagnes is List && campagnes.isNotEmpty && campagnes.first is Map) {
+      return depuisJson(Map<String, dynamic>.from(campagnes.first as Map));
+    }
+    return campagnePrincipale;
+  }
 
   static CampagneStage depuisJson(Map<String, dynamic> json) {
-    final hospitalsList = (json['hospitals'] as List?)
-            ?.whereType<Map>()
-            .map((h) {
-              final hMap = Map<String, dynamic>.from(h);
-              final hospitalInfo = hMap['hospital'] is Map
-                  ? Map<String, dynamic>.from(hMap['hospital'] as Map)
-                  : <String, dynamic>{};
-              final partId = hMap['participation_id'] is int
-                  ? hMap['participation_id'] as int
-                  : int.tryParse(hMap['participation_id']?.toString() ?? '');
-              final placesDispo = hMap['available_places'] is int
-                  ? hMap['available_places'] as int
-                  : (int.tryParse(hMap['available_places']?.toString() ?? '') ?? 10);
-              final nom = hospitalInfo['name']?.toString() ??
-                  hMap['nom']?.toString() ??
-                  'Hôpital partenaire';
-              final ville = hospitalInfo['city']?.toString() ?? 'Kinshasa';
-              final commune = hospitalInfo['province']?.toString() ?? 'Kinshasa';
+    final hospitalsList =
+        (json['hospitals'] as List?)?.whereType<Map>().map((h) {
+          final hMap = Map<String, dynamic>.from(h);
+          final hospitalInfo = hMap['hospital'] is Map
+              ? Map<String, dynamic>.from(hMap['hospital'] as Map)
+              : <String, dynamic>{};
+          final partId = hMap['participation_id'] is int
+              ? hMap['participation_id'] as int
+              : int.tryParse(hMap['participation_id']?.toString() ?? '');
+          final placesDispo = hMap['available_places'] is int
+              ? hMap['available_places'] as int
+              : (int.tryParse(hMap['available_places']?.toString() ?? '') ??
+                    10);
+          final nom =
+              hospitalInfo['name']?.toString() ??
+              hMap['nom']?.toString() ??
+              'Hôpital partenaire';
+          final ville = hospitalInfo['city']?.toString() ?? 'Kinshasa';
+          final commune = hospitalInfo['province']?.toString() ?? 'Kinshasa';
 
-              return HopitalCampagne(
-                id: partId != null ? 'PART-$partId' : 'HOSP-${nom.hashCode.abs()}',
-                participationId: partId,
-                nom: nom,
-                distanceKm: 3.5,
-                placesDisponibles: placesDispo,
-                placesRestantes: placesDispo,
-                fraisRequis: hMap['fees_required'] == true,
-                montantFrais: (hMap['amount'] is num ? (hMap['amount'] as num).toInt() : 0),
-                devise: hMap['currency']?.toString() ?? 'CDF',
-                ville: ville,
-                commune: commune,
-                adresse: '$commune, $ville',
-              );
-            })
-            .toList() ??
+          return HopitalCampagne(
+            id: partId != null ? 'PART-$partId' : 'HOSP-${nom.hashCode.abs()}',
+            participationId: partId,
+            nom: nom,
+            distanceKm: 3.5,
+            placesDisponibles: placesDispo,
+            placesRestantes: placesDispo,
+            fraisRequis: hMap['fees_required'] == true,
+            montantFrais: (hMap['amount'] is num
+                ? (hMap['amount'] as num).toDouble()
+                : 0),
+            devise: hMap['currency']?.toString() ?? 'CDF',
+            ville: ville,
+            commune: commune,
+            adresse: '$commune, $ville',
+          );
+        }).toList() ??
         campagnePrincipale.hopitaux;
 
-    final campaignId = json['campaign_id']?.toString() ??
+    final campaignId =
+        json['campaign_id']?.toString() ??
         json['id']?.toString() ??
         'CAM-STG-2026-001';
     final enrollmentId = json['academic_enrollment_id'] is int
         ? json['academic_enrollment_id'] as int
         : int.tryParse(json['academic_enrollment_id']?.toString() ?? '');
-    final titre = json['title']?.toString() ??
+    final titre =
+        json['title']?.toString() ??
         json['titre']?.toString() ??
         'Stage médical D4 2026';
     final dateDebut = json['start_date']?.toString() ?? '2026-11-10';
     final dateFin = json['end_date']?.toString() ?? '2027-01-14';
     final mode = json['mode'] is Map ? json['mode'] as Map : null;
-    final isD4 = mode?['is_d4'] == true || (json['stage_type'] is Map && json['stage_type']['code'] == 'MEDICAL_D4');
+    final isD4 =
+        mode?['is_d4'] == true ||
+        (json['stage_type'] is Map &&
+            json['stage_type']['code'] == 'MEDICAL_D4');
 
     return CampagneStage(
       id: campaignId,
       academicEnrollmentId: enrollmentId,
       isD4: isD4,
       titre: titre,
-      sousTitre: json['program']?.toString() ?? 'Médecine générale • Universités partenaires',
+      sousTitre:
+          json['program']?.toString() ??
+          'Médecine générale • Universités partenaires',
       dateDebut: dateDebut,
       dateFin: dateFin,
       periodeTexte: '$dateDebut - $dateFin',

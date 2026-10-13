@@ -70,52 +70,91 @@ void main() {
     });
   });
 
-  test('mappe une campagne universitaire et ses hôpitaux éligibles', () {
+  test('mappe le nouveau contrat d’une campagne et de ses hôpitaux', () {
     final campagne = MappeurCampagneStageApi.depuisJson({
-      'campaign_id': 32,
+      'campaign_id': 39,
       'academic_enrollment_id': 43,
-      'title': 'Lancement L1 2026-2027',
+      'code': 'CAM-000039',
+      'title': 'Stage de fin d’année 2026',
+      'start_date': '2026-10-01',
+      'end_date': '2026-10-31',
+      'stage_type': {'code': 'SPECIALISATION', 'label': 'Spécialisation'},
       'mode': {
         'is_d4': false,
-        'self_reservation_allowed': false,
-        'reservation_mode': 'UNIVERSITY_MANAGED',
+        'self_reservation_allowed': true,
+        'reservation_mode': 'STUDENT_CHOICE_UNIVERSITY_CONFIRMATION',
       },
+      'promotion': {
+        'code': 'PRO-0009',
+        'name': 'Médecine Humaine · 2026-2027 · L1',
+        'level': 'L1',
+      },
+      'program': 'Médecine Humaine',
       'hospitals_count': 1,
+      'available_hospitals': 1,
       'hospitals': [
         {
-          'participation_id': 27,
+          'participation_id': 81,
           'hospital': {
-            'code': 'HGT',
-            'name': 'Hôpital Général de Test',
-            'city': 'MOMO',
-            'province': 'Haut-Uélé',
-            'services': [
-              {
-                'id': 12,
-                'code': 'SRV-LOC-C4C50F65',
-                'name': 'Gyn',
-                'type': 'SERVICE',
-              },
-              {
-                'id': 11,
-                'code': 'SRV-LOC-D0AEF415',
-                'name': 'Pediatrie',
-                'type': 'SERVICE',
-              },
-            ],
+            'code': 'HOP-001',
+            'name': 'Hôpital Général',
+            'phone': '+243000000000',
+            'city': 'Kinshasa',
+            'province': 'Kinshasa',
+            'services': <Map<String, dynamic>>[],
           },
-          'available_places': 10,
-          'fees_required': false,
+          'capacity': 20,
+          'used_places': 7,
+          'available_places': 13,
+          'available': true,
+          'fees_required': true,
+          'amount': 25.5,
+          'currency': 'USD',
+          'conditions': 'Tenue médicale obligatoire.',
         },
       ],
     });
 
-    expect(campagne.autoriseReservationAutonome, isFalse);
-    expect(campagne.modeReservation, 'UNIVERSITY_MANAGED');
+    expect(campagne.id, '39');
+    expect(campagne.code, 'CAM-000039');
+    expect(campagne.autoriseReservationAutonome, isTrue);
+    expect(campagne.modeReservation, 'STUDENT_CHOICE_UNIVERSITY_CONFIRMATION');
+    expect(campagne.typeStageCode, 'SPECIALISATION');
+    expect(campagne.typeStageLibelle, 'Spécialisation');
+    expect(campagne.promotionCode, 'PRO-0009');
+    expect(campagne.promotionNom, 'Médecine Humaine · 2026-2027 · L1');
+    expect(campagne.niveau, 'L1');
+    expect(campagne.periodeTexte, '2026-10-01 - 2026-10-31');
     expect(campagne.nombreHopitaux, 1);
-    expect(campagne.hopitaux.single.nom, 'Hôpital Général de Test');
-    expect(campagne.hopitaux.single.placesRestantesEffectives, 10);
-    expect(campagne.hopitaux.single.services, ['Gyn', 'Pediatrie']);
+    expect(campagne.nombreHopitauxDisponibles, 1);
+    expect(campagne.hopitaux.single.nom, 'Hôpital Général');
+    expect(campagne.hopitaux.single.capacite, 20);
+    expect(campagne.hopitaux.single.placesUtilisees, 7);
+    expect(campagne.hopitaux.single.placesRestantesEffectives, 13);
+    expect(campagne.hopitaux.single.peutReserver, isTrue);
+    expect(campagne.hopitaux.single.fraisRequis, isTrue);
+    expect(campagne.hopitaux.single.montantFrais, 25.5);
+    expect(campagne.hopitaux.single.devise, 'USD');
+    expect(campagne.hopitaux.single.conditions, 'Tenue médicale obligatoire.');
+    expect(campagne.hopitaux.single.localisationCourte, 'Kinshasa');
+  });
+
+  test('interdit la réservation quand l’API marque l’hôpital indisponible', () {
+    final campagne = MappeurCampagneStageApi.depuisJson({
+      'campaign_id': 39,
+      'academic_enrollment_id': 43,
+      'mode': {'self_reservation_allowed': true},
+      'hospitals': [
+        {
+          'participation_id': 81,
+          'hospital': {'name': 'Hôpital complet'},
+          'available_places': 3,
+          'available': false,
+        },
+      ],
+    });
+
+    expect(campagne.hopitaux.single.peutReserver, isFalse);
   });
 
   test(
@@ -142,11 +181,40 @@ void main() {
       expect(resultat['created'], isTrue);
     },
   );
+
+  test('transmet les filtres documentés de GET /student/stages', () async {
+    final client = _ClientApiEspion();
+    final source = SourceStageDistante(client);
+
+    final resultat = await source.stages(
+      status: ['PLANIFIEE', 'ACTIVE'],
+      rotationStatus: ['PLANIFIEE', 'ACTIVE'],
+      campaignId: [39, 40],
+      hospitalId: 8,
+      dateFrom: '2026-10-01',
+      dateTo: '2026-10-31',
+      include: ['rotations', 'supervisors', 'summary'],
+    );
+
+    expect(client.cheminGet, EndpointsApi.stagesEtudiant);
+    expect(client.parametresGet, {
+      'status': 'PLANIFIEE,ACTIVE',
+      'rotation_status': 'PLANIFIEE,ACTIVE',
+      'campaign_id': '39,40',
+      'hospital_id': '8',
+      'date_from': '2026-10-01',
+      'date_to': '2026-10-31',
+      'include': 'rotations,supervisors,summary',
+    });
+    expect((resultat['items'] as List), isEmpty);
+  });
 }
 
 class _ClientApiEspion implements ClientApi {
   String? cheminPost;
   Object? corpsPost;
+  String? cheminGet;
+  Map<String, dynamic>? parametresGet;
 
   @override
   Future<Map<String, dynamic>> post(
@@ -183,7 +251,15 @@ class _ClientApiEspion implements ClientApi {
   Future<Map<String, dynamic>> get(
     String chemin, {
     Map<String, dynamic>? parametres,
-  }) => throw UnimplementedError();
+  }) async {
+    cheminGet = chemin;
+    parametresGet = parametres;
+    return {
+      'success': true,
+      'message': '',
+      'data': {'items': <Map<String, dynamic>>[]},
+    };
+  }
 
   @override
   Future<List<int>> getBytes(

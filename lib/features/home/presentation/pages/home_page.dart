@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/mocks/depot_mock_etudiant.dart';
+import '../../../../core/mocks/scenario_etudiant_ui.dart';
 import '../../../../core/network/client_api_http.dart';
 import '../../../../core/network/configuration_api.dart';
 import '../../../../core/network/source_etudiant_distante.dart';
@@ -58,6 +59,7 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     if (ConfigurationApi.utiliserDonneesMockees) {
       DepotMockEtudiant.changements.addListener(_donneesLocalesModifiees);
+      ScenarioEtudiantUi.changements.addListener(_donneesLocalesModifiees);
     }
     SuiviStageService.changements.addListener(_workflowStageModifie);
     _initialiserChargements();
@@ -67,6 +69,7 @@ class _HomePageState extends State<HomePage> {
   void dispose() {
     if (ConfigurationApi.utiliserDonneesMockees) {
       DepotMockEtudiant.changements.removeListener(_donneesLocalesModifiees);
+      ScenarioEtudiantUi.changements.removeListener(_donneesLocalesModifiees);
     }
     SuiviStageService.changements.removeListener(_workflowStageModifie);
     super.dispose();
@@ -251,6 +254,7 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final marge = MediaQuery.sizeOf(context).width < 360 ? 14.0 : 18.0;
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
 
     // AppBar : Skeleton tant que le profil n'est pas chargé
     final PreferredSizeWidget appBar = _chargementProfil
@@ -258,7 +262,9 @@ class _HomePageState extends State<HomePage> {
         : EnTeteAccueil(etudiant: _construireIdentiteEtudiant());
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: modeSombre
+          ? const Color(0xFF0F172A)
+          : Theme.of(context).scaffoldBackgroundColor,
       appBar: appBar,
       body: ContenuAdaptatif(
         enfant: RefreshIndicator(

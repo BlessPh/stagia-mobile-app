@@ -23,6 +23,11 @@ class CarteEcheanceTache extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
+    final fondCarte = modeSombre ? const Color(0xFF1E293B) : Colors.white;
+    final bordureCouleur = modeSombre ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final texteCouleur = modeSombre ? Colors.white : const Color(0xFF0F172A);
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -31,14 +36,14 @@ class CarteEcheanceTache extends StatelessWidget {
         child: Container(
           width: double.infinity,
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: fondCarte,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-            boxShadow: const [
+            border: Border.all(color: bordureCouleur),
+            boxShadow: [
               BoxShadow(
-                color: Color(0x05000000),
+                color: modeSombre ? const Color(0x30000000) : const Color(0x05000000),
                 blurRadius: 10,
-                offset: Offset(0, 2),
+                offset: const Offset(0, 2),
               ),
             ],
           ),
@@ -58,7 +63,7 @@ class CarteEcheanceTache extends StatelessWidget {
                       style: GoogleFonts.inter(
                         fontSize: 13.5,
                         fontWeight: FontWeight.w800,
-                        color: const Color(0xFF0F172A),
+                        color: texteCouleur,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -78,7 +83,7 @@ class CarteEcheanceTache extends StatelessWidget {
               Container(
                 width: 1,
                 height: 36,
-                color: const Color(0xFFF1F5F9),
+                color: modeSombre ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
                 margin: const EdgeInsets.symmetric(horizontal: 12),
               ),
 
@@ -115,7 +120,7 @@ class CarteEcheanceTache extends StatelessWidget {
                       style: GoogleFonts.inter(
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
-                        color: const Color(0xFF0F172A),
+                        color: texteCouleur,
                         height: 1.25,
                       ),
                     ),

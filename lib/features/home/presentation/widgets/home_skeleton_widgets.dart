@@ -11,13 +11,11 @@ class ShimmerBloc extends StatelessWidget {
     super.key,
   });
 
-  const ShimmerBloc.cercle({
-    required double diametre,
-    super.key,
-  })  : width = diametre,
-        height = diametre,
-        borderRadius = 0,
-        shape = BoxShape.circle;
+  const ShimmerBloc.cercle({required double diametre, super.key})
+    : width = diametre,
+      height = diametre,
+      borderRadius = 0,
+      shape = BoxShape.circle;
 
   final double? width;
   final double height;
@@ -27,8 +25,12 @@ class ShimmerBloc extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final modeSombre = Theme.of(context).brightness == Brightness.dark;
-    final baseColor = modeSombre ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0);
-    final highlightColor = modeSombre ? const Color(0xFF334155) : const Color(0xFFF8FAFC);
+    final baseColor = modeSombre
+        ? const Color(0xFF1E293B)
+        : const Color(0xFFE2E8F0);
+    final highlightColor = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFF8FAFC);
 
     return Shimmer.fromColors(
       baseColor: baseColor,
@@ -40,7 +42,9 @@ class ShimmerBloc extends StatelessWidget {
         decoration: BoxDecoration(
           color: baseColor,
           shape: shape,
-          borderRadius: shape == BoxShape.circle ? null : BorderRadius.circular(borderRadius),
+          borderRadius: shape == BoxShape.circle
+              ? null
+              : BorderRadius.circular(borderRadius),
         ),
       ),
     );
@@ -48,7 +52,8 @@ class ShimmerBloc extends StatelessWidget {
 }
 
 /// En-tête Shimmer reproduisant l'avatar circulaire, le nom et les 2 boutons d'action
-class EnTeteAccueilSkeleton extends StatelessWidget implements PreferredSizeWidget {
+class EnTeteAccueilSkeleton extends StatelessWidget
+    implements PreferredSizeWidget {
   const EnTeteAccueilSkeleton({super.key});
 
   @override
@@ -56,10 +61,13 @@ class EnTeteAccueilSkeleton extends StatelessWidget implements PreferredSizeWidg
 
   @override
   Widget build(BuildContext context) {
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
     return AppBar(
       automaticallyImplyLeading: false,
       toolbarHeight: preferredSize.height,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: modeSombre
+          ? const Color(0xFF0F172A)
+          : Theme.of(context).scaffoldBackgroundColor,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       title: Row(
@@ -146,19 +154,26 @@ class SectionTachesAccueilSkeleton extends StatelessWidget {
   }
 
   Widget _buildCarteTacheSkeleton(BuildContext context) {
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
+    final fondCarte = modeSombre ? const Color(0xFF1E293B) : Colors.white;
+    final bordure = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFF1F5F9);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: fondCarte,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFF1F5F9)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x06000000),
-            blurRadius: 10,
-            offset: Offset(0, 3),
-          ),
-        ],
+        border: Border.all(color: bordure),
+        boxShadow: modeSombre
+            ? const []
+            : const [
+                BoxShadow(
+                  color: Color(0x06000000),
+                  blurRadius: 10,
+                  offset: Offset(0, 3),
+                ),
+              ],
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -177,7 +192,7 @@ class SectionTachesAccueilSkeleton extends StatelessWidget {
             width: 1,
             height: 38,
             margin: const EdgeInsets.symmetric(horizontal: 14),
-            color: const Color(0xFFF1F5F9),
+            color: bordure,
           ),
           // Colonne droite : Badge + Lieu + Titre
           Expanded(
@@ -188,13 +203,23 @@ class SectionTachesAccueilSkeleton extends StatelessWidget {
                   children: const [
                     ShimmerBloc(width: 55, height: 18, borderRadius: 6),
                     SizedBox(width: 8),
-                    Expanded(child: ShimmerBloc(width: null, height: 12, borderRadius: 4)),
+                    Expanded(
+                      child: ShimmerBloc(
+                        width: null,
+                        height: 12,
+                        borderRadius: 4,
+                      ),
+                    ),
                     SizedBox(width: 8),
                     ShimmerBloc.cercle(diametre: 8),
                   ],
                 ),
                 const SizedBox(height: 8),
-                const ShimmerBloc(width: double.infinity, height: 15, borderRadius: 4),
+                const ShimmerBloc(
+                  width: double.infinity,
+                  height: 15,
+                  borderRadius: 4,
+                ),
               ],
             ),
           ),
@@ -210,6 +235,11 @@ class SectionStageDisponibleSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
+    final fondCarte = modeSombre ? const Color(0xFF1E293B) : Colors.white;
+    final bordure = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFF1F5F9);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -226,22 +256,28 @@ class SectionStageDisponibleSkeleton extends StatelessWidget {
         Container(
           width: double.infinity,
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: fondCarte,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFF1F5F9)),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x06000000),
-                blurRadius: 10,
-                offset: Offset(0, 3),
-              ),
-            ],
+            border: Border.all(color: bordure),
+            boxShadow: modeSombre
+                ? const []
+                : const [
+                    BoxShadow(
+                      color: Color(0x06000000),
+                      blurRadius: 10,
+                      offset: Offset(0, 3),
+                    ),
+                  ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Ligne décorative supérieure
-              const ShimmerBloc(width: double.infinity, height: 4.5, borderRadius: 4),
+              const ShimmerBloc(
+                width: double.infinity,
+                height: 4.5,
+                borderRadius: 4,
+              ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
                 child: Column(
@@ -257,9 +293,17 @@ class SectionStageDisponibleSkeleton extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              ShimmerBloc(width: 40, height: 12, borderRadius: 4),
+                              ShimmerBloc(
+                                width: 40,
+                                height: 12,
+                                borderRadius: 4,
+                              ),
                               SizedBox(height: 6),
-                              ShimmerBloc(width: 110, height: 14, borderRadius: 4),
+                              ShimmerBloc(
+                                width: 110,
+                                height: 14,
+                                borderRadius: 4,
+                              ),
                             ],
                           ),
                         ),
@@ -267,9 +311,17 @@ class SectionStageDisponibleSkeleton extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              ShimmerBloc(width: 60, height: 12, borderRadius: 4),
+                              ShimmerBloc(
+                                width: 60,
+                                height: 12,
+                                borderRadius: 4,
+                              ),
                               SizedBox(height: 6),
-                              ShimmerBloc(width: 90, height: 14, borderRadius: 4),
+                              ShimmerBloc(
+                                width: 90,
+                                height: 14,
+                                borderRadius: 4,
+                              ),
                             ],
                           ),
                         ),
@@ -295,7 +347,11 @@ class SectionStageDisponibleSkeleton extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     // Bouton d'action complet "Voir les détails"
-                    const ShimmerBloc(width: double.infinity, height: 46, borderRadius: 14),
+                    const ShimmerBloc(
+                      width: double.infinity,
+                      height: 46,
+                      borderRadius: 14,
+                    ),
                   ],
                 ),
               ),
@@ -313,6 +369,11 @@ class SectionStageEnCoursSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
+    final fondCarte = modeSombre ? const Color(0xFF1E293B) : Colors.white;
+    final bordure = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFF1F5F9);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -329,22 +390,28 @@ class SectionStageEnCoursSkeleton extends StatelessWidget {
         Container(
           width: double.infinity,
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: fondCarte,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFF1F5F9)),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x06000000),
-                blurRadius: 10,
-                offset: Offset(0, 3),
-              ),
-            ],
+            border: Border.all(color: bordure),
+            boxShadow: modeSombre
+                ? const []
+                : const [
+                    BoxShadow(
+                      color: Color(0x06000000),
+                      blurRadius: 10,
+                      offset: Offset(0, 3),
+                    ),
+                  ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Ligne décorative supérieure
-              const ShimmerBloc(width: double.infinity, height: 4.5, borderRadius: 4),
+              const ShimmerBloc(
+                width: double.infinity,
+                height: 4.5,
+                borderRadius: 4,
+              ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
                 child: Column(
@@ -372,7 +439,11 @@ class SectionStageEnCoursSkeleton extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     // Barre de progression
-                    const ShimmerBloc(width: double.infinity, height: 7, borderRadius: 4),
+                    const ShimmerBloc(
+                      width: double.infinity,
+                      height: 7,
+                      borderRadius: 4,
+                    ),
                     const SizedBox(height: 6),
                     const ShimmerBloc(width: 120, height: 12, borderRadius: 4),
                     const SizedBox(height: 14),
@@ -403,7 +474,7 @@ class SectionStageEnCoursSkeleton extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                    Divider(height: 1, color: bordure),
                     const SizedBox(height: 12),
                     // Encadreur (avatar + infos)
                     Row(
@@ -415,7 +486,11 @@ class SectionStageEnCoursSkeleton extends StatelessWidget {
                           children: [
                             ShimmerBloc(width: 60, height: 11, borderRadius: 4),
                             SizedBox(height: 4),
-                            ShimmerBloc(width: 110, height: 13, borderRadius: 4),
+                            ShimmerBloc(
+                              width: 110,
+                              height: 13,
+                              borderRadius: 4,
+                            ),
                           ],
                         ),
                       ],

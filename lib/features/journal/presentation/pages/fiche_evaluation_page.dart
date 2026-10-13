@@ -42,7 +42,11 @@ class FicheEvaluationPage extends StatelessWidget {
               0)
         : scoreGlobal;
 
+    final evaluator = donneesEvaluation?['evaluator'] is Map
+        ? Map<String, dynamic>.from(donneesEvaluation!['evaluator'] as Map)
+        : const <String, dynamic>{};
     final evalNom =
+        evaluator['name']?.toString() ??
         donneesEvaluation?['evaluator_name']?.toString() ??
         donneesEvaluation?['supervisor']?.toString() ??
         (donneesApi ? '' : nomEvaluateur);
@@ -54,6 +58,8 @@ class FicheEvaluationPage extends StatelessWidget {
         ? Map<String, dynamic>.from(donneesEvaluation!['hospital'] as Map)
         : const <String, dynamic>{};
     final evalFonction =
+        evaluator['function']?.toString() ??
+        donneesEvaluation?['evaluator_function']?.toString() ??
         unit['name']?.toString() ??
         hospital['name']?.toString() ??
         (donneesApi ? '' : fonctionEvaluateur);
@@ -72,7 +78,10 @@ class FicheEvaluationPage extends StatelessWidget {
 
     List<String> forts = pointsForts;
     if (forts.isEmpty) {
-      if (appreciation != null && appreciation.isNotEmpty) {
+      final points = donneesEvaluation?['strengths']?.toString().trim() ?? '';
+      if (points.isNotEmpty) {
+        forts = [points];
+      } else if (appreciation != null && appreciation.isNotEmpty) {
         forts = [appreciation];
       } else if (ConfigurationApi.utiliserDonneesMockees && !donneesApi) {
         forts = const [
@@ -85,6 +94,7 @@ class FicheEvaluationPage extends StatelessWidget {
     List<String> axes = axesAmelioration;
     if (axes.isEmpty) {
       final obs =
+          donneesEvaluation?['improvement_areas']?.toString() ??
           donneesEvaluation?['observation']?.toString() ??
           donneesEvaluation?['improvement_points']?.toString();
       if (obs != null && obs.isNotEmpty) {
@@ -116,6 +126,11 @@ class FicheEvaluationPage extends StatelessWidget {
             titre: titre,
             pourcentage: val,
             couleur: const Color(0xFF1D61F2),
+            categorie: c['categorie']?.toString() ?? '',
+            scoreTexte: note != null && noteMax != null
+                ? '${_nombreCompact(note)} / ${_nombreCompact(noteMax)}'
+                : null,
+            commentaire: c['commentaire']?.toString(),
           );
         }).toList();
       }
@@ -403,7 +418,7 @@ class FicheEvaluationPage extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            '${comp.pourcentage}%',
+                            comp.scoreTexte ?? '${comp.pourcentage}%',
                             style: GoogleFonts.inter(
                               fontSize: 14.5,
                               fontWeight: FontWeight.w800,
@@ -413,6 +428,17 @@ class FicheEvaluationPage extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 10),
+                      if (comp.categorie.isNotEmpty) ...[
+                        Text(
+                          comp.categorie.replaceAll('_', ' '),
+                          style: GoogleFonts.inter(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF94A3B8),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
                       ClipRRect(
                         borderRadius: BorderRadius.circular(6),
                         child: LinearProgressIndicator(
@@ -424,6 +450,18 @@ class FicheEvaluationPage extends StatelessWidget {
                           ),
                         ),
                       ),
+                      if ((comp.commentaire ?? '').trim().isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        Text(
+                          comp.commentaire!.trim(),
+                          style: GoogleFonts.inter(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                            color: const Color(0xFF64748B),
+                            height: 1.3,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -440,9 +478,19 @@ class CompetenceEvaluation {
     required this.titre,
     required this.pourcentage,
     required this.couleur,
+    this.categorie = '',
+    this.scoreTexte,
+    this.commentaire,
   });
 
   final String titre;
   final int pourcentage;
   final Color couleur;
+  final String categorie;
+  final String? scoreTexte;
+  final String? commentaire;
 }
+
+String _nombreCompact(double valeur) => valeur == valeur.roundToDouble()
+    ? valeur.toInt().toString()
+    : valeur.toStringAsFixed(1);

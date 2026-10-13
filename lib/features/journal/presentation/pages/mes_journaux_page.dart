@@ -38,7 +38,7 @@ class _MesJournauxPageState extends State<MesJournauxPage> {
 
   Future<void> _chargerJournaux() async {
     try {
-      final res = await _source.journal();
+      final res = await _source.journal(perPage: 100);
       final items = (res['items'] as List? ?? [])
           .whereType<Map>()
           .map(Map<String, dynamic>.from)
@@ -71,8 +71,8 @@ class _MesJournauxPageState extends State<MesJournauxPage> {
           .toUpperCase();
       final matchFiltre = switch (_filtreActif) {
         'Brouillons' => statut == 'BROUILLON',
-        'Soumis' => statut == 'SOUMIS' || statut == 'EN_ATTENTE',
-        'Validés' => statut == 'VALIDE' || statut == 'VALIDÉ',
+        'Soumis' => statut == 'SOUMISE',
+        'Validés' => statut == 'VALIDEE',
         _ => true,
       };
       final description =
@@ -90,7 +90,7 @@ class _MesJournauxPageState extends State<MesJournauxPage> {
         _stats['validated'] ??
         _journaux.where((j) {
           final s = (j['statut'] ?? j['status'] ?? '').toString().toUpperCase();
-          return s == 'VALIDE' || s == 'VALIDÉ';
+          return s == 'VALIDEE';
         }).length;
 
     return Scaffold(
@@ -342,15 +342,15 @@ class _MesJournauxPageState extends State<MesJournauxPage> {
     Color statutBg = const Color(0xFFF1F5F9);
     String statutAffiche = 'BROUILLON';
 
-    if (statutBrut == 'VALIDE' || statutBrut == 'VALIDÉ') {
+    if (statutBrut == 'VALIDEE') {
       statutCouleur = const Color(0xFF16A34A);
       statutBg = const Color(0xFFDCFCE7);
       statutAffiche = 'VALIDÉ';
-    } else if (statutBrut == 'SOUMIS' || statutBrut == 'EN_ATTENTE') {
+    } else if (statutBrut == 'SOUMISE') {
       statutCouleur = const Color(0xFF0284C7);
       statutBg = const Color(0xFFE0F2FE);
       statutAffiche = 'SOUMIS';
-    } else if (statutBrut.contains('CORRIG') || statutBrut.contains('REJET')) {
+    } else if (statutBrut == 'REJETEE') {
       statutCouleur = const Color(0xFFEA580C);
       statutBg = const Color(0xFFFFF7ED);
       statutAffiche = 'À CORRIGER';
@@ -360,10 +360,8 @@ class _MesJournauxPageState extends State<MesJournauxPage> {
     final description =
         (j['summary'] ?? j['learning'] ?? j['description'] ?? '').toString();
     final nbActivites =
-        (j['activities'] is List
-            ? (j['activities'] as List).length
-            : j['nombreActivites']) ??
-        0;
+        j['activities_count'] ??
+        (j['activities'] is List ? (j['activities'] as List).length : 0);
     final retourEncadreur =
         j['validator_comment'] ??
         j['comment'] ??
@@ -373,8 +371,22 @@ class _MesJournauxPageState extends State<MesJournauxPage> {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () {
-          Navigator.of(context).push(
+        onTap: () async {
+          if (j['editable'] == true) {
+            final actualiser = await Navigator.of(context).push<bool>(
+              MaterialPageRoute<bool>(
+                builder: (_) => SaisirJournalPage(
+                  donneesJournal: j,
+                  assignmentUuid: j['assignment_uuid']?.toString(),
+                  logbookUuid: j['uuid']?.toString(),
+                ),
+              ),
+            );
+            if (actualiser == true) await _chargerJournaux();
+            return;
+          }
+          if (!context.mounted) return;
+          await Navigator.of(context).push(
             MaterialPageRoute<void>(
               builder: (_) => DetailJournalPage(
                 donneesJournal: j,

@@ -1,9 +1,9 @@
 import 'dart:io';
 import 'package:alert_info/alert_info.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../widgets/bottom_sheet_photo_profil.dart';
 import '../../../../app/routes/routes_application.dart';
 import '../../../../core/network/client_api_http.dart';
 import '../../../../core/network/source_etudiant_distante.dart';
@@ -13,15 +13,16 @@ import '../../../../core/services/sse_notifications_service.dart';
 import '../../../../core/widgets/contenu_adaptatif.dart';
 import '../../../authentication/data/datasources/source_authentification_distante.dart';
 import '../../../journal/presentation/pages/journal_page.dart';
+import '../../../journal/presentation/widgets/section_rapport.dart';
 import '../../../stage/presentation/pages/candidatures_stage_page.dart';
 import '../../data/models/etudiant_profil.dart';
-import '../widgets/section_dossier_profil.dart';
 import '../widgets/section_parametres_profil.dart';
 import 'modifier_informations_academiques_page.dart';
 import 'gestion_email_page.dart';
 import 'modifier_informations_personnelles_page.dart';
 import 'notes_academiques_page.dart';
 import '../../../planning/presentation/pages/planning_page.dart';
+import '../../../stage/presentation/pages/mes_paiements_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -86,11 +87,10 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _choisirPhoto() async {
     try {
-      final fichiers = await FilePicker.pickFiles(type: FileType.image);
-      if (!mounted || fichiers.isEmpty) return;
+      final chemin = await BottomSheetPhotoProfil.afficher(context);
+      if (!mounted || chemin == null) return;
 
-      final chemin = fichiers.first.path;
-      if (chemin == null || !await File(chemin).exists()) {
+      if (!await File(chemin).exists()) {
         throw const FileSystemException('Image inaccessible');
       }
 
@@ -98,7 +98,7 @@ class _ProfilePageState extends State<ProfilePage> {
       if (!mounted) return;
       AlertInfo.show(
         context: context,
-        text: 'Photo de profil importée avec succès.',
+        text: 'Photo de profil mise à jour avec succès.',
         typeInfo: TypeInfo.success,
       );
     } catch (_) {
@@ -125,18 +125,30 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  void _ouvrirPage(String titre, Widget contenu) {
+  void _ouvrirRapports() {
     Navigator.of(context, rootNavigator: true).push(
       MaterialPageRoute<void>(
-        builder: (_) => Scaffold(
-          appBar: AppBar(
-            title: Text(
-              titre,
-              style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+        builder: (context) {
+          final modeSombre = Theme.of(context).brightness == Brightness.dark;
+          final fond = modeSombre
+              ? const Color(0xFF0B1220)
+              : const Color(0xFFF8FAFC);
+          return Scaffold(
+            backgroundColor: fond,
+            appBar: AppBar(
+              backgroundColor: fond,
+              surfaceTintColor: Colors.transparent,
+              title: Text(
+                'Mes rapports',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+              ),
             ),
-          ),
-          body: ContenuAdaptatif(largeurMaximale: 640, enfant: contenu),
-        ),
+            body: const ContenuAdaptatif(
+              largeurMaximale: 640,
+              enfant: SectionRapport(),
+            ),
+          );
+        },
       ),
     );
   }
@@ -426,64 +438,118 @@ class _ProfilePageState extends State<ProfilePage> {
                                       ignoring: masquerAvatar,
                                       child: GestureDetector(
                                         onTap: _choisirPhoto,
-                                        child: Container(
-                                          width: 98,
-                                          height: 98,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            color: const Color(0xFFD4B28C),
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Colors.black.withValues(
-                                                  alpha: 0.18,
-                                                ),
-                                                blurRadius: 14,
-                                                offset: const Offset(0, 4),
-                                              ),
-                                            ],
-                                          ),
-                                          child: ClipOval(
-                                            child: photoValide
-                                                ? Image.file(
-                                                    File(cheminPhoto),
-                                                    width: 98,
-                                                    height: 98,
-                                                    fit: BoxFit.cover,
-                                                  )
-                                                : avatarDistant.isNotEmpty
-                                                ? Image.network(
-                                                    avatarDistant,
-                                                    width: 98,
-                                                    height: 98,
-                                                    fit: BoxFit.cover,
-                                                    errorBuilder:
-                                                        (
-                                                          context,
-                                                          error,
-                                                          stackTrace,
-                                                        ) => const Icon(
-                                                          Icons.person,
-                                                          size: 56,
-                                                          color: Colors.white,
+                                        child: Stack(
+                                          clipBehavior: Clip.none,
+                                          children: [
+                                            Container(
+                                              width: 98,
+                                              height: 98,
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                color: const Color(0xFFD4B28C),
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: Colors.black
+                                                        .withValues(
+                                                          alpha: 0.18,
                                                         ),
-                                                  )
-                                                : Image.asset(
-                                                    'assets/images/avatar_etudiant.jpg',
-                                                    width: 98,
-                                                    height: 98,
-                                                    fit: BoxFit.cover,
-                                                    errorBuilder:
-                                                        (
-                                                          context,
-                                                          error,
-                                                          stackTrace,
-                                                        ) => const Icon(
-                                                          Icons.person,
-                                                          size: 56,
-                                                          color: Colors.white,
-                                                        ),
+                                                    blurRadius: 14,
+                                                    offset: const Offset(0, 4),
                                                   ),
-                                          ),
+                                                ],
+                                              ),
+                                              child: ClipOval(
+                                                child: photoValide
+                                                    ? Image.file(
+                                                        File(cheminPhoto),
+                                                        width: 98,
+                                                        height: 98,
+                                                        fit: BoxFit.cover,
+                                                      )
+                                                    : avatarDistant.isNotEmpty
+                                                    ? Image.network(
+                                                        avatarDistant,
+                                                        width: 98,
+                                                        height: 98,
+                                                        fit: BoxFit.cover,
+                                                        errorBuilder:
+                                                            (
+                                                              context,
+                                                              error,
+                                                              stackTrace,
+                                                            ) => const Icon(
+                                                              Icons.person,
+                                                              size: 56,
+                                                              color:
+                                                                  Colors.white,
+                                                            ),
+                                                      )
+                                                    : Image.asset(
+                                                        'assets/images/avatar_etudiant.jpg',
+                                                        width: 98,
+                                                        height: 98,
+                                                        fit: BoxFit.cover,
+                                                        errorBuilder:
+                                                            (
+                                                              context,
+                                                              error,
+                                                              stackTrace,
+                                                            ) => const Icon(
+                                                              Icons.person,
+                                                              size: 56,
+                                                              color:
+                                                                  Colors.white,
+                                                            ),
+                                                      ),
+                                              ),
+                                            ),
+                                            Positioned(
+                                              right: -2,
+                                              bottom: -2,
+                                              child: Container(
+                                                width: 32,
+                                                height: 32,
+                                                decoration: BoxDecoration(
+                                                  gradient:
+                                                      const LinearGradient(
+                                                        begin:
+                                                            Alignment.topLeft,
+                                                        end: Alignment
+                                                            .bottomRight,
+                                                        colors: [
+                                                          Color(0xFF2563EB),
+                                                          Color(0xFF1D4ED8),
+                                                        ],
+                                                      ),
+                                                  shape: BoxShape.circle,
+                                                  border: Border.all(
+                                                    color: Colors.white,
+                                                    width: 2.5,
+                                                  ),
+                                                  boxShadow: [
+                                                    BoxShadow(
+                                                      color: Colors.black
+                                                          .withValues(
+                                                            alpha: 0.25,
+                                                          ),
+                                                      blurRadius: 6,
+                                                      offset: const Offset(
+                                                        0,
+                                                        2,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                child: const Center(
+                                                  child: Icon(
+                                                    Icons.camera_alt_rounded,
+                                                    size: 15,
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ),
@@ -619,13 +685,26 @@ class _ProfilePageState extends State<ProfilePage> {
                               ),
                               Divider(height: 1, color: separateurCouleur),
                               _ItemMenu(
+                                icone: Icons.payments_outlined,
+                                titre: 'Mes paiements',
+                                couleurTexte: texteCouleur,
+                                onTap: () =>
+                                    Navigator.of(
+                                      context,
+                                      rootNavigator: true,
+                                    ).push(
+                                      MaterialPageRoute<void>(
+                                        builder: (_) =>
+                                            const MesPaiementsPage(),
+                                      ),
+                                    ),
+                              ),
+                              Divider(height: 1, color: separateurCouleur),
+                              _ItemMenu(
                                 icone: Icons.description_outlined,
                                 titre: 'Mes rapports',
                                 couleurTexte: texteCouleur,
-                                onTap: () => _ouvrirPage(
-                                  'Mes rapports',
-                                  const SectionDossierProfil(),
-                                ),
+                                onTap: _ouvrirRapports,
                               ),
                             ],
                           ),

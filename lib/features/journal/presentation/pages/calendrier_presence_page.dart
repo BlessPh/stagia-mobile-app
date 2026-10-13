@@ -32,27 +32,45 @@ class _CalendrierPresencePageState extends State<CalendrierPresencePage> {
     _chargerPresences();
   }
 
-  Future<void> _chargerPresences() async {
+  Future<void> _chargerPresences([DateTime? mois]) async {
+    final moisCible = DateTime(
+      (mois ?? _moisAffiche).year,
+      (mois ?? _moisAffiche).month,
+    );
+    final premierJour = moisCible;
+    final dernierJour = DateTime(moisCible.year, moisCible.month + 1, 0);
     try {
-      final futurPresences = _source.presences();
-      final futurCounts = _source.notificationCounts();
-      final results = await Future.wait([futurPresences, futurCounts]);
-
-      final presencesData = results[0];
-      final countsData = results[1];
+      final presencesData = await _source.presences(
+        dateFrom: _dateApi(premierJour),
+        dateTo: _dateApi(dernierJour),
+        perPage: 100,
+      );
 
       final items = (presencesData['items'] as List? ?? [])
           .whereType<Map>()
           .map(Map<String, dynamic>.from)
           .toList();
+      items.sort(
+        (a, b) => (b['date']?.toString() ?? '').compareTo(
+          a['date']?.toString() ?? '',
+        ),
+      );
 
-      final unread =
-          int.tryParse(countsData['notifications']?.toString() ?? '0') ?? 0;
+      var unread = _unreadNotifications;
+      try {
+        final countsData = await _source.notificationCounts();
+        unread =
+            int.tryParse(countsData['notifications']?.toString() ?? '0') ?? 0;
+      } catch (_) {
+        // Le compteur de notifications ne doit pas bloquer les présences.
+      }
 
       // Construire les pastilles pour le mois affiché
-      final pastilles = _extrairePastillesParJour(items, _moisAffiche);
+      final pastilles = _extrairePastillesParJour(items, moisCible);
 
-      if (mounted) {
+      if (mounted &&
+          _moisAffiche.year == moisCible.year &&
+          _moisAffiche.month == moisCible.month) {
         setState(() {
           _pointages = items;
           _statutsPointageParJour = pastilles;
@@ -61,8 +79,14 @@ class _CalendrierPresencePageState extends State<CalendrierPresencePage> {
         });
       }
     } catch (_) {
-      if (mounted) {
-        setState(() => _chargement = false);
+      if (mounted &&
+          _moisAffiche.year == moisCible.year &&
+          _moisAffiche.month == moisCible.month) {
+        setState(() {
+          _pointages = [];
+          _statutsPointageParJour = {};
+          _chargement = false;
+        });
       }
     }
   }
@@ -80,26 +104,31 @@ class _CalendrierPresencePageState extends State<CalendrierPresencePage> {
         final statut = (item['status'] ?? item['statut'] ?? '')
             .toString()
             .toUpperCase();
-        if (statut.contains('PRESENT') || statut == 'VALIDE') {
-          map[dt.day] = const Color(0xFF16A34A); // Vert
-        } else if (statut.contains('RETARD')) {
-          map[dt.day] = const Color(0xFFF97316); // Orange
-        } else if (statut.contains('ABSENT')) {
-          map[dt.day] = const Color(0xFFDC2626); // Rouge
+        switch (statut) {
+          case 'PRESENT':
+            map[dt.day] = const Color(0xFF16A34A);
+          case 'RETARD':
+            map[dt.day] = const Color(0xFFF97316);
+          case 'ABSENT':
+            map[dt.day] = const Color(0xFFDC2626);
+          case 'JUSTIFIE':
+            map[dt.day] = const Color(0xFF2563EB);
+          case 'GARDE':
+            map[dt.day] = const Color(0xFF7E22CE);
         }
       }
     }
     return map;
   }
 
-  void _onChangementMois(DateTime nouveauMois) {
+  Future<void> _onChangementMois(DateTime nouveauMois) async {
     setState(() {
       _moisAffiche = nouveauMois;
-      _statutsPointageParJour = _extrairePastillesParJour(
-        _pointages,
-        nouveauMois,
-      );
+      _pointages = [];
+      _statutsPointageParJour = {};
+      _chargement = true;
     });
+    await _chargerPresences(nouveauMois);
   }
 
   @override
@@ -180,7 +209,7 @@ class _CalendrierPresencePageState extends State<CalendrierPresencePage> {
               )
             : RefreshIndicator(
                 color: const Color(0xFFFF7417),
-                onRefresh: _chargerPresences,
+                onRefresh: () => _chargerPresences(_moisAffiche),
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
@@ -304,23 +333,34 @@ class _CalendrierPresencePageState extends State<CalendrierPresencePage> {
                                 .take(2)
                                 .join(':');
                         final horaires = '$arrivee - $depart';
-                        final source =
-                            p['hospital_name']?.toString() ??
-                            p['observation']?.toString() ??
-                            'Pointage clinique';
+                        final source = [
+                          _map(p['hospital'])['name']?.toString() ?? '',
+                          _map(p['unit'])['name']?.toString() ?? '',
+                          p['source']?.toString() ?? '',
+                        ].where((valeur) => valeur.isNotEmpty).join(' • ');
                         final statutBrut =
-                            (p['status'] ?? p['statut'] ?? 'PRESENT')
-                                .toString()
-                                .toUpperCase();
+                            (p['status'] ?? p['statut'])
+                                ?.toString()
+                                .toUpperCase() ??
+                            '';
 
                         Color couleurStatut = const Color(0xFF16A34A);
-                        String statutTexte = 'Présent';
-                        if (statutBrut.contains('RETARD')) {
-                          couleurStatut = const Color(0xFFF97316);
-                          statutTexte = 'Retard';
-                        } else if (statutBrut.contains('ABSENT')) {
-                          couleurStatut = const Color(0xFFDC2626);
-                          statutTexte = 'Absent';
+                        String statutTexte = statutBrut;
+                        switch (statutBrut) {
+                          case 'PRESENT':
+                            statutTexte = 'Présent';
+                          case 'RETARD':
+                            couleurStatut = const Color(0xFFF97316);
+                            statutTexte = 'Retard';
+                          case 'ABSENT':
+                            couleurStatut = const Color(0xFFDC2626);
+                            statutTexte = 'Absent';
+                          case 'JUSTIFIE':
+                            couleurStatut = const Color(0xFF2563EB);
+                            statutTexte = 'Justifié';
+                          case 'GARDE':
+                            couleurStatut = const Color(0xFF7E22CE);
+                            statutTexte = 'Garde';
                         }
 
                         return Padding(
@@ -329,7 +369,7 @@ class _CalendrierPresencePageState extends State<CalendrierPresencePage> {
                             dateJour: dateJour,
                             jourSemaine: jourSemaine,
                             horaires: horaires,
-                            sourceTexte: 'Source : $source',
+                            sourceTexte: source,
                             statutTexte: statutTexte,
                             statutCouleur: couleurStatut,
                           ),
@@ -506,3 +546,11 @@ class _CalendrierPresencePageState extends State<CalendrierPresencePage> {
     );
   }
 }
+
+String _dateApi(DateTime date) =>
+    '${date.year.toString().padLeft(4, '0')}-'
+    '${date.month.toString().padLeft(2, '0')}-'
+    '${date.day.toString().padLeft(2, '0')}';
+
+Map<String, dynamic> _map(Object? valeur) =>
+    valeur is Map ? Map<String, dynamic>.from(valeur) : <String, dynamic>{};
