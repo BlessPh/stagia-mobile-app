@@ -8,14 +8,9 @@ import '../../../../core/widgets/erreur_chargement_api.dart';
 import 'paiement_mobile_page.dart';
 
 class ApercuFacturePage extends StatefulWidget {
-  const ApercuFacturePage({
-    required this.obligationUuid,
-    this.obligationInitiale,
-    super.key,
-  });
+  const ApercuFacturePage({required this.obligationUuid, super.key});
 
   final String obligationUuid;
-  final Map<String, dynamic>? obligationInitiale;
 
   @override
   State<ApercuFacturePage> createState() => _ApercuFacturePageState();
@@ -42,6 +37,15 @@ class _ApercuFacturePageState extends State<ApercuFacturePage> {
     await futur;
   }
 
+  static bool _actionAutorisee(Map<String, dynamic> donnees, String action) {
+    final obligation = donnees['obligation'];
+    if (obligation is! Map) return false;
+    final actions = obligation['actions'];
+    if (actions is! Map) return false;
+    final configuration = actions[action];
+    return configuration is Map && configuration['allowed'] == true;
+  }
+
   Future<void> _synchroniser() async {
     setState(() => _enCoursDeSync = true);
     try {
@@ -61,18 +65,24 @@ class _ApercuFacturePageState extends State<ApercuFacturePage> {
               : const Color(0xFF2563EB),
         ),
       );
-      _actualiser();
+      await _actualiser();
     } on ErreurApi catch (e) {
       if (!mounted) return;
       setState(() => _enCoursDeSync = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message), backgroundColor: const Color(0xFFEF4444)),
+        SnackBar(
+          content: Text(e.message),
+          backgroundColor: const Color(0xFFEF4444),
+        ),
       );
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() => _enCoursDeSync = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur : $e'), backgroundColor: const Color(0xFFEF4444)),
+        const SnackBar(
+          content: Text('Impossible de synchroniser le paiement.'),
+          backgroundColor: Color(0xFFEF4444),
+        ),
       );
     }
   }
@@ -80,7 +90,9 @@ class _ApercuFacturePageState extends State<ApercuFacturePage> {
   @override
   Widget build(BuildContext context) {
     final modeSombre = Theme.of(context).brightness == Brightness.dark;
-    final fondPage = modeSombre ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final fondPage = modeSombre
+        ? const Color(0xFF0F172A)
+        : const Color(0xFFF8FAFC);
     final texteCouleur = modeSombre ? Colors.white : const Color(0xFF0F172A);
 
     return Scaffold(
@@ -106,16 +118,28 @@ class _ApercuFacturePageState extends State<ApercuFacturePage> {
           ),
         ),
         actions: [
-          IconButton(
-            tooltip: 'Synchroniser l’état',
-            icon: _enCoursDeSync
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFFF751F)),
-                  )
-                : const Icon(Icons.sync_rounded, color: Color(0xFFFF751F)),
-            onPressed: _enCoursDeSync ? null : _synchroniser,
+          FutureBuilder<Map<String, dynamic>>(
+            future: _chargement,
+            builder: (context, snapshot) {
+              final syncAutorisee =
+                  snapshot.hasData && _actionAutorisee(snapshot.data!, 'sync');
+              return IconButton(
+                tooltip: 'Synchroniser l’état',
+                icon: _enCoursDeSync
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Color(0xFFFF751F),
+                        ),
+                      )
+                    : const Icon(Icons.sync_rounded, color: Color(0xFFFF751F)),
+                onPressed: _enCoursDeSync || !syncAutorisee
+                    ? null
+                    : _synchroniser,
+              );
+            },
           ),
         ],
         centerTitle: false,
@@ -124,17 +148,13 @@ class _ApercuFacturePageState extends State<ApercuFacturePage> {
         largeurMaximale: 640,
         enfant: FutureBuilder<Map<String, dynamic>>(
           future: _chargement,
-          initialData: widget.obligationInitiale != null
-              ? {'obligation': widget.obligationInitiale!}
-              : null,
           builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting &&
-                !snapshot.hasData) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(
                 child: CircularProgressIndicator(color: Color(0xFFFF751F)),
               );
             }
-            if (snapshot.hasError && !snapshot.hasData) {
+            if (snapshot.hasError) {
               return ErreurChargementApi(
                 erreur: snapshot.error,
                 onReessayer: _actualiser,
@@ -144,7 +164,7 @@ class _ApercuFacturePageState extends State<ApercuFacturePage> {
             final data = snapshot.data ?? {};
             final obligation = data['obligation'] is Map
                 ? Map<String, dynamic>.from(data['obligation'] as Map)
-                : (widget.obligationInitiale ?? <String, dynamic>{});
+                : <String, dynamic>{};
 
             if (obligation.isEmpty) {
               return Center(
@@ -168,19 +188,28 @@ class _ApercuFacturePageState extends State<ApercuFacturePage> {
                 ? Map<String, dynamic>.from(contextData!['hospital'] as Map)
                 : null;
 
-            final status = (obligation['status'] ?? '').toString().toUpperCase();
+            final status = (obligation['status'] ?? '')
+                .toString()
+                .toUpperCase();
             final estPayee = status == 'PAID' || invoice?['status'] == 'PAYEE';
-            final payable = obligation['payable'] == true && !estPayee;
+            final payable =
+                obligation['payable'] == true &&
+                !estPayee &&
+                _actionAutorisee(data, 'initiate');
 
-            final montantTotal = obligation['amount'] ?? invoice?['amount'] ?? 0;
-            final montantRestant = obligation['amount_remaining'] ?? (estPayee ? 0 : montantTotal);
-            final devise = obligation['currency'] ?? invoice?['currency'] ?? 'USD';
-            final referenceObligation = obligation['reference'] ?? 'OBL-STAGE';
-            final referenceFacture = invoice?['reference'] ?? 'FAC-STAGE';
-            final dateFacture = invoice?['issued_at'] ?? '2026-10-08';
+            final montantTotal = obligation['amount'] ?? invoice?['amount'];
+            final montantRestant =
+                obligation['amount_remaining'] ?? (estPayee ? 0 : montantTotal);
+            final devise =
+                (obligation['currency'] ?? invoice?['currency'])?.toString() ??
+                '';
+            final referenceObligation =
+                obligation['reference']?.toString() ?? '—';
+            final referenceFacture = invoice?['reference']?.toString() ?? '—';
+            final dateFacture = invoice?['issued_at']?.toString() ?? '—';
 
-            final nomHopital = hospital?['name']?.toString() ?? 'Hôpital Général';
-            final titreCampagne = campaign?['title']?.toString() ?? "Stage de fin d'année 2026";
+            final nomHopital = hospital?['name']?.toString();
+            final titreCampagne = campaign?['title']?.toString();
 
             return Column(
               children: [
@@ -194,6 +223,7 @@ class _ApercuFacturePageState extends State<ApercuFacturePage> {
                         modeSombre: modeSombre,
                         estPayee: estPayee,
                         enAttente: obligation['payment_pending'] == true,
+                        statut: status,
                       ),
 
                       const SizedBox(height: 16),
@@ -204,8 +234,8 @@ class _ApercuFacturePageState extends State<ApercuFacturePage> {
                         referenceFacture: referenceFacture,
                         referenceObligation: referenceObligation,
                         dateFacture: dateFacture,
-                        titreCampagne: titreCampagne,
-                        nomHopital: nomHopital,
+                        titreCampagne: titreCampagne ?? '—',
+                        nomHopital: nomHopital ?? '—',
                         montantTotal: montantTotal,
                         montantRestant: montantRestant,
                         devise: devise,
@@ -236,7 +266,9 @@ class _ApercuFacturePageState extends State<ApercuFacturePage> {
                     color: modeSombre ? const Color(0xFF1E293B) : Colors.white,
                     border: Border(
                       top: BorderSide(
-                        color: modeSombre ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                        color: modeSombre
+                            ? const Color(0xFF334155)
+                            : const Color(0xFFF1F5F9),
                       ),
                     ),
                   ),
@@ -253,7 +285,10 @@ class _ApercuFacturePageState extends State<ApercuFacturePage> {
                                 borderRadius: BorderRadius.circular(14),
                               ),
                             ),
-                            icon: const Icon(Icons.check_circle_rounded, size: 20),
+                            icon: const Icon(
+                              Icons.check_circle_rounded,
+                              size: 20,
+                            ),
                             label: Text(
                               'Facture réglée avec succès',
                               style: GoogleFonts.inter(
@@ -263,21 +298,26 @@ class _ApercuFacturePageState extends State<ApercuFacturePage> {
                             ),
                           )
                         : FilledButton.icon(
-                            onPressed: !payable
+                            onPressed:
+                                !payable ||
+                                    montantRestant is! num ||
+                                    devise.isEmpty
                                 ? null
                                 : () async {
-                                    final res = await Navigator.of(context).push<bool>(
-                                      MaterialPageRoute<bool>(
-                                        builder: (_) => PaiementMobilePage(
-                                          obligationUuid: widget.obligationUuid,
-                                          montant: montantRestant,
-                                          devise: devise,
-                                          reference: referenceObligation,
-                                          nomHopital: nomHopital,
-                                          titreCampagne: titreCampagne,
-                                        ),
-                                      ),
-                                    );
+                                    final res = await Navigator.of(context)
+                                        .push<bool>(
+                                          MaterialPageRoute<bool>(
+                                            builder: (_) => PaiementMobilePage(
+                                              obligationUuid:
+                                                  widget.obligationUuid,
+                                              montant: montantRestant,
+                                              devise: devise,
+                                              reference: referenceObligation,
+                                              nomHopital: nomHopital,
+                                              titreCampagne: titreCampagne,
+                                            ),
+                                          ),
+                                        );
                                     if (res == true && mounted) {
                                       _actualiser();
                                     }
@@ -291,7 +331,9 @@ class _ApercuFacturePageState extends State<ApercuFacturePage> {
                             ),
                             icon: const Icon(Icons.payment_rounded, size: 20),
                             label: Text(
-                              'Passer au paiement ($montantRestant $devise)',
+                              montantRestant is num && devise.isNotEmpty
+                                  ? 'Passer au paiement ($montantRestant $devise)'
+                                  : 'Passer au paiement',
                               style: GoogleFonts.inter(
                                 fontSize: 15.5,
                                 fontWeight: FontWeight.w800,
@@ -312,25 +354,47 @@ class _ApercuFacturePageState extends State<ApercuFacturePage> {
     required bool modeSombre,
     required bool estPayee,
     required bool enAttente,
+    required String statut,
   }) {
+    final estErreur = const {'FAILED', 'CANCELLED', 'EXPIRED'}.contains(statut);
     final couleur = estPayee
         ? const Color(0xFF16A34A)
+        : estErreur
+        ? const Color(0xFFDC2626)
         : (enAttente ? const Color(0xFF2563EB) : const Color(0xFFEA580C));
     final fond = estPayee
-        ? (modeSombre ? const Color(0xFF064E3B).withValues(alpha: 0.35) : const Color(0xFFDCFCE7))
+        ? (modeSombre
+              ? const Color(0xFF064E3B).withValues(alpha: 0.35)
+              : const Color(0xFFDCFCE7))
+        : estErreur
+        ? (modeSombre
+              ? const Color(0xFF7F1D1D).withValues(alpha: 0.35)
+              : const Color(0xFFFEE2E2))
         : (enAttente
-            ? (modeSombre ? const Color(0xFF1E3A8A).withValues(alpha: 0.35) : const Color(0xFFEFF6FF))
-            : (modeSombre ? const Color(0xFF7C2D12).withValues(alpha: 0.35) : const Color(0xFFFFEDD5)));
+              ? (modeSombre
+                    ? const Color(0xFF1E3A8A).withValues(alpha: 0.35)
+                    : const Color(0xFFEFF6FF))
+              : (modeSombre
+                    ? const Color(0xFF7C2D12).withValues(alpha: 0.35)
+                    : const Color(0xFFFFEDD5)));
 
     final titre = estPayee
         ? 'Facture réglée'
+        : estErreur
+        ? switch (statut) {
+            'FAILED' => 'Paiement échoué',
+            'CANCELLED' => 'Paiement annulé',
+            _ => 'Obligation expirée',
+          }
         : (enAttente ? 'Paiement en cours de traitement' : 'Paiement requis');
 
     final message = estPayee
-        ? 'Le montant a été validé. Votre place est confirmée et transmise à l’université.'
+        ? 'Le montant a été validé et cette obligation financière est réglée.'
+        : estErreur
+        ? 'Cette obligation ne peut pas être réglée dans son état actuel.'
         : (enAttente
-            ? 'Une transaction a été initiée. Vous pouvez synchroniser le statut une fois le code PIN saisi.'
-            : 'Votre candidature a été approuvée par l’université. Veuillez régler pour finaliser votre affectation.');
+              ? 'Une transaction a été initiée. Vous pouvez synchroniser le statut une fois le code PIN saisi.'
+              : 'Cette obligation financière doit être réglée pour poursuivre le processus associé.');
 
     return Container(
       width: double.infinity,
@@ -346,7 +410,11 @@ class _ApercuFacturePageState extends State<ApercuFacturePage> {
           Icon(
             estPayee
                 ? Icons.verified_rounded
-                : (enAttente ? Icons.hourglass_top_rounded : Icons.info_outline_rounded),
+                : estErreur
+                ? Icons.error_outline_rounded
+                : (enAttente
+                      ? Icons.hourglass_top_rounded
+                      : Icons.info_outline_rounded),
             color: couleur,
             size: 24,
           ),
@@ -369,7 +437,9 @@ class _ApercuFacturePageState extends State<ApercuFacturePage> {
                   style: GoogleFonts.inter(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
-                    color: modeSombre ? const Color(0xFFE2E8F0) : const Color(0xFF334155),
+                    color: modeSombre
+                        ? const Color(0xFFE2E8F0)
+                        : const Color(0xFF334155),
                     height: 1.4,
                   ),
                 ),
@@ -403,7 +473,9 @@ class _ApercuFacturePageState extends State<ApercuFacturePage> {
         ),
         boxShadow: [
           BoxShadow(
-            color: modeSombre ? Colors.black.withValues(alpha: 0.15) : const Color(0x06000000),
+            color: modeSombre
+                ? Colors.black.withValues(alpha: 0.15)
+                : const Color(0x06000000),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -431,9 +503,14 @@ class _ApercuFacturePageState extends State<ApercuFacturePage> {
               const SizedBox(width: 8),
               Flexible(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
-                    color: modeSombre ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                    color: modeSombre
+                        ? const Color(0xFF334155)
+                        : const Color(0xFFF1F5F9),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -443,7 +520,9 @@ class _ApercuFacturePageState extends State<ApercuFacturePage> {
                     style: GoogleFonts.inter(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
-                      color: modeSombre ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                      color: modeSombre
+                          ? const Color(0xFFCBD5E1)
+                          : const Color(0xFF475569),
                     ),
                   ),
                 ),
@@ -452,7 +531,11 @@ class _ApercuFacturePageState extends State<ApercuFacturePage> {
           ),
           const SizedBox(height: 16),
 
-          _buildLigneDetail('Référence obligation', referenceObligation, modeSombre),
+          _buildLigneDetail(
+            'Référence obligation',
+            referenceObligation,
+            modeSombre,
+          ),
           _buildLigneDetail('Campagne de stage', titreCampagne, modeSombre),
           _buildLigneDetail('Établissement / Hôpital', nomHopital, modeSombre),
           _buildLigneDetail('Date d’émission', dateFacture, modeSombre),
@@ -460,7 +543,9 @@ class _ApercuFacturePageState extends State<ApercuFacturePage> {
           const SizedBox(height: 16),
           Divider(
             height: 1,
-            color: modeSombre ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+            color: modeSombre
+                ? const Color(0xFF334155)
+                : const Color(0xFFE2E8F0),
           ),
           const SizedBox(height: 16),
 
@@ -472,7 +557,9 @@ class _ApercuFacturePageState extends State<ApercuFacturePage> {
                 style: GoogleFonts.inter(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
-                  color: modeSombre ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  color: modeSombre
+                      ? const Color(0xFF94A3B8)
+                      : const Color(0xFF64748B),
                 ),
               ),
               Text(
@@ -504,7 +591,9 @@ class _ApercuFacturePageState extends State<ApercuFacturePage> {
                   fontSize: 22,
                   fontWeight: FontWeight.w900,
                   color: estPayee
-                      ? (modeSombre ? const Color(0xFF4ADE80) : const Color(0xFF16A34A))
+                      ? (modeSombre
+                            ? const Color(0xFF4ADE80)
+                            : const Color(0xFF16A34A))
                       : const Color(0xFFFF751F),
                 ),
               ),
@@ -529,7 +618,9 @@ class _ApercuFacturePageState extends State<ApercuFacturePage> {
               style: GoogleFonts.inter(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
-                color: modeSombre ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                color: modeSombre
+                    ? const Color(0xFF94A3B8)
+                    : const Color(0xFF64748B),
               ),
             ),
           ),
@@ -574,7 +665,7 @@ class _ApercuFacturePageState extends State<ApercuFacturePage> {
           final ref = pay['reference'] ?? 'PAY';
           final montant = pay['amount'] ?? 0;
           final status = (pay['status'] ?? '').toString();
-          final channel = pay['channel'] ?? 'MOBILE MONEY';
+          final channel = pay['channel']?.toString() ?? '—';
           final date = pay['initiated_at'] ?? '';
 
           return Container(
@@ -584,7 +675,9 @@ class _ApercuFacturePageState extends State<ApercuFacturePage> {
               color: modeSombre ? const Color(0xFF1E293B) : Colors.white,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: modeSombre ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                color: modeSombre
+                    ? const Color(0xFF334155)
+                    : const Color(0xFFE2E8F0),
               ),
             ),
             child: Row(
@@ -598,7 +691,9 @@ class _ApercuFacturePageState extends State<ApercuFacturePage> {
                       style: GoogleFonts.inter(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: modeSombre ? Colors.white : const Color(0xFF0F172A),
+                        color: modeSombre
+                            ? Colors.white
+                            : const Color(0xFF0F172A),
                       ),
                     ),
                     if (date.isNotEmpty) ...[

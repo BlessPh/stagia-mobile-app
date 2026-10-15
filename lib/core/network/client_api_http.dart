@@ -112,6 +112,7 @@ class ClientApiHttp implements ClientApi {
               json['message']?.toString() ??
               'Erreur lors de l\'envoi du fichier (${reponse.statusCode}).',
           details: json['data'],
+          retryAfter: reponse.headers['retry-after'],
         );
       }
       return json;
@@ -331,6 +332,7 @@ class ClientApiHttp implements ClientApi {
               : json['message']?.toString() ??
                     'Erreur du serveur (${reponse.statusCode}).',
           details: json['data'],
+          retryAfter: reponse.headers['retry-after'],
         );
       }
       return json;

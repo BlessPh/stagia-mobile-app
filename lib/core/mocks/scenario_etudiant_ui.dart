@@ -137,6 +137,11 @@ abstract final class ScenarioEtudiantUi {
         EndpointsApi.reservationsEtudiant => reservations,
         EndpointsApi.admissionEtudiant => admissions,
         EndpointsApi.stagesEtudiant => stages,
+        EndpointsApi.cloturesStageEtudiant => completions,
+        EndpointsApi.resultatsStageEtudiant => results,
+        EndpointsApi.documentsEtudiant => documentsOfficiels,
+        EndpointsApi.rapportsStageEtudiant => rapportsStage,
+        EndpointsApi.justificationsStageEtudiant => justificationsStage,
         EndpointsApi.contexteExecution ||
         EndpointsApi.contextePointage => executionContext,
         EndpointsApi.presencesEtudiant => attendance,
@@ -694,6 +699,232 @@ abstract final class ScenarioEtudiantUi {
     },
   };
 
+  static const completions = <String, dynamic>{
+    'items': [
+      {
+        'uuid': 'completion-history-001',
+        'status': 'VALIDE',
+        'score': 17.0,
+        'attendance_rate': 94.0,
+        'final_appreciation': 'Excellent stage.',
+        'decision_comment': 'Dossier complet transmis à l’université.',
+        'prepared_at': '2026-07-01 09:00:00',
+        'validated_at': '2026-07-03 14:30:00',
+        'final_deliberation': {'status': 'VALIDEE'},
+        'university_validation': {'status': 'VALIDE'},
+        'progress': {'percent': 100},
+        'readiness': {'ready': true, 'blockers': <String>[]},
+        'validator': {'name': 'Dr Patrick Kabeya'},
+        'assignment': {'uuid': 'assignment-history-001', 'status': 'TERMINEE'},
+        'campaign': {
+          'uuid': 'campaign-history-021',
+          'code': 'CAM-000021',
+          'title': 'Stage hospitalier du second semestre',
+        },
+        'hospital': {
+          'id': 10,
+          'code': 'HOP-003',
+          'name': 'Cliniques Universitaires de Kinshasa',
+        },
+        'department': {'id': 20, 'name': 'Médecine interne'},
+      },
+    ],
+    'pagination': {'page': 1, 'per_page': 20, 'total': 1, 'pages': 1},
+    'stats': {'total': 1, 'validated': 1, 'pending': 0},
+  };
+
+  static const results = <String, dynamic>{
+    'items': [
+      {
+        'uuid': 'result-history-001',
+        'decision': 'VALIDE',
+        'score': 17.0,
+        'appreciation': 'Excellent stage.',
+        'assignment': {'uuid': 'assignment-history-001', 'status': 'TERMINEE'},
+        'campaign': {
+          'uuid': 'campaign-history-021',
+          'code': 'CAM-000021',
+          'title': 'Stage hospitalier du second semestre',
+        },
+        'hospital': {
+          'id': 10,
+          'code': 'HOP-003',
+          'name': 'Cliniques Universitaires de Kinshasa',
+        },
+        'administrative_process': {
+          'status': 'COMPLETED',
+          'university_transmission': {'status': 'VALIDE'},
+        },
+        'document': {
+          'uuid': 'certificate-history-001',
+          'reference': 'ATT-2026-000021',
+          'type': 'ATTESTATION_STAGE',
+          'status': 'GENERE',
+          'available': true,
+          'file_endpoint':
+              '/api/v1/student/certificates/certificate-history-001/file',
+          'download_endpoint':
+              '/api/v1/student/certificates/certificate-history-001/file?download=1',
+        },
+      },
+    ],
+    'pagination': {'page': 1, 'per_page': 20, 'total': 1, 'pages': 1},
+    'stats': {'total': 1, 'validated': 1},
+  };
+
+  static const documentsOfficiels = <String, dynamic>{
+    'items': [
+      {
+        'uuid': 'certificate-history-001',
+        'reference': 'ATT-2026-000021',
+        'type_document': 'ATTESTATION_STAGE',
+        'status': 'GENERE',
+        'available': true,
+        'availability_reason': null,
+        'university_result_status': 'VALIDE',
+        'file_endpoint':
+            '/api/v1/student/certificates/certificate-history-001/file',
+        'download_endpoint':
+            '/api/v1/student/certificates/certificate-history-001/file?download=1',
+        'stage': {'assignment_uuid': 'assignment-history-001'},
+        'campaign': {
+          'uuid': 'campaign-history-021',
+          'code': 'CAM-000021',
+          'title': 'Stage hospitalier du second semestre',
+        },
+        'hospital': {
+          'id': 10,
+          'code': 'HOP-003',
+          'name': 'Cliniques Universitaires de Kinshasa',
+        },
+      },
+    ],
+    'pagination': {'page': 1, 'per_page': 20, 'total': 1, 'pages': 1},
+    'stats': {'total': 1, 'available': 1, 'pending': 0},
+    'filters': <String, dynamic>{},
+    'available_filters': {
+      'types': ['ATTESTATION_STAGE', 'CERTIFICAT_STAGE'],
+      'statuses': ['GENERE'],
+    },
+  };
+
+  static final Map<String, dynamic> rapportsStage = {
+    'items': <Map<String, dynamic>>[
+      {
+        'uuid': 'report-history-002',
+        'version': 2,
+        'title': 'Rapport de stage corrigé',
+        'description': 'Corrections demandées par l’université.',
+        'status': 'ACCEPTE',
+        'university_comment': 'Rapport conforme.',
+        'submitted_at': '2026-07-05 10:00:00',
+        'received_at': '2026-07-05 10:10:00',
+        'reviewed_at': '2026-07-06 09:00:00',
+        'reviewer': {'user_id': 18, 'name': 'Responsable académique'},
+        'file': {
+          'original_name': 'rapport_stage_corrige.pdf',
+          'mime_type': 'application/pdf',
+          'extension': 'pdf',
+          'size': 524288,
+        },
+        'assignment': {
+          'uuid': 'assignment-history-001',
+          'status': 'TERMINEE',
+          'start_date': '2026-04-01',
+          'end_date': '2026-06-30',
+        },
+        'campaign': {
+          'uuid': 'campaign-history-021',
+          'code': 'CAM-000021',
+          'title': 'Stage hospitalier du second semestre',
+        },
+        'hospital': {'id': 10, 'name': 'Cliniques Universitaires de Kinshasa'},
+        'university': {'id': 23, 'name': 'ISP'},
+        'department': {'id': 20, 'name': 'Médecine interne'},
+      },
+      {
+        'uuid': 'report-history-001',
+        'version': 1,
+        'title': 'Rapport de stage',
+        'description': 'Version initiale.',
+        'status': 'A_CORRIGER',
+        'university_comment': 'Compléter la conclusion.',
+        'submitted_at': '2026-07-01 14:30:00',
+        'assignment': {'uuid': 'assignment-history-001', 'status': 'TERMINEE'},
+        'campaign': {
+          'uuid': 'campaign-history-021',
+          'code': 'CAM-000021',
+          'title': 'Stage hospitalier du second semestre',
+        },
+        'hospital': {'id': 10, 'name': 'Cliniques Universitaires de Kinshasa'},
+        'university': {'id': 23, 'name': 'ISP'},
+      },
+    ],
+    'stats': {
+      'total': 2,
+      'by_status': {
+        'SOUMIS': 0,
+        'RECU': 0,
+        'ACCEPTE': 1,
+        'A_CORRIGER': 1,
+        'REJETE': 0,
+        'ARCHIVE': 0,
+      },
+      'assignments': 1,
+    },
+    'pagination': {'page': 1, 'per_page': 20, 'total': 2, 'pages': 1},
+    'filters': <String, dynamic>{},
+    'available_filters': {
+      'statuses': [
+        'SOUMIS',
+        'RECU',
+        'ACCEPTE',
+        'A_CORRIGER',
+        'REJETE',
+        'ARCHIVE',
+      ],
+      'per_page_max': 100,
+    },
+  };
+
+  static final Map<String, dynamic> justificationsStage = {
+    'items': <Map<String, dynamic>>[
+      {
+        'assignment_uuid': assignmentUuid,
+        'situation': 'INTERRUPTION',
+        'allowed_type': 'INTERRUPTION',
+        'message':
+            'Une justification est demandée pour l’interruption de ce stage.',
+        'justification_uuid': 'justification-stage-001',
+        'justification_status': 'REJETEE',
+        'reason': 'MALADIE',
+        'explanation': null,
+        'decision_seen': false,
+        'decision_message':
+            'Le document fourni ne permet pas de vérifier la période concernée.',
+        'file_endpoint':
+            '/api/v1/student/stage-justifications/justification-stage-001/file',
+        'read_endpoint':
+            '/api/v1/student/stage-justifications/justification-stage-001/read',
+        'campaign': {
+          'uuid': 'campaign-active-037',
+          'title': 'Stage clinique intégré 2026',
+        },
+        'hospital': {'name': 'Hôpital Général de Référence de Kinshasa'},
+        'actions': {
+          'submit': {'allowed': true},
+          'read': {'allowed': true},
+        },
+      },
+    ],
+    'stats': {'total': 1, 'pending': 0, 'accepted': 0, 'rejected': 1},
+    'allowed_values': {
+      'types': ['NON_DEMARRAGE', 'INTERRUPTION'],
+      'reasons': ['MALADIE', 'ACCIDENT', 'CONTRAINTE_FAMILIALE', 'AUTRE'],
+      'statuses': ['EN_ATTENTE', 'ACCEPTEE', 'REJETEE'],
+    },
+  };
+
   static final Map<String, dynamic> executionContext = {
     'context': {
       'date': '2026-10-10',
@@ -1088,6 +1319,139 @@ abstract final class ScenarioEtudiantUi {
       'message': 'Feedback marqué comme lu.',
       'feedback': Map<String, dynamic>.from(_feedbacks[index]),
     };
+  }
+
+  static Map<String, dynamic> soumettreRapport({
+    required String assignmentUuid,
+    required String cheminFichier,
+    String? title,
+    String? description,
+  }) {
+    final items = rapportsStage['items'] as List<Map<String, dynamic>>;
+    final versions = items
+        .where(
+          (item) =>
+              (item['assignment'] as Map?)?['uuid']?.toString() ==
+              assignmentUuid,
+        )
+        .map((item) => (item['version'] as num?)?.toInt() ?? 0);
+    final version = versions.isEmpty
+        ? 1
+        : versions.reduce((a, b) => a > b ? a : b) + 1;
+    final nomFichier = cheminFichier.split(RegExp(r'[/\\]')).last;
+    final extension = nomFichier.contains('.')
+        ? nomFichier.split('.').last.toLowerCase()
+        : 'pdf';
+    final stage = _assignmentByUuid(assignmentUuid);
+    final rapport = <String, dynamic>{
+      'uuid': 'report-mock-${DateTime.now().millisecondsSinceEpoch}',
+      'version': version,
+      'title': title?.trim().isNotEmpty == true
+          ? title!.trim()
+          : 'Rapport de stage',
+      'description': description?.trim().isNotEmpty == true
+          ? description!.trim()
+          : null,
+      'status': 'SOUMIS',
+      'university_comment': null,
+      'submitted_at': DateTime.now().toIso8601String(),
+      'file': {'original_name': nomFichier, 'extension': extension, 'size': 0},
+      'assignment': {
+        'uuid': assignmentUuid,
+        'status': stage?['assignment_status'],
+      },
+      'campaign': stage?['campaign'],
+      'hospital': stage?['hospital'],
+    };
+    items.insert(0, rapport);
+    rapportsStage['stats'] = {
+      'total': items.length,
+      'by_status': {
+        for (final statut in const [
+          'SOUMIS',
+          'RECU',
+          'ACCEPTE',
+          'A_CORRIGER',
+          'REJETE',
+          'ARCHIVE',
+        ])
+          statut: items.where((item) => item['status'] == statut).length,
+      },
+      'assignments': items
+          .map((item) => (item['assignment'] as Map?)?['uuid'])
+          .whereType<String>()
+          .toSet()
+          .length,
+    };
+    changements.value++;
+    return {'report': rapport};
+  }
+
+  static Map<String, dynamic> soumettreJustification({
+    required String assignmentUuid,
+    required String typeSituation,
+    required String motif,
+    required String explication,
+    required String cheminDocument,
+  }) {
+    final items = justificationsStage['items'] as List<Map<String, dynamic>>;
+    final index = items.indexWhere(
+      (item) => item['assignment_uuid']?.toString() == assignmentUuid,
+    );
+    final precedente = index >= 0 ? items[index] : <String, dynamic>{};
+    final uuid =
+        precedente['justification_uuid']?.toString() ??
+        'justification-${DateTime.now().millisecondsSinceEpoch}';
+    final justification = <String, dynamic>{
+      ...precedente,
+      'assignment_uuid': assignmentUuid,
+      'situation': typeSituation,
+      'allowed_type': typeSituation,
+      'justification_uuid': uuid,
+      'justification_status': 'EN_ATTENTE',
+      'reason': motif,
+      'explanation': explication.isEmpty ? null : explication,
+      'decision_seen': false,
+      'decision_message': null,
+      'file_endpoint': cheminDocument.isEmpty
+          ? precedente['file_endpoint']
+          : '/api/v1/student/stage-justifications/$uuid/file',
+      'actions': {
+        'submit': {'allowed': true},
+        'read': {'allowed': false},
+      },
+    };
+    if (index >= 0) {
+      items[index] = justification;
+    } else {
+      items.add(justification);
+    }
+    changements.value++;
+    return {'justification': justification};
+  }
+
+  static void marquerDecisionJustificationLue(String uuid) {
+    final items = justificationsStage['items'] as List<Map<String, dynamic>>;
+    final index = items.indexWhere(
+      (item) => item['justification_uuid']?.toString() == uuid,
+    );
+    if (index < 0) return;
+    items[index]['decision_seen'] = true;
+    final actions = Map<String, dynamic>.from(
+      items[index]['actions'] as Map? ?? const {},
+    );
+    actions['read'] = {'allowed': false};
+    items[index]['actions'] = actions;
+    changements.value++;
+  }
+
+  static Map<String, dynamic>? _assignmentByUuid(String uuid) {
+    for (final stage in (stages['items'] as List).whereType<Map>()) {
+      if (stage['assignment_uuid']?.toString() == uuid) {
+        return Map<String, dynamic>.from(stage);
+      }
+    }
+    return null;
   }
 
   static Map<String, dynamic> sauvegarderJournal({

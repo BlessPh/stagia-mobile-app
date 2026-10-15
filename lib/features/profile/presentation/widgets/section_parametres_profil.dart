@@ -8,6 +8,7 @@ import '../../../../core/services/preferences_application_service.dart';
 import '../../../../core/widgets/contenu_adaptatif.dart';
 import '../../data/models/etudiant_profil.dart';
 import '../pages/modifier_informations_personnelles_page.dart';
+import '../pages/supprimer_compte_page.dart';
 
 class SectionParametresProfil extends StatefulWidget {
   const SectionParametresProfil({super.key, this.profil});
@@ -457,7 +458,7 @@ class _SectionParametresProfilState extends State<SectionParametresProfil> {
     );
   }
 
-  void _confirmerDesactivation() {
+  void _confirmerSuppressionCompte() {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -479,7 +480,7 @@ class _SectionParametresProfilState extends State<SectionParametresProfil> {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                'Désactiver le compte ?',
+                'Supprimer le compte ?',
                 style: GoogleFonts.inter(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
@@ -489,7 +490,7 @@ class _SectionParametresProfilState extends State<SectionParametresProfil> {
           ],
         ),
         content: Text(
-          'Attention : la désactivation suspendra l\'accès à toutes vos candidatures, conventions et carnets de stage.',
+          'Votre compte restera désactivé pendant 30 jours avant d’être définitivement supprimé. Si vous vous reconnectez avant la fin de ce délai, la suppression sera annulée et votre compte sera réactivé.',
           style: GoogleFonts.inter(
             fontSize: 14,
             color: const Color(0xFF64748B),
@@ -504,10 +505,8 @@ class _SectionParametresProfilState extends State<SectionParametresProfil> {
           FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
-              AlertInfo.show(
-                context: context,
-                text: 'Demande de désactivation envoyée.',
-                typeInfo: TypeInfo.warning,
+              Navigator.of(context, rootNavigator: true).push(
+                MaterialPageRoute(builder: (_) => const SupprimerComptePage()),
               );
             },
             style: FilledButton.styleFrom(
@@ -809,9 +808,9 @@ class _SectionParametresProfilState extends State<SectionParametresProfil> {
                   _LigneParametre(
                     icone: Icons.delete_outline_rounded,
                     couleurIcone: const Color(0xFFEF4444),
-                    titre: 'Désactiver mon compte',
+                    titre: 'Supprimer mon compte',
                     couleurTexte: const Color(0xFFEF4444),
-                    onTap: _confirmerDesactivation,
+                    onTap: _confirmerSuppressionCompte,
                   ),
                 ],
               ),

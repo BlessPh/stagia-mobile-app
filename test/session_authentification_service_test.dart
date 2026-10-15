@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:stagia/core/network/client_api_http.dart';
+import 'package:stagia/core/network/reponse_api.dart';
 import 'package:stagia/core/services/preference_onboarding.dart';
 import 'package:stagia/core/services/session_authentification_service.dart';
 
@@ -36,6 +37,39 @@ void main() {
     expect(
       await SessionAuthentificationService.refreshToken(),
       'refresh-local',
+    );
+  });
+
+  test('mémorise la réactivation signalée par POST /login', () async {
+    await SessionAuthentificationService.enregistrer({
+      'access_token': 'access-local',
+      'account_reactivated': true,
+    });
+
+    expect(
+      await SessionAuthentificationService.compteReactiveALaConnexion(),
+      isTrue,
+    );
+  });
+
+  test('conserve Retry-After sur une réponse HTTP 429', () async {
+    final client = ClientApiHttp(
+      client: MockClient(
+        (_) async => http.Response(
+          '{"success":false,"message":"Trop de tentatives","data":{}}',
+          429,
+          headers: {'content-type': 'application/json', 'retry-after': '45'},
+        ),
+      ),
+    );
+
+    await expectLater(
+      client.post('/login'),
+      throwsA(
+        isA<ErreurApi>()
+            .having((erreur) => erreur.code, 'code', 'HTTP_429')
+            .having((erreur) => erreur.retryAfter, 'retryAfter', '45'),
+      ),
     );
   });
 

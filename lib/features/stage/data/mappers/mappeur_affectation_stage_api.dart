@@ -1,3 +1,5 @@
+import 'mappeur_visibilite_resultat_stage_api.dart';
+
 /// Normalise le contrat de `GET /student/stages` pour tous les écrans mobiles.
 ///
 /// Le mappeur conserve les objets canoniques (`hospital`, `campaign`,
@@ -5,9 +7,10 @@
 /// à partir de ces objets. Il n'injecte aucune donnée métier fictive.
 abstract final class MappeurAffectationStageApi {
   static Map<String, dynamic> normaliserReponse(Map<String, dynamic> donnees) {
-    final items = _liste(
-      donnees['items'],
-    ).map(depuisJson).toList(growable: false);
+    final items = _liste(donnees['items'])
+        .map(depuisJson)
+        .map(MappeurVisibiliteResultatStageApi.normaliserElement)
+        .toList(growable: false);
     return {...donnees, 'items': items};
   }
 

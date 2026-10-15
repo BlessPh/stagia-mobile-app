@@ -20,6 +20,25 @@ class _MainShellState extends State<MainShell> {
   bool _afficherBarreNavigation = true;
 
   @override
+  void initState() {
+    super.initState();
+    SuiviStageService.ongletNavigationDemande.addListener(_onNavigationDemande);
+  }
+
+  @override
+  void dispose() {
+    SuiviStageService.ongletNavigationDemande.removeListener(_onNavigationDemande);
+    super.dispose();
+  }
+
+  void _onNavigationDemande() {
+    final index = SuiviStageService.ongletNavigationDemande.value;
+    if (index != null && mounted) {
+      setState(() => _currentIndex = index);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final pages = <Widget>[
       HomePage(

@@ -221,7 +221,7 @@ abstract final class DonneesEtudiantMockees {
       'unit_name': 'Service de Chirurgie Générale',
       'completion_status': 'EN_COURS',
       'taux_presence': 92.5,
-      'note_finale': 17.0,
+      'note_finale': null,
       'certificate_uuid': null,
       'certificate_reference': null,
     },

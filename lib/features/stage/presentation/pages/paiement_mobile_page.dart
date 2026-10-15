@@ -81,12 +81,15 @@ class _PaiementMobilePageState extends State<PaiementMobilePage> {
   ];
 
   late _OperateurMobile _operateurSelectionne;
+  late final String _idempotencyKey;
   bool _enCoursTraitement = false;
 
   @override
   void initState() {
     super.initState();
     _operateurSelectionne = _operateurs.first;
+    _idempotencyKey =
+        'mobile-${DateTime.now().microsecondsSinceEpoch}-${widget.obligationUuid.hashCode.abs()}';
   }
 
   @override
@@ -119,12 +122,30 @@ class _PaiementMobilePageState extends State<PaiementMobilePage> {
         obligationUuid: widget.obligationUuid,
         channel: _operateurSelectionne.cle,
         phoneNumber: phone,
+        idempotencyKey: _idempotencyKey,
       );
 
       if (!mounted) return;
       setState(() => _enCoursTraitement = false);
 
-      _afficherBoiteDialogueAttente(resultat);
+      final paiement = resultat['payment'] is Map
+          ? Map<String, dynamic>.from(resultat['payment'] as Map)
+          : <String, dynamic>{};
+      final statut = (paiement['status'] ?? '').toString().toUpperCase();
+      if (const {'PAID', 'SUCCEEDED', 'CONFIRME'}.contains(statut)) {
+        _afficherSuccesModal();
+      } else if (const {
+        'FAILED',
+        'CANCELLED',
+        'ANNULE',
+        'EXPIRED',
+      }.contains(statut)) {
+        _afficherErreurPaiement(
+          'La demande de paiement n’a pas abouti. Vérifiez le numéro et réessayez.',
+        );
+      } else {
+        _afficherBoiteDialogueAttente(resultat);
+      }
     } on ErreurApi catch (e) {
       if (!mounted) return;
       setState(() => _enCoursTraitement = false);
@@ -134,14 +155,11 @@ class _PaiementMobilePageState extends State<PaiementMobilePage> {
           backgroundColor: const Color(0xFFEF4444),
         ),
       );
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() => _enCoursTraitement = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur : $e'),
-          backgroundColor: const Color(0xFFEF4444),
-        ),
+      _afficherErreurPaiement(
+        'Impossible d’initier le paiement pour le moment.',
       );
     }
   }
@@ -159,8 +177,21 @@ class _PaiementMobilePageState extends State<PaiementMobilePage> {
       setState(() => _enCoursTraitement = false);
 
       final paymentStatus = (syncResult['payment_status'] ?? '').toString();
-      if (paymentStatus == 'PAID' || syncResult['invoice_status'] == 'PAYEE') {
+      final statutNormalise = paymentStatus.toUpperCase();
+      if (statutNormalise == 'PAID' ||
+          syncResult['invoice_status'] == 'PAYEE') {
         _afficherSuccesModal();
+      } else if (const {
+        'FAILED',
+        'CANCELLED',
+        'EXPIRED',
+        'NOT_CONFIRMED',
+      }.contains(statutNormalise)) {
+        _afficherErreurPaiement(
+          statutNormalise == 'NOT_CONFIRMED'
+              ? 'Le paiement n’a pas encore été confirmé par l’opérateur.'
+              : 'Le paiement a échoué ou a été annulé. Vous pouvez réessayer.',
+        );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -171,16 +202,32 @@ class _PaiementMobilePageState extends State<PaiementMobilePage> {
           ),
         );
       }
-    } catch (e) {
+    } on ErreurApi catch (e) {
       if (!mounted) return;
       setState(() => _enCoursTraitement = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erreur de synchronisation : $e'),
+          content: Text(e.message),
           backgroundColor: const Color(0xFFEF4444),
         ),
       );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _enCoursTraitement = false);
+      _afficherErreurPaiement(
+        'Impossible de synchroniser le paiement pour le moment.',
+      );
     }
+  }
+
+  void _afficherErreurPaiement(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: const Color(0xFFEF4444),
+      ),
+    );
   }
 
   void _afficherBoiteDialogueAttente(Map<String, dynamic> donnees) {
@@ -192,7 +239,9 @@ class _PaiementMobilePageState extends State<PaiementMobilePage> {
       builder: (ctx) {
         return AlertDialog(
           backgroundColor: modeSombre ? const Color(0xFF1E293B) : Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           title: Row(
             children: [
               Container(
@@ -229,7 +278,9 @@ class _PaiementMobilePageState extends State<PaiementMobilePage> {
                 style: GoogleFonts.inter(
                   fontSize: 13.5,
                   fontWeight: FontWeight.w500,
-                  color: modeSombre ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                  color: modeSombre
+                      ? const Color(0xFFCBD5E1)
+                      : const Color(0xFF334155),
                   height: 1.45,
                 ),
               ),
@@ -237,10 +288,14 @@ class _PaiementMobilePageState extends State<PaiementMobilePage> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: modeSombre ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                  color: modeSombre
+                      ? const Color(0xFF0F172A)
+                      : const Color(0xFFF8FAFC),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: modeSombre ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                    color: modeSombre
+                        ? const Color(0xFF334155)
+                        : const Color(0xFFE2E8F0),
                   ),
                 ),
                 child: Row(
@@ -257,7 +312,9 @@ class _PaiementMobilePageState extends State<PaiementMobilePage> {
                         style: GoogleFonts.inter(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w600,
-                          color: modeSombre ? Colors.white : const Color(0xFF0F172A),
+                          color: modeSombre
+                              ? Colors.white
+                              : const Color(0xFF0F172A),
                         ),
                       ),
                     ),
@@ -309,7 +366,9 @@ class _PaiementMobilePageState extends State<PaiementMobilePage> {
       builder: (ctx) {
         return AlertDialog(
           backgroundColor: modeSombre ? const Color(0xFF1E293B) : Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -344,7 +403,9 @@ class _PaiementMobilePageState extends State<PaiementMobilePage> {
                 style: GoogleFonts.inter(
                   fontSize: 13.5,
                   fontWeight: FontWeight.w500,
-                  color: modeSombre ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  color: modeSombre
+                      ? const Color(0xFF94A3B8)
+                      : const Color(0xFF64748B),
                   height: 1.45,
                 ),
               ),
@@ -355,7 +416,9 @@ class _PaiementMobilePageState extends State<PaiementMobilePage> {
                 child: FilledButton(
                   onPressed: () {
                     Navigator.of(ctx).pop();
-                    Navigator.of(context).pop(true); // Retourne succès à la page précédente
+                    Navigator.of(
+                      context,
+                    ).pop(true); // Retourne succès à la page précédente
                   },
                   style: FilledButton.styleFrom(
                     backgroundColor: const Color(0xFF16A34A),
@@ -383,9 +446,13 @@ class _PaiementMobilePageState extends State<PaiementMobilePage> {
   @override
   Widget build(BuildContext context) {
     final modeSombre = Theme.of(context).brightness == Brightness.dark;
-    final fondPage = modeSombre ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final fondPage = modeSombre
+        ? const Color(0xFF0F172A)
+        : const Color(0xFFF8FAFC);
     final texteCouleur = modeSombre ? Colors.white : const Color(0xFF0F172A);
-    final texteSecondaire = modeSombre ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final texteSecondaire = modeSombre
+        ? const Color(0xFF94A3B8)
+        : const Color(0xFF64748B);
 
     return Scaffold(
       backgroundColor: fondPage,
@@ -418,7 +485,8 @@ class _PaiementMobilePageState extends State<PaiementMobilePage> {
             children: [
               Expanded(
                 child: SingleChildScrollView(
-                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
                   physics: const BouncingScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                   child: Column(
@@ -427,278 +495,318 @@ class _PaiementMobilePageState extends State<PaiementMobilePage> {
                       // Aperçu de l'opérateur actuellement sélectionné avec son logo au-dessus
                       _buildEnTeteOperateur(modeSombre),
 
-                    const SizedBox(height: 20),
+                      const SizedBox(height: 20),
 
-                    // Montant à débiter
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-                      decoration: BoxDecoration(
-                        color: modeSombre ? const Color(0xFF1E293B) : Colors.white,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: modeSombre ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                      // Montant à débiter
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 16,
                         ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Montant net à débiter',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: texteSecondaire,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '${widget.montant} ${widget.devise}',
-                                style: GoogleFonts.inter(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.w900,
-                                  color: modeSombre ? Colors.white : const Color(0xFF0F172A),
-                                  letterSpacing: -0.5,
-                                ),
-                              ),
-                            ],
+                        decoration: BoxDecoration(
+                          color: modeSombre
+                              ? const Color(0xFF1E293B)
+                              : Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: modeSombre
+                                ? const Color(0xFF334155)
+                                : const Color(0xFFE2E8F0),
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: modeSombre
-                                  ? const Color(0xFF334155)
-                                  : const Color(0xFFF1F5F9),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Row(
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Icon(
-                                  Icons.lock_outline_rounded,
-                                  color: modeSombre
-                                      ? const Color(0xFFCBD5E1)
-                                      : const Color(0xFF475569),
-                                  size: 15,
-                                ),
-                                const SizedBox(width: 4),
                                 Text(
-                                  'Sécurisé',
+                                  'Montant net à débiter',
                                   style: GoogleFonts.inter(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: texteSecondaire,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${widget.montant} ${widget.devise}',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w900,
                                     color: modeSombre
-                                        ? const Color(0xFFCBD5E1)
-                                        : const Color(0xFF475569),
+                                        ? Colors.white
+                                        : const Color(0xFF0F172A),
+                                    letterSpacing: -0.5,
                                   ),
                                 ),
                               ],
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // Sélection de l'opérateur Mobile Money
-                    Text(
-                      'Choisissez votre opérateur',
-                      style: GoogleFonts.inter(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: texteCouleur,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    Row(
-                      children: _operateurs.map((op) {
-                        final selectionne = op.cle == _operateurSelectionne.cle;
-                        return Expanded(
-                          child: GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                _operateurSelectionne = op;
-                                if (!_phoneController.text.startsWith(op.prefixeIndicatif)) {
-                                  _phoneController.text = op.prefixeIndicatif;
-                                  _phoneController.selection = TextSelection.fromPosition(
-                                    TextPosition(offset: _phoneController.text.length),
-                                  );
-                                }
-                              });
-                            },
-                            child: Container(
-                              margin: const EdgeInsets.symmetric(horizontal: 4),
-                              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                              decoration: BoxDecoration(
-                                color: selectionne
-                                    ? (modeSombre
-                                        ? const Color(0xFF1E293B)
-                                        : Colors.white)
-                                    : (modeSombre
-                                        ? const Color(0xFF1E293B).withValues(alpha: 0.5)
-                                        : const Color(0xFFF1F5F9)),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: selectionne
-                                      ? const Color(0xFFFF751F)
-                                      : (modeSombre
-                                          ? const Color(0xFF334155)
-                                          : Colors.transparent),
-                                  width: selectionne ? 2 : 1,
-                                ),
-                                boxShadow: selectionne
-                                    ? [
-                                        BoxShadow(
-                                          color: const Color(0xFFFF751F).withValues(alpha: 0.18),
-                                          blurRadius: 10,
-                                          offset: const Offset(0, 4),
-                                        ),
-                                      ]
-                                    : null,
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
                               ),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
+                              decoration: BoxDecoration(
+                                color: modeSombre
+                                    ? const Color(0xFF334155)
+                                    : const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Row(
                                 children: [
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: Image.asset(
-                                      op.logoAsset,
-                                      width: 40,
-                                      height: 40,
-                                      fit: BoxFit.contain,
-                                      errorBuilder: (context, error, stackTrace) => Container(
-                                        width: 40,
-                                        height: 40,
-                                        color: op.couleurAccent.withValues(alpha: 0.2),
-                                        child: Icon(
-                                          Icons.phone_android,
-                                          color: op.couleurAccent,
-                                          size: 20,
-                                        ),
-                                      ),
-                                    ),
+                                  Icon(
+                                    Icons.lock_outline_rounded,
+                                    color: modeSombre
+                                        ? const Color(0xFFCBD5E1)
+                                        : const Color(0xFF475569),
+                                    size: 15,
                                   ),
-                                  const SizedBox(height: 8),
+                                  const SizedBox(width: 4),
                                   Text(
-                                    op.cle.replaceAll('_', ' '),
-                                    textAlign: TextAlign.center,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                                    'Sécurisé',
                                     style: GoogleFonts.inter(
-                                      fontSize: 10.5,
-                                      fontWeight: selectionne ? FontWeight.w800 : FontWeight.w600,
-                                      color: selectionne
-                                          ? const Color(0xFFFF751F)
-                                          : texteSecondaire,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: modeSombre
+                                          ? const Color(0xFFCBD5E1)
+                                          : const Color(0xFF475569),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // Champ de saisie du numéro de téléphone
-                    Text(
-                      'Numéro Mobile Money du compte',
-                      style: GoogleFonts.inter(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: texteCouleur,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Le montant de ${widget.montant} ${widget.devise} sera débité de ce numéro.',
-                      style: GoogleFonts.inter(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w500,
-                        color: texteSecondaire,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    Container(
-                      decoration: BoxDecoration(
-                        color: modeSombre ? const Color(0xFF1E293B) : Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: _focusNodePhone.hasFocus
-                              ? const Color(0xFFFF751F)
-                              : (modeSombre ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
-                          width: 1.5,
+                          ],
                         ),
                       ),
-                      child: TextField(
-                        controller: _phoneController,
-                        focusNode: _focusNodePhone,
-                        keyboardType: TextInputType.phone,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(RegExp(r'[\d+]')),
-                        ],
+
+                      const SizedBox(height: 24),
+
+                      // Sélection de l'opérateur Mobile Money
+                      Text(
+                        'Choisissez votre opérateur',
                         style: GoogleFonts.inter(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
                           color: texteCouleur,
-                          letterSpacing: 0.5,
                         ),
-                        decoration: InputDecoration(
-                          prefixIcon: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 14),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(6),
-                                  child: Image.asset(
-                                    _operateurSelectionne.logoAsset,
-                                    width: 24,
-                                    height: 24,
-                                    fit: BoxFit.contain,
-                                    errorBuilder: (context, error, stackTrace) => const Icon(
-                                      Icons.phone_android,
-                                      size: 20,
-                                      color: Color(0xFFFF751F),
+                      ),
+                      const SizedBox(height: 12),
+
+                      Row(
+                        children: _operateurs.map((op) {
+                          final selectionne =
+                              op.cle == _operateurSelectionne.cle;
+                          return Expanded(
+                            child: GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _operateurSelectionne = op;
+                                  if (!_phoneController.text.startsWith(
+                                    op.prefixeIndicatif,
+                                  )) {
+                                    _phoneController.text = op.prefixeIndicatif;
+                                    _phoneController
+                                        .selection = TextSelection.fromPosition(
+                                      TextPosition(
+                                        offset: _phoneController.text.length,
+                                      ),
+                                    );
+                                  }
+                                });
+                              },
+                              child: Container(
+                                margin: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                  horizontal: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: selectionne
+                                      ? (modeSombre
+                                            ? const Color(0xFF1E293B)
+                                            : Colors.white)
+                                      : (modeSombre
+                                            ? const Color(
+                                                0xFF1E293B,
+                                              ).withValues(alpha: 0.5)
+                                            : const Color(0xFFF1F5F9)),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: selectionne
+                                        ? const Color(0xFFFF751F)
+                                        : (modeSombre
+                                              ? const Color(0xFF334155)
+                                              : Colors.transparent),
+                                    width: selectionne ? 2 : 1,
+                                  ),
+                                  boxShadow: selectionne
+                                      ? [
+                                          BoxShadow(
+                                            color: const Color(
+                                              0xFFFF751F,
+                                            ).withValues(alpha: 0.18),
+                                            blurRadius: 10,
+                                            offset: const Offset(0, 4),
+                                          ),
+                                        ]
+                                      : null,
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Image.asset(
+                                        op.logoAsset,
+                                        width: 40,
+                                        height: 40,
+                                        fit: BoxFit.contain,
+                                        errorBuilder:
+                                            (context, error, stackTrace) =>
+                                                Container(
+                                                  width: 40,
+                                                  height: 40,
+                                                  color: op.couleurAccent
+                                                      .withValues(alpha: 0.2),
+                                                  child: Icon(
+                                                    Icons.phone_android,
+                                                    color: op.couleurAccent,
+                                                    size: 20,
+                                                  ),
+                                                ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      op.cle.replaceAll('_', ' '),
+                                      textAlign: TextAlign.center,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 10.5,
+                                        fontWeight: selectionne
+                                            ? FontWeight.w800
+                                            : FontWeight.w600,
+                                        color: selectionne
+                                            ? const Color(0xFFFF751F)
+                                            : texteSecondaire,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Champ de saisie du numéro de téléphone
+                      Text(
+                        'Numéro Mobile Money du compte',
+                        style: GoogleFonts.inter(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: texteCouleur,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Le montant de ${widget.montant} ${widget.devise} sera débité de ce numéro.',
+                        style: GoogleFonts.inter(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
+                          color: texteSecondaire,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      Container(
+                        decoration: BoxDecoration(
+                          color: modeSombre
+                              ? const Color(0xFF1E293B)
+                              : Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: _focusNodePhone.hasFocus
+                                ? const Color(0xFFFF751F)
+                                : (modeSombre
+                                      ? const Color(0xFF334155)
+                                      : const Color(0xFFCBD5E1)),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: TextField(
+                          controller: _phoneController,
+                          focusNode: _focusNodePhone,
+                          keyboardType: TextInputType.phone,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'[\d+]')),
+                          ],
+                          style: GoogleFonts.inter(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: texteCouleur,
+                            letterSpacing: 0.5,
+                          ),
+                          decoration: InputDecoration(
+                            prefixIcon: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: Image.asset(
+                                      _operateurSelectionne.logoAsset,
+                                      width: 24,
+                                      height: 24,
+                                      fit: BoxFit.contain,
+                                      errorBuilder:
+                                          (context, error, stackTrace) =>
+                                              const Icon(
+                                                Icons.phone_android,
+                                                size: 20,
+                                                color: Color(0xFFFF751F),
+                                              ),
                                     ),
                                   ),
-                                ),
-                                const SizedBox(width: 8),
-                                Container(
-                                  width: 1,
-                                  height: 22,
-                                  color: modeSombre
-                                      ? const Color(0xFF334155)
-                                      : const Color(0xFFE2E8F0),
-                                ),
-                              ],
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    width: 1,
+                                    height: 22,
+                                    color: modeSombre
+                                        ? const Color(0xFF334155)
+                                        : const Color(0xFFE2E8F0),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                          hintText: '+243...',
-                          hintStyle: GoogleFonts.inter(
-                            color: const Color(0xFF94A3B8),
-                            fontWeight: FontWeight.w500,
-                          ),
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 16,
+                            hintText: '+243...',
+                            hintStyle: GoogleFonts.inter(
+                              color: const Color(0xFF94A3B8),
+                              fontWeight: FontWeight.w500,
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 16,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
+                      const SizedBox(height: 16),
+                    ],
+                  ),
                 ),
               ),
-            ),
 
               // Barre d'action inférieure (évite tout overflow au clavier)
               Container(
@@ -707,7 +815,9 @@ class _PaiementMobilePageState extends State<PaiementMobilePage> {
                   color: modeSombre ? const Color(0xFF1E293B) : Colors.white,
                   border: Border(
                     top: BorderSide(
-                      color: modeSombre ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                      color: modeSombre
+                          ? const Color(0xFF334155)
+                          : const Color(0xFFF1F5F9),
                     ),
                   ),
                 ),
@@ -763,7 +873,9 @@ class _PaiementMobilePageState extends State<PaiementMobilePage> {
         ),
         boxShadow: [
           BoxShadow(
-            color: modeSombre ? Colors.black.withValues(alpha: 0.15) : const Color(0x06000000),
+            color: modeSombre
+                ? Colors.black.withValues(alpha: 0.15)
+                : const Color(0x06000000),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -777,7 +889,9 @@ class _PaiementMobilePageState extends State<PaiementMobilePage> {
             height: 86,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: modeSombre ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+              color: modeSombre
+                  ? const Color(0xFF0F172A)
+                  : const Color(0xFFF8FAFC),
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
@@ -818,7 +932,9 @@ class _PaiementMobilePageState extends State<PaiementMobilePage> {
             style: GoogleFonts.inter(
               fontSize: 13,
               fontWeight: FontWeight.w500,
-              color: modeSombre ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+              color: modeSombre
+                  ? const Color(0xFF94A3B8)
+                  : const Color(0xFF64748B),
             ),
           ),
         ],

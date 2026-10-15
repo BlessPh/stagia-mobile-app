@@ -13,6 +13,7 @@ class SectionStageEnCoursAccueil extends StatelessWidget {
     this.joursRestantsService = 0,
     this.nomEncadreur = '',
     this.photoEncadreur,
+    this.afficherEnTete = true,
     this.onTap,
     super.key,
   });
@@ -27,6 +28,7 @@ class SectionStageEnCoursAccueil extends StatelessWidget {
   final int joursRestantsService;
   final String nomEncadreur;
   final String? photoEncadreur;
+  final bool afficherEnTete;
   final VoidCallback? onTap;
 
   @override
@@ -54,44 +56,45 @@ class SectionStageEnCoursAccueil extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // En-tête : Titre + Badge 1 campagne active
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Stage en cours',
-              style: GoogleFonts.inter(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: textePrincipal,
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 10,
-                vertical: 4.5,
-              ),
-              decoration: BoxDecoration(
-                color: modeSombre
-                    ? const Color(0xFF0C4A6E)
-                    : const Color(0xFFE0F2FE),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                '1 campagne active',
+        if (afficherEnTete) ...[
+          // En-tête : Titre + Badge 1 campagne active
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Stage en cours',
                 style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: modeSombre
-                      ? const Color(0xFF7DD3FC)
-                      : const Color(0xFF0284C7),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: textePrincipal,
                 ),
               ),
-            ),
-          ],
-        ),
-
-        const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4.5,
+                ),
+                decoration: BoxDecoration(
+                  color: modeSombre
+                      ? const Color(0xFF0C4A6E)
+                      : const Color(0xFFE0F2FE),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '1 campagne active',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: modeSombre
+                        ? const Color(0xFF7DD3FC)
+                        : const Color(0xFF0284C7),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+        ],
 
         // Carte principale du stage en cours
         Material(

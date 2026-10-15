@@ -12,6 +12,7 @@ abstract final class SessionAuthentificationService {
   static const _cleSessionLocale = 'session_authentifiee_locale';
   static const _cleExpirationJeton = 'expiration_jeton_authentification';
   static const _cleExpirationRefresh = 'expiration_refresh_authentification';
+  static const _cleCompteReactive = 'compte_reactive_a_la_connexion';
 
   static Future<void> enregistrer(Map<String, dynamic> data) async {
     final preferences = await SharedPreferences.getInstance();
@@ -58,6 +59,10 @@ abstract final class SessionAuthentificationService {
     await preferences.setString(_cleNom, nom.toString());
     await preferences.setString(_clePrenom, prenom.toString());
     await preferences.setBool(_cleSessionLocale, true);
+    await preferences.setBool(
+      _cleCompteReactive,
+      data['account_reactivated'] == true,
+    );
     await _enregistrerExpirations(
       preferences,
       expiresIn: _entier(data['expires_in']),
@@ -136,6 +141,11 @@ abstract final class SessionAuthentificationService {
     };
   }
 
+  static Future<bool> compteReactiveALaConnexion() async {
+    final preferences = await SharedPreferences.getInstance();
+    return preferences.getBool(_cleCompteReactive) ?? false;
+  }
+
   static Future<void> supprimer() async {
     final preferences = await SharedPreferences.getInstance();
     await preferences.remove(_cleJeton);
@@ -149,6 +159,7 @@ abstract final class SessionAuthentificationService {
     await preferences.remove(_cleSessionLocale);
     await preferences.remove(_cleExpirationJeton);
     await preferences.remove(_cleExpirationRefresh);
+    await preferences.remove(_cleCompteReactive);
   }
 
   static int? _entier(dynamic valeur) {

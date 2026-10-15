@@ -6,6 +6,7 @@ abstract final class EndpointsApi {
   static const profilEtudiant = '/me';
   static const motDePasseOublie = '/forgot-password';
   static const reinitialiserMotDePasse = '/reset-password';
+  static const desactiverCompteEtudiant = '/student/account/deactivate';
 
   // Étudiant & Stages (API Mobile v1)
   static const tableauDeBordEtudiant = '/student/dashboard';
@@ -17,8 +18,6 @@ abstract final class EndpointsApi {
   static const reserverStage = '/student/reservations';
   static const candidaturesEtudiant = '/student/applications';
   static const reservationsEtudiant = '/student/reservations';
-  static String confirmerReservationEtudiant(String uuid) =>
-      '/student/reservations/$uuid/confirm';
   static String annulerReservationEtudiant(String uuid) =>
       '/student/reservations/$uuid/cancel';
   static const admissionEtudiant = '/student/admissions';
@@ -51,11 +50,28 @@ abstract final class EndpointsApi {
   static const feedbacksEtudiant = '/student/feedbacks';
   static String lireFeedback(String uuid) => '/student/feedbacks/$uuid/read';
   static const evaluationsEtudiant = '/student/evaluations';
+  static const cloturesStageEtudiant = '/student/completions';
+  static const resultatsStageEtudiant = '/student/results';
 
   // Documents
   static const documentsEtudiant = '/student/documents';
   static String fichierCertificat(String uuid, {bool download = false}) =>
       '/student/certificates/$uuid/file${download ? '?download=1' : ''}';
+  static const rapportsStageEtudiant = '/student/stage-reports';
+  static String detailRapportStageEtudiant(String uuid) =>
+      '/student/stage-reports/$uuid';
+  static String fichierRapportStageEtudiant(
+    String uuid, {
+    bool download = false,
+  }) => '/student/stage-reports/$uuid/file${download ? '?download=1' : ''}';
+  static const justificationsStageEtudiant = '/student/stage-justifications';
+  static String fichierJustificationStageEtudiant(
+    String uuid, {
+    bool download = false,
+  }) =>
+      '/student/stage-justifications/$uuid/file${download ? '?download=1' : ''}';
+  static String lireDecisionJustificationStageEtudiant(String uuid) =>
+      '/student/stage-justifications/$uuid/read';
   static const conventionsEtudiant = '/student/conventions';
   static String fichierConvention(String uuid, {bool download = false}) =>
       '/student/conventions/$uuid/file${download ? '?download=1' : ''}';
@@ -96,8 +112,6 @@ abstract final class EndpointsApi {
   static const candidatures = '/applications';
   static String reserverPlace(String candidatureId) =>
       '/applications/$candidatureId/reservations';
-  static String confirmerReservation(String reservationId) =>
-      '/reservations/$reservationId/confirm';
   static String annulerReservation(String reservationId) =>
       '/reservations/$reservationId/cancel';
   static String exigencesFinancieres(String campagneId) =>
@@ -125,7 +139,6 @@ abstract final class EndpointsApi {
       '/media/$mediaId/download-url';
 
   // Accueil
-  static const tableauDeBord = '/analytics/overview';
 
   // Notifications (Tâche 8)
   static const notificationsEtudiant = '/student/notifications';

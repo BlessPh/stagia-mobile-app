@@ -163,26 +163,46 @@ class FicheEvaluationPage extends StatelessWidget {
       ];
     }
 
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
+    final fondPage = modeSombre
+        ? const Color(0xFF0F172A)
+        : const Color(0xFFF8FAFC);
+    final fondCarte = modeSombre ? const Color(0xFF1E293B) : Colors.white;
+    final bordureCouleur = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFE2E8F0);
+    final texteCouleur = modeSombre ? Colors.white : const Color(0xFF0F172A);
+    final texteSecondaire = modeSombre
+        ? const Color(0xFF94A3B8)
+        : const Color(0xFF64748B);
+    final separateurCouleur = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFF1F5F9);
+
+    final mentionAffichee = score >= 16
+        ? 'Excellent'
+        : (score >= 12 ? 'Bien' : 'Moyen');
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: fondPage,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF8FAFC),
+        backgroundColor: fondPage,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(
+          icon: Icon(
             CupertinoIcons.chevron_left,
-            color: Color(0xFF0F172A),
+            color: texteCouleur,
             size: 24,
           ),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
-          'Fiche d\'Évaluation',
+          'Fiche d\'évaluation',
           style: GoogleFonts.inter(
             fontSize: 18.5,
             fontWeight: FontWeight.w800,
-            color: const Color(0xFF0F172A),
+            color: texteCouleur,
           ),
         ),
       ),
@@ -194,14 +214,16 @@ class FicheEvaluationPage extends StatelessWidget {
             Container(
               width: double.infinity,
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: fondCarte,
                 borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-                boxShadow: const [
+                border: Border.all(color: bordureCouleur),
+                boxShadow: [
                   BoxShadow(
-                    color: Color(0x06000000),
+                    color: modeSombre
+                        ? const Color(0x30000000)
+                        : const Color(0x06000000),
                     blurRadius: 16,
-                    offset: Offset(0, 4),
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
@@ -235,7 +257,7 @@ class FicheEvaluationPage extends StatelessWidget {
                                 style: GoogleFonts.inter(
                                   fontSize: 32,
                                   fontWeight: FontWeight.w900,
-                                  color: const Color(0xFF0F172A),
+                                  color: texteCouleur,
                                 ),
                               ),
                               Text(
@@ -256,17 +278,19 @@ class FicheEvaluationPage extends StatelessWidget {
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFDCFCE7),
+                          color: modeSombre
+                              ? const Color(0xFF14532D)
+                              : const Color(0xFFDCFCE7),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          score >= 16
-                              ? 'EXCELLENT'
-                              : (score >= 12 ? 'BIEN' : 'MOYEN'),
+                          mentionAffichee,
                           style: GoogleFonts.inter(
                             fontSize: 12.5,
                             fontWeight: FontWeight.w800,
-                            color: const Color(0xFF16A34A),
+                            color: modeSombre
+                                ? const Color(0xFF4ADE80)
+                                : const Color(0xFF16A34A),
                           ),
                         ),
                       ),
@@ -274,7 +298,7 @@ class FicheEvaluationPage extends StatelessWidget {
                   ),
 
                   const SizedBox(height: 20),
-                  const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                  Divider(height: 1, color: separateurCouleur),
                   const SizedBox(height: 18),
 
                   // Évaluateur
@@ -282,7 +306,9 @@ class FicheEvaluationPage extends StatelessWidget {
                     children: [
                       CircleAvatar(
                         radius: 22,
-                        backgroundColor: const Color(0xFFEFF6FF),
+                        backgroundColor: modeSombre
+                            ? const Color(0xFF1E3A8A).withValues(alpha: 0.5)
+                            : const Color(0xFFEFF6FF),
                         child: Text(
                           evalInit.isNotEmpty ? evalInit : initialesEvaluateur,
                           style: GoogleFonts.inter(
@@ -302,7 +328,7 @@ class FicheEvaluationPage extends StatelessWidget {
                               style: GoogleFonts.inter(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w800,
-                                color: const Color(0xFF0F172A),
+                                color: texteCouleur,
                               ),
                             ),
                             const SizedBox(height: 2),
@@ -311,7 +337,7 @@ class FicheEvaluationPage extends StatelessWidget {
                               style: GoogleFonts.inter(
                                 fontSize: 12.5,
                                 fontWeight: FontWeight.w500,
-                                color: const Color(0xFF64748B),
+                                color: texteSecondaire,
                               ),
                             ),
                           ],
@@ -321,7 +347,7 @@ class FicheEvaluationPage extends StatelessWidget {
                   ),
 
                   const SizedBox(height: 18),
-                  const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                  Divider(height: 1, color: separateurCouleur),
                   const SizedBox(height: 16),
 
                   // Points Forts
@@ -330,7 +356,7 @@ class FicheEvaluationPage extends StatelessWidget {
                     style: GoogleFonts.inter(
                       fontSize: 15,
                       fontWeight: FontWeight.w800,
-                      color: const Color(0xFF0F172A),
+                      color: texteCouleur,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -342,7 +368,7 @@ class FicheEvaluationPage extends StatelessWidget {
                         style: GoogleFonts.inter(
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
-                          color: const Color(0xFF64748B),
+                          color: texteSecondaire,
                           height: 1.35,
                         ),
                       ),
@@ -356,7 +382,7 @@ class FicheEvaluationPage extends StatelessWidget {
                     style: GoogleFonts.inter(
                       fontSize: 15,
                       fontWeight: FontWeight.w800,
-                      color: const Color(0xFF0F172A),
+                      color: texteCouleur,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -368,7 +394,7 @@ class FicheEvaluationPage extends StatelessWidget {
                         style: GoogleFonts.inter(
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
-                          color: const Color(0xFF64748B),
+                          color: texteSecondaire,
                           height: 1.35,
                         ),
                       ),
@@ -385,7 +411,7 @@ class FicheEvaluationPage extends StatelessWidget {
               style: GoogleFonts.inter(
                 fontSize: 16.5,
                 fontWeight: FontWeight.w800,
-                color: const Color(0xFF0F172A),
+                color: texteCouleur,
               ),
             ),
             const SizedBox(height: 12),
@@ -397,9 +423,9 @@ class FicheEvaluationPage extends StatelessWidget {
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: fondCarte,
                     borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    border: Border.all(color: bordureCouleur),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -413,7 +439,7 @@ class FicheEvaluationPage extends StatelessWidget {
                               style: GoogleFonts.inter(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
-                                color: const Color(0xFF0F172A),
+                                color: texteCouleur,
                               ),
                             ),
                           ),
@@ -444,7 +470,9 @@ class FicheEvaluationPage extends StatelessWidget {
                         child: LinearProgressIndicator(
                           value: comp.pourcentage / 100,
                           minHeight: 8,
-                          backgroundColor: const Color(0xFFF1F5F9),
+                          backgroundColor: modeSombre
+                              ? const Color(0xFF334155)
+                              : const Color(0xFFF1F5F9),
                           valueColor: AlwaysStoppedAnimation<Color>(
                             comp.couleur,
                           ),
@@ -457,7 +485,7 @@ class FicheEvaluationPage extends StatelessWidget {
                           style: GoogleFonts.inter(
                             fontSize: 12.5,
                             fontWeight: FontWeight.w500,
-                            color: const Color(0xFF64748B),
+                            color: texteSecondaire,
                             height: 1.3,
                           ),
                         ),

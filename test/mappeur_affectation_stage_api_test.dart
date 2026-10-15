@@ -153,5 +153,28 @@ void main() {
         );
       },
     );
+
+    test('masque la note finale tant que la clôture n’est pas validée', () {
+      final reponse = MappeurAffectationStageApi.normaliserReponse({
+        'items': [
+          {
+            'assignment_uuid': 'assignment-pending',
+            'assignment_status': 'TERMINEE',
+            'completion_status': 'PRET',
+            'note_finale': 16,
+          },
+          {
+            'assignment_uuid': 'assignment-validated',
+            'assignment_status': 'TERMINEE',
+            'completion_status': 'VALIDE',
+            'note_finale': 18,
+          },
+        ],
+      });
+
+      final items = reponse['items'] as List<Map<String, dynamic>>;
+      expect(items.first['note_finale'], isNull);
+      expect(items.last['note_finale'], 18);
+    });
   });
 }

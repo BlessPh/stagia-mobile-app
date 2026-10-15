@@ -208,9 +208,108 @@ void main() {
     });
     expect((resultat['items'] as List), isEmpty);
   });
+
+  test(
+    'préserve le contrat de GET /student/stages et protège la note',
+    () async {
+      final client = _ClientApiEspion(
+        donneesGet: {
+          'student': {'id': 30, 'stagia_code': 'STG-ETU-00000030'},
+          'items': [
+            {
+              'assignment_uuid': 'assignment-1',
+              'assignment_status': 'TERMINEE',
+              'completion_status': 'PRET',
+              'note_finale': 15,
+              'planning': {'rotations': <Map<String, dynamic>>[]},
+            },
+          ],
+          'filters': {
+            'statuses': ['TERMINEE'],
+            'includes': ['rotations', 'summary'],
+          },
+          'summary': {
+            'total': 1,
+            'by_status': {'TERMINEE': 1},
+          },
+        },
+      );
+
+      final resultat = await SourceStageDistante(client).stages();
+      final item = Map<String, dynamic>.from(
+        (resultat['items'] as List).single as Map,
+      );
+
+      expect((resultat['student'] as Map)['id'], 30);
+      expect((resultat['filters'] as Map)['statuses'], ['TERMINEE']);
+      expect((resultat['summary'] as Map)['total'], 1);
+      expect(item['note_finale'], isNull);
+    },
+  );
+
+  test('filtre GET /student/admissions et conserve ses statistiques', () async {
+    final client = _ClientApiEspion(
+      donneesGet: {
+        'items': [
+          {
+            'reservation': {'uuid': 'reservation-1', 'status': 'CONFIRMEE'},
+            'application': {'uuid': 'application-1', 'status': 'ACCEPTEE'},
+            'placement': {'exists': true, 'status': 'CONFIRME'},
+            'admission': {'exists': true, 'status': 'ADMIS'},
+            'assignment': {'exists': true, 'status': 'TERMINEE'},
+            'completion': {'status': 'PRET', 'final_score': 17},
+            'workflow_status': 'STAGE_TERMINE',
+          },
+        ],
+        'stats': {'total': 1, 'completed': 1},
+      },
+    );
+
+    final resultat = await SourceStageDistante(
+      client,
+    ).admission(reservationUuid: 'reservation-1');
+    final item = Map<String, dynamic>.from(
+      (resultat['items'] as List).single as Map,
+    );
+
+    expect(client.cheminGet, EndpointsApi.admissionEtudiant);
+    expect(client.parametresGet, {'reservation_uuid': 'reservation-1'});
+    expect((resultat['stats'] as Map)['completed'], 1);
+    expect((item['completion'] as Map)['final_score'], isNull);
+  });
+
+  test('transmet tous les filtres de GET /student/applications', () async {
+    final client = _ClientApiEspion();
+    final source = SourceStageDistante(client);
+
+    await source.candidatures(
+      statut: ['SOUMISE', 'ACCEPTEE'],
+      reservationStatus: ['EN_ATTENTE_PAIEMENT'],
+      workflowStatus: ['PLACEMENT_UNIVERSITAIRE_EN_ATTENTE'],
+      campaignId: 39,
+      hospitalId: 24,
+      page: 2,
+      perPage: 50,
+    );
+
+    expect(client.cheminGet, EndpointsApi.candidaturesEtudiant);
+    expect(client.parametresGet, {
+      'status': 'SOUMISE,ACCEPTEE',
+      'reservation_status': 'EN_ATTENTE_PAIEMENT',
+      'workflow_status': 'PLACEMENT_UNIVERSITAIRE_EN_ATTENTE',
+      'campaign_id': 39,
+      'hospital_id': 24,
+      'page': 2,
+      'per_page': 50,
+    });
+  });
 }
 
 class _ClientApiEspion implements ClientApi {
+  _ClientApiEspion({Map<String, dynamic>? donneesGet})
+    : donneesGet = donneesGet ?? {'items': <Map<String, dynamic>>[]};
+
+  final Map<String, dynamic> donneesGet;
   String? cheminPost;
   Object? corpsPost;
   String? cheminGet;
@@ -254,11 +353,7 @@ class _ClientApiEspion implements ClientApi {
   }) async {
     cheminGet = chemin;
     parametresGet = parametres;
-    return {
-      'success': true,
-      'message': '',
-      'data': {'items': <Map<String, dynamic>>[]},
-    };
+    return {'success': true, 'message': '', 'data': donneesGet};
   }
 
   @override

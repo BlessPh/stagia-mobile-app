@@ -30,11 +30,13 @@ class ErreurApi implements Exception {
     required this.message,
     this.details,
     this.requestId,
+    this.retryAfter,
   });
   final String code;
   final String message;
   final Object? details;
   final String? requestId;
+  final String? retryAfter;
 
   @override
   String toString() => message;

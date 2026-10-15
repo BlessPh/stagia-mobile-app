@@ -6,6 +6,7 @@ void main() {
   test('mappe le workflow admissions et reconnaît la campagne engagée', () {
     final suivi = SuiviCandidatureStage.depuisAdmission({
       'reservation': {'uuid': 'reservation-1', 'status': 'CONFIRMEE'},
+      'application': {'uuid': 'application-1', 'status': 'ACCEPTEE'},
       'campaign': {
         'code': 'CAM-000039',
         'title': 'Stage de fin d’année 2026',
@@ -36,6 +37,7 @@ void main() {
     );
 
     expect(suivi.libelleStatut, 'En attente d’affectation');
+    expect(suivi.applicationStatus, 'ACCEPTEE');
     expect(suivi.progression, 5);
     expect(suivi.concerne(campagneDisponible), isTrue);
 

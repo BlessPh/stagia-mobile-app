@@ -8,7 +8,7 @@ import '../../../../core/network/client_api_http.dart';
 import '../../../../core/network/configuration_api.dart';
 import '../../../../core/network/source_etudiant_distante.dart';
 import '../../../../core/services/suivi_stage_service.dart';
-import '../../../journal/presentation/pages/journal_page.dart';
+import '../../../../core/widgets/erreur_chargement_api.dart';
 import '../../../messagerie/presentation/pages/messagerie_page.dart';
 import '../../../notifications/presentation/pages/notifications_page.dart';
 import '../../data/datasources/source_stage_distante.dart';
@@ -17,9 +17,9 @@ import '../../data/mappers/mappeur_campagne_stage_api.dart';
 import '../../data/mappers/mappeur_affectation_stage_api.dart';
 import '../../domain/entities/campagne_stage.dart';
 import '../../domain/entities/suivi_candidature_stage.dart';
-import '../../../home/presentation/widgets/section_stage_en_cours_accueil.dart';
 import '../routes/routes_stage.dart';
 import 'detail_campagne_page.dart';
+import 'justification_stage_page.dart';
 import 'mon_stage_page.dart';
 import '../widgets/barre_recherche_stages.dart';
 import '../widgets/carte_candidature_moderne.dart';
@@ -30,7 +30,14 @@ import 'dart:async';
 import '../../../../core/services/sse_notifications_service.dart';
 
 class MesStagesPage extends StatefulWidget {
-  const MesStagesPage({super.key});
+  const MesStagesPage({
+    this.filtreSuiviInitial = 'Tous',
+    this.depuisProfil = false,
+    super.key,
+  });
+
+  final String filtreSuiviInitial;
+  final bool depuisProfil;
 
   @override
   State<MesStagesPage> createState() => _MesStagesPageState();
@@ -44,6 +51,9 @@ class _MesStagesPageState extends State<MesStagesPage> {
   final TextEditingController _rechercheController = TextEditingController();
   String _filtreCategorie = 'Tous';
   String _filtreCandidature = 'Toutes';
+  late String _filtreSuiviStage;
+  bool _actuelServiceDeroule = true;
+  bool _prochainServiceDeroule = false;
 
   late Future<List<Map<String, dynamic>>> _chargement;
   Map<String, dynamic>? _counts;
@@ -52,6 +62,7 @@ class _MesStagesPageState extends State<MesStagesPage> {
   @override
   void initState() {
     super.initState();
+    _filtreSuiviStage = widget.filtreSuiviInitial;
     _chargement = _charger();
     _chargerCounts();
     _sseSubscription = SseNotificationsService.instance.fluxCompteurs.listen((
@@ -110,6 +121,9 @@ class _MesStagesPageState extends State<MesStagesPage> {
     _sourceEtudiant.candidatures().catchError((_) => <String, dynamic>{}),
     _sourceEtudiant.admissions().catchError((_) => <String, dynamic>{}),
     _sourceEtudiant.reservations().catchError((_) => <String, dynamic>{}),
+    _sourceEtudiant.cloturesStage(perPage: 100),
+    _sourceEtudiant.resultatsStage(perPage: 100),
+    _sourceEtudiant.justificationsStage(),
   ]);
 
   Future<void> _actualiser() async {
@@ -160,6 +174,19 @@ class _MesStagesPageState extends State<MesStagesPage> {
               child: FutureBuilder<List<Map<String, dynamic>>>(
                 future: _chargement,
                 builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF1D61F2),
+                      ),
+                    );
+                  }
+                  if (snapshot.hasError) {
+                    return ErreurChargementApi(
+                      erreur: snapshot.error,
+                      onReessayer: _actualiser,
+                    );
+                  }
                   final donneesStages = snapshot.data?.isNotEmpty == true
                       ? snapshot.data![0]
                       : const <String, dynamic>{};
@@ -179,6 +206,18 @@ class _MesStagesPageState extends State<MesStagesPage> {
                       snapshot.data != null && snapshot.data!.length > 4
                       ? snapshot.data![4]
                       : const <String, dynamic>{};
+                  final donneesClotures =
+                      snapshot.data != null && snapshot.data!.length > 5
+                      ? snapshot.data![5]
+                      : const <String, dynamic>{};
+                  final donneesResultats =
+                      snapshot.data != null && snapshot.data!.length > 6
+                      ? snapshot.data![6]
+                      : const <String, dynamic>{};
+                  final donneesJustifications =
+                      snapshot.data != null && snapshot.data!.length > 7
+                      ? snapshot.data![7]
+                      : const <String, dynamic>{};
 
                   final stagesListe =
                       (donneesStages['items'] as List?)
@@ -186,19 +225,17 @@ class _MesStagesPageState extends State<MesStagesPage> {
                           .map(Map<String, dynamic>.from)
                           .toList() ??
                       [];
-                  Map<String, dynamic>? stageActif;
-                  for (final stage in stagesListe) {
-                    if (MappeurAffectationStageApi.estActive(stage)) {
-                      stageActif = stage;
-                      break;
-                    }
-                  }
-
                   return RefreshIndicator(
                     color: const Color(0xFF1D61F2),
                     onRefresh: _actualiser,
                     child: switch (_ongletActif) {
-                      0 => _buildOngletEnCours(stageActif, modeSombre),
+                      0 => _buildOngletEnCours(
+                        stagesListe,
+                        donneesClotures,
+                        donneesResultats,
+                        donneesJustifications,
+                        modeSombre,
+                      ),
                       1 => _buildOngletExplorer(donneesCampagnes, modeSombre),
                       2 => _buildOngletCandidatures(
                         donneesCandidatures,
@@ -234,7 +271,7 @@ class _MesStagesPageState extends State<MesStagesPage> {
         int.tryParse(_counts?['notifications']?.toString() ?? '0') ?? 0;
 
     return AppBar(
-      automaticallyImplyLeading: false,
+      automaticallyImplyLeading: widget.depuisProfil,
       backgroundColor: couleurFond,
       elevation: 0,
       surfaceTintColor: Colors.transparent,
@@ -344,9 +381,15 @@ class _MesStagesPageState extends State<MesStagesPage> {
   }
 
   // ==========================================
-  // ONGLET 1 : EN COURS (Fidèle à l'Image 2)
+  // ONGLET 1 : EN COURS (Harmonisé avec Candidatures)
   // ==========================================
-  Widget _buildOngletEnCours(Map<String, dynamic>? stage, bool modeSombre) {
+  Widget _buildOngletEnCours(
+    List<Map<String, dynamic>> stages,
+    Map<String, dynamic> donneesClotures,
+    Map<String, dynamic> donneesResultats,
+    Map<String, dynamic> donneesJustifications,
+    bool modeSombre,
+  ) {
     final couleurCarte = modeSombre ? const Color(0xFF1E293B) : Colors.white;
     final couleurBordure = modeSombre
         ? const Color(0xFF334155)
@@ -356,97 +399,137 @@ class _MesStagesPageState extends State<MesStagesPage> {
         ? const Color(0xFF94A3B8)
         : const Color(0xFF64748B);
 
-    if (stage == null) {
-      return LayoutBuilder(
-        builder: (context, constraints) => SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: constraints.maxHeight),
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 64,
-                      height: 64,
-                      decoration: BoxDecoration(
-                        color: modeSombre
-                            ? const Color(0xFF1E293B)
-                            : const Color(0xFFF1F5F9),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Iconsax.briefcase,
-                        size: 30,
-                        color: modeSombre
-                            ? const Color(0xFF64748B)
-                            : const Color(0xFF94A3B8),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      "Vous n'avez aucun stage en cours.",
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: texteSecondaire,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
+    final clotures = _maps(donneesClotures['items']);
+    final resultats = _maps(donneesResultats['items']);
+
+    // Compteurs pour la bannière récapitulative
+    int nbTotal = stages.length;
+    int nbEnCours = 0;
+    int nbClotures = 0;
+    int nbEnValidation = 0;
+    int nbValides = 0;
+
+    for (final s in stages) {
+      final ref = s['assignment_uuid']?.toString();
+      final c = _parAffectation(clotures, ref);
+      final r = _parAffectation(resultats, ref);
+      final lib = _libelleSuivi(s, c, r);
+      if (lib == 'Stage validé') {
+        nbValides++;
+      } else if (lib == 'Validation universitaire en attente') {
+        nbEnValidation++;
+      } else if (lib == 'Clôture en cours') {
+        nbClotures++;
+      } else {
+        nbEnCours++;
+      }
     }
 
-    // Extraction enrichie selon GET /api/v1/student/stages
-    final hospital = stage['hospital'] is Map
-        ? stage['hospital'] as Map
+    final query = _rechercheController.text.trim().toLowerCase();
+    final stagesFiltres = stages
+        .where((stage) {
+          final reference = stage['assignment_uuid']?.toString();
+          final completion = _parAffectation(clotures, reference);
+          final resultat = _parAffectation(resultats, reference);
+          final matchFiltre = _correspondAuFiltre(stage, completion, resultat);
+
+          if (!matchFiltre) return false;
+          if (query.isEmpty) return true;
+
+          final nomH =
+              (stage['hospital'] is Map
+                      ? stage['hospital']['name']
+                      : stage['hospital_name'])
+                  ?.toString()
+                  .toLowerCase() ??
+              '';
+          final titreC =
+              (stage['campaign'] is Map
+                      ? stage['campaign']['title']
+                      : stage['campaign_title'] ?? stage['titre'])
+                  ?.toString()
+                  .toLowerCase() ??
+              '';
+          final nomDep =
+              (stage['department'] is Map
+                      ? stage['department']['name']
+                      : stage['department_name'])
+                  ?.toString()
+                  .toLowerCase() ??
+              '';
+          return nomH.contains(query) ||
+              titreC.contains(query) ||
+              nomDep.contains(query);
+        })
+        .toList(growable: false);
+
+    final stage = stagesFiltres.isEmpty
+        ? null
+        : MappeurAffectationStageApi.selectionnerAffectationPrincipale(
+                stagesFiltres,
+              ) ??
+              stagesFiltres.first;
+    final completion = _parAffectation(
+      clotures,
+      stage?['assignment_uuid']?.toString(),
+    );
+    final resultat = _parAffectation(
+      resultats,
+      stage?['assignment_uuid']?.toString(),
+    );
+    final justification = _justificationPourAffectation(
+      donneesJustifications,
+      stage?['assignment_uuid']?.toString(),
+    );
+
+    final couleurFondBanniere = modeSombre
+        ? const Color(0xFF1E293B)
+        : Colors.white;
+    final couleurBordureBanniere = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFE2E8F0);
+
+    // Extraction enrichie selon GET /api/v1/student/stages. Une map vide
+    // permet de préparer le rendu avant le branchement vide/non vide sans
+    // forcer l'accès à une affectation nullable.
+    final stageAffiche = stage ?? const <String, dynamic>{};
+    final hospital = stageAffiche['hospital'] is Map
+        ? stageAffiche['hospital'] as Map
         : const {};
-    final department = stage['department'] is Map
-        ? stage['department'] as Map
+    final department = stageAffiche['department'] is Map
+        ? stageAffiche['department'] as Map
         : const {};
-    final campaign = stage['campaign'] is Map
-        ? stage['campaign'] as Map
+    final campaign = stageAffiche['campaign'] is Map
+        ? stageAffiche['campaign'] as Map
         : const {};
-    final period = stage['period'] is Map ? stage['period'] as Map : const {};
-    final planning = stage['planning'] is Map
-        ? stage['planning'] as Map
+    final period = stageAffiche['period'] is Map
+        ? stageAffiche['period'] as Map
+        : const {};
+    final planning = stageAffiche['planning'] is Map
+        ? stageAffiche['planning'] as Map
         : const {};
     final rotationsList =
-        (planning['rotations'] as List? ?? stage['rotations'] as List? ?? [])
+        (planning['rotations'] as List? ??
+                stageAffiche['rotations'] as List? ??
+                [])
             .whereType<Map>()
             .map(Map<String, dynamic>.from)
             .toList();
     final currentRotation = planning['current_rotation'] is Map
         ? Map<String, dynamic>.from(planning['current_rotation'] as Map)
         : null;
-    final departmentIntegrity = stage['department_integrity'] is Map
-        ? Map<String, dynamic>.from(stage['department_integrity'] as Map)
-        : const <String, dynamic>{};
-    final anomalieIntegrite =
-        departmentIntegrity['valid'] == false ||
-        rotationsList.any(
-          (rotation) =>
-              rotation['integrity'] is Map &&
-              (rotation['integrity'] as Map)['valid'] == false,
-        );
-
     final titreCampagne =
-        (campaign['title'] ?? stage['campaign_title'] ?? stage['titre'])
+        (campaign['title'] ??
+                stageAffiche['campaign_title'] ??
+                stageAffiche['titre'])
             ?.toString() ??
         '';
     final nomHopital =
-        (hospital['name'] ?? stage['hospital_name'])?.toString() ?? '';
+        (hospital['name'] ?? stageAffiche['hospital_name'])?.toString() ?? '';
     final nomDepartement =
-        (department['name'] ?? stage['department_name'])?.toString() ?? '';
+        (department['name'] ?? stageAffiche['department_name'])?.toString() ??
+        '';
 
-    // Service de la rotation active
     final serviceMap =
         currentRotation != null && currentRotation['service'] is Map
         ? currentRotation['service'] as Map
@@ -459,7 +542,6 @@ class _MesStagesPageState extends State<MesStagesPage> {
         '';
     final nomUnite = unitMap['name']?.toString();
 
-    // Superviseur
     final supervisorMap =
         currentRotation != null && currentRotation['supervisor'] is Map
         ? currentRotation['supervisor'] as Map
@@ -468,15 +550,102 @@ class _MesStagesPageState extends State<MesStagesPage> {
         (supervisorMap['name'] ?? currentRotation?['supervisor_name'])
             ?.toString() ??
         '';
-    final fonctionEncadreur =
-        (supervisorMap['function'] ?? currentRotation?['supervisor_function'])
-            ?.toString() ??
-        '';
 
-    // Dates
-    final dateDebutStr = (period['start_date'] ?? stage['date_debut'])
+    // Extraction du service actuel
+    final rotationActuelle = currentRotation ??
+        (rotationsList.isNotEmpty ? rotationsList.first : null);
+    final serviceActuelMap = rotationActuelle != null && rotationActuelle['service'] is Map
+        ? rotationActuelle['service'] as Map
+        : const {};
+    final unitActuelMap = rotationActuelle != null && rotationActuelle['unit'] is Map
+        ? rotationActuelle['unit'] as Map
+        : const {};
+    final supervisorActuelMap = rotationActuelle != null && rotationActuelle['supervisor'] is Map
+        ? rotationActuelle['supervisor'] as Map
+        : const {};
+    final deptActuelMap = rotationActuelle != null && rotationActuelle['department'] is Map
+        ? rotationActuelle['department'] as Map
+        : const {};
+
+    final nomServiceAffiche = (serviceActuelMap['name'] ??
+            rotationActuelle?['service_name'] ??
+            nomService)
+        ?.toString() ?? '';
+    final nomUniteAffiche = (unitActuelMap['name'] ??
+            rotationActuelle?['unit_name'] ??
+            nomUnite)
         ?.toString();
-    final dateFinStr = (period['end_date'] ?? stage['date_fin'])?.toString();
+    final nomDepartementActuel = (deptActuelMap['name'] ??
+            rotationActuelle?['department_name'] ??
+            nomDepartement)
+        ?.toString() ?? '';
+    final nomEncadreurActuel = (supervisorActuelMap['name'] ??
+            rotationActuelle?['supervisor_name'] ??
+            nomEncadreur)
+        ?.toString() ?? '';
+
+    final periodActuelMap = rotationActuelle != null && rotationActuelle['period'] is Map
+        ? rotationActuelle['period'] as Map
+        : const {};
+    final debActuel = (periodActuelMap['start_date'] ?? rotationActuelle?['date_debut'])?.toString();
+    final finActuel = (periodActuelMap['end_date'] ?? rotationActuelle?['date_fin'])?.toString();
+    final periodeActuel = (debActuel != null && debActuel.isNotEmpty && finActuel != null && finActuel.isNotEmpty)
+        ? 'Du $debActuel au $finActuel'
+        : '';
+
+    // Extraction du prochain service (next_rotation ou rotation suivante dans rotationsList)
+    final nextRotation = planning['next_rotation'] is Map
+        ? Map<String, dynamic>.from(planning['next_rotation'] as Map)
+        : null;
+    final Map<String, dynamic>? prochainRotationAffichee = nextRotation ?? () {
+      if (rotationActuelle == null || rotationsList.length <= 1) return null;
+      final indexActuel = rotationsList.indexOf(rotationActuelle);
+      if (indexActuel >= 0 && indexActuel + 1 < rotationsList.length) {
+        return rotationsList[indexActuel + 1];
+      }
+      return null;
+    }();
+
+    final serviceProchainMap = prochainRotationAffichee != null && prochainRotationAffichee['service'] is Map
+        ? prochainRotationAffichee['service'] as Map
+        : const {};
+    final unitProchainMap = prochainRotationAffichee != null && prochainRotationAffichee['unit'] is Map
+        ? prochainRotationAffichee['unit'] as Map
+        : const {};
+    final supervisorProchainMap = prochainRotationAffichee != null && prochainRotationAffichee['supervisor'] is Map
+        ? prochainRotationAffichee['supervisor'] as Map
+        : const {};
+    final deptProchainMap = prochainRotationAffichee != null && prochainRotationAffichee['department'] is Map
+        ? prochainRotationAffichee['department'] as Map
+        : const {};
+
+    final nomServiceProchain = (serviceProchainMap['name'] ??
+            prochainRotationAffichee?['service_name'])
+        ?.toString() ?? '';
+    final nomUniteProchain = (unitProchainMap['name'] ??
+            prochainRotationAffichee?['unit_name'])
+        ?.toString();
+    final nomDepartementProchain = (deptProchainMap['name'] ??
+            prochainRotationAffichee?['department_name'] ??
+            nomDepartement)
+        ?.toString() ?? '';
+    final nomEncadreurProchain = (supervisorProchainMap['name'] ??
+            prochainRotationAffichee?['supervisor_name'])
+        ?.toString() ?? '';
+
+    final periodProchainMap = prochainRotationAffichee != null && prochainRotationAffichee['period'] is Map
+        ? prochainRotationAffichee['period'] as Map
+        : const {};
+    final debProchain = (periodProchainMap['start_date'] ?? prochainRotationAffichee?['date_debut'])?.toString();
+    final finProchain = (periodProchainMap['end_date'] ?? prochainRotationAffichee?['date_fin'])?.toString();
+    final periodeProchain = (debProchain != null && debProchain.isNotEmpty && finProchain != null && finProchain.isNotEmpty)
+        ? 'Du $debProchain au $finProchain'
+        : '';
+
+    final dateDebutStr = (period['start_date'] ?? stageAffiche['date_debut'])
+        ?.toString();
+    final dateFinStr = (period['end_date'] ?? stageAffiche['date_fin'])
+        ?.toString();
     final dateDebut = DateTime.tryParse(dateDebutStr ?? '');
     final dateFin = DateTime.tryParse(dateFinStr ?? '');
     final totalJours = dateDebut != null && dateFin != null
@@ -486,493 +655,801 @@ class _MesStagesPageState extends State<MesStagesPage> {
         ? DateTime.now().difference(dateDebut).inDays.clamp(0, totalJours)
         : 0;
 
-    // Rotations et jours restants dans le service
     final totalRotations = planning['total'] is int
         ? planning['total'] as int
         : rotationsList.length;
     final rotationsEffectuees = rotationsList
-        .where((r) => r['status'] == 'TERMINEE')
+        .where((rotation) => rotation['status'] == 'TERMINEE')
         .length;
 
-    final rotFinStr =
-        (currentRotation?['period'] is Map
-                ? currentRotation!['period']['end_date']
-                : currentRotation?['date_fin'])
-            ?.toString();
-    final rotFin = DateTime.tryParse(rotFinStr ?? '');
-    final joursRestantsService = rotFin != null
-        ? rotFin.difference(DateTime.now()).inDays.clamp(0, 999)
-        : (totalJours - joursEffectues).clamp(0, 999);
+    final paddingBas = MediaQuery.paddingOf(context).bottom + 96.0;
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+      padding: EdgeInsets.fromLTRB(16, 14, 16, paddingBas),
       children: [
-        // Composant d'accueil réutilisé fidèlement
-        SectionStageEnCoursAccueil(
-          titreCampagne: titreCampagne,
-          nomEtablissement: nomHopital,
-          joursEffectues: joursEffectues,
-          totalJours: totalJours,
-          servicesEffectues: rotationsEffectuees,
-          totalServices: totalRotations,
-          serviceActuel: [
-            nomService,
-            if (nomUnite != null && nomUnite.isNotEmpty) nomUnite,
-          ].where((valeur) => valeur.isNotEmpty).join(' • '),
-          joursRestantsService: joursRestantsService,
-          nomEncadreur: nomEncadreur,
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => MonStagePage(
-                assignmentReference: stage['assignment_uuid']?.toString(),
-              ),
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 18),
-
-        // Détails supplémentaires des rotations ordonnées (GET /api/v1/student/stages)
+        // 1. Bannière récapitulative fine & élégante comme dans Candidatures
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8.5),
           decoration: BoxDecoration(
-            color: couleurCarte,
+            color: couleurFondBanniere,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: couleurBordure),
+            border: Border.all(color: couleurBordureBanniere),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Rotations planifiées ($totalRotations)',
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: textePrincipal,
-                    ),
-                  ),
-                  if (anomalieIntegrite)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: modeSombre
-                            ? const Color(0xFF7F1D1D).withValues(alpha: 0.45)
-                            : const Color(0xFFFEF2F2),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        'Anomalie signalée',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: modeSombre
-                              ? const Color(0xFFFCA5A5)
-                              : const Color(0xFFDC2626),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              if (rotationsList.isEmpty)
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
                 Text(
-                  'Aucune rotation enregistrée pour ce stage.',
+                  '$nbTotal stage${nbTotal > 1 ? 's' : ''}',
                   style: GoogleFonts.inter(
-                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
                     color: texteSecondaire,
+                    fontSize: 12.5,
                   ),
-                )
-              else
-                ...rotationsList.map((rot) {
-                  final rotPeriod = rot['period'] is Map
-                      ? rot['period'] as Map
-                      : const {};
-                  final rService = rot['service'] is Map
-                      ? rot['service'] as Map
-                      : const {};
-                  final rUnit = rot['unit'] is Map
-                      ? rot['unit'] as Map
-                      : const {};
-                  final rSup = rot['supervisor'] is Map
-                      ? rot['supervisor'] as Map
-                      : const {};
-                  final nomR =
-                      (rService['name'] ?? rot['service_name'])?.toString() ??
-                      '';
-                  final uniteR = rUnit['name']?.toString();
-                  final statutR =
-                      (rot['status'] ?? rot['statut'])
-                          ?.toString()
-                          .toUpperCase() ??
-                      '';
-                  final estActif = statutR == 'ACTIVE' || statutR == 'EN_COURS';
-                  final estTermine = statutR == 'TERMINEE';
-                  final estAnnule = statutR == 'ANNULEE';
-                  final debR =
-                      rotPeriod['start_date'] ?? rot['date_debut'] ?? '';
-                  final finR = rotPeriod['end_date'] ?? rot['date_fin'] ?? '';
-
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: estActif
-                          ? (modeSombre
-                                ? const Color(0xFF1E3A8A).withValues(alpha: 0.3)
-                                : const Color(0xFFEFF6FF))
-                          : (modeSombre
-                                ? const Color(0xFF0F172A)
-                                : const Color(0xFFF8FAFC)),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: estActif
-                            ? const Color(0xFF3B82F6)
-                            : (modeSombre
-                                  ? const Color(0xFF334155)
-                                  : const Color(0xFFE2E8F0)),
-                      ),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: estActif
-                                ? const Color(0xFF2563EB)
-                                : (estTermine
-                                      ? const Color(0xFF16A34A)
-                                      : (modeSombre
-                                            ? const Color(0xFF334155)
-                                            : const Color(0xFFCBD5E1))),
-                            shape: BoxShape.circle,
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            '${rot['sequence'] ?? rot['position'] ?? rotationsList.indexOf(rot) + 1}',
-                            style: GoogleFonts.inter(
-                              color: Colors.white,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                uniteR != null ? '$nomR • $uniteR' : nomR,
-                                style: GoogleFonts.inter(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  color: textePrincipal,
-                                ),
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                'Du $debR au $finR',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  color: texteSecondaire,
-                                ),
-                              ),
-                              if (rSup['name'] != null ||
-                                  rot['supervisor_name'] != null) ...[
-                                const SizedBox(height: 3),
-                                Text(
-                                  'Encadreur : ${rSup['name'] ?? rot['supervisor_name']}',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                    color: const Color(0xFF3B82F6),
-                                  ),
-                                ),
-                              ],
-                              if (rot['objectives'] != null &&
-                                  rot['objectives'].toString().isNotEmpty) ...[
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Objectif : ${rot['objectives']}',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 11.5,
-                                    fontStyle: FontStyle.italic,
-                                    color: texteSecondaire,
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: estActif
-                                ? (modeSombre
-                                      ? const Color(
-                                          0xFF14532D,
-                                        ).withValues(alpha: 0.65)
-                                      : const Color(0xFFDCFCE7))
-                                : (estTermine
-                                      ? (modeSombre
-                                            ? const Color(0xFF334155)
-                                            : const Color(0xFFF1F5F9))
-                                      : (modeSombre
-                                            ? const Color(
-                                                0xFF78350F,
-                                              ).withValues(alpha: 0.65)
-                                            : const Color(0xFFFEF3C7))),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            estActif
-                                ? 'En cours'
-                                : estTermine
-                                ? 'Terminée'
-                                : estAnnule
-                                ? 'Annulée'
-                                : 'Planifiée',
-                            style: GoogleFonts.inter(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w700,
-                              color: estActif
-                                  ? (modeSombre
-                                        ? const Color(0xFF4ADE80)
-                                        : const Color(0xFF16A34A))
-                                  : (estTermine
-                                        ? (modeSombre
-                                              ? const Color(0xFFCBD5E1)
-                                              : const Color(0xFF64748B))
-                                        : (modeSombre
-                                              ? const Color(0xFFFBBF24)
-                                              : const Color(0xFFD97706))),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 16),
-
-        // Détails Superviseur, Hôpital et Département
-        Row(
-          children: [
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: couleurCarte,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: couleurBordure),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Superviseur',
-                      style: GoogleFonts.inter(
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Text(
+                    '•',
+                    style: TextStyle(
+                      color: modeSombre
+                          ? const Color(0xFF475569)
+                          : const Color(0xFFCBD5E1),
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                Text(
+                  '$nbEnCours en cours',
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w700,
+                    color: modeSombre
+                        ? const Color(0xFF38BDF8)
+                        : const Color(0xFF1D61F2),
+                    fontSize: 12.5,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Text(
+                    '•',
+                    style: TextStyle(
+                      color: modeSombre
+                          ? const Color(0xFF475569)
+                          : const Color(0xFFCBD5E1),
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                Text(
+                  '$nbValides validé${nbValides > 1 ? 's' : ''}',
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w700,
+                    color: modeSombre
+                        ? const Color(0xFF4ADE80)
+                        : const Color(0xFF16A34A),
+                    fontSize: 12.5,
+                  ),
+                ),
+                if (nbEnValidation > 0) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: Text(
+                      '•',
+                      style: TextStyle(
+                        color: modeSombre
+                            ? const Color(0xFF475569)
+                            : const Color(0xFFCBD5E1),
                         fontSize: 12,
-                        color: const Color(0xFF94A3B8),
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      nomEncadreur,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: textePrincipal,
-                      ),
+                  ),
+                  Text(
+                    '$nbEnValidation en validation',
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w700,
+                      color: modeSombre
+                          ? const Color(0xFFFCD34D)
+                          : const Color(0xFFD97706),
+                      fontSize: 12.5,
                     ),
-                    Text(
-                      fonctionEncadreur,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.inter(
-                        fontSize: 11.5,
-                        color: texteSecondaire,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: couleurCarte,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: couleurBordure),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Département',
-                      style: GoogleFonts.inter(
+                  ),
+                ],
+                if (nbClotures > 0) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: Text(
+                      '•',
+                      style: TextStyle(
+                        color: modeSombre
+                            ? const Color(0xFF475569)
+                            : const Color(0xFFCBD5E1),
                         fontSize: 12,
-                        color: const Color(0xFF94A3B8),
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      nomDepartement,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: textePrincipal,
-                      ),
+                  ),
+                  Text(
+                    '$nbClotures clôturé${nbClotures > 1 ? 's' : ''}',
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w700,
+                      color: modeSombre
+                          ? const Color(0xFFA5B4FC)
+                          : const Color(0xFF4338CA),
+                      fontSize: 12.5,
                     ),
-                    Text(
-                      nomHopital,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.inter(
-                        fontSize: 11.5,
-                        color: texteSecondaire,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+                  ),
+                ],
+              ],
             ),
-          ],
-        ),
-
-        const SizedBox(height: 22),
-
-        // Titre Outils de suivi
-        Text(
-          'Outils de suivi',
-          style: GoogleFonts.inter(
-            fontSize: 17,
-            fontWeight: FontWeight.w800,
-            color: textePrincipal,
           ),
         ),
 
         const SizedBox(height: 12),
 
-        // 3 boutons d'outils : Journal de bord, Rapport, Évaluations
-        Row(
-          children: [
-            Expanded(
-              child: _buildCarteOutilSuivi(
-                icone: CupertinoIcons.book,
-                couleurIcone: const Color(0xFF1D61F2),
-                titre: 'Journal de bord',
-                modeSombre: modeSombre,
-                onTap: () => Navigator.of(context, rootNavigator: true).push(
-                  MaterialPageRoute<void>(builder: (_) => const JournalPage()),
+        // 2. Filtres horizontaux au design élégant des chips Candidatures
+        _buildFiltresSuivi(modeSombre),
+
+        const SizedBox(height: 16),
+
+        if (stage == null) ...[
+          const SizedBox(height: 48),
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: modeSombre
+                          ? const Color(0xFF1E293B)
+                          : const Color(0xFFF1F5F9),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Iconsax.briefcase,
+                      size: 30,
+                      color: modeSombre
+                          ? const Color(0xFF64748B)
+                          : const Color(0xFF94A3B8),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    _filtreSuiviStage == 'Tous'
+                        ? "Vous n'avez aucun stage à suivre."
+                        : 'Aucun stage ne correspond à ce filtre.',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: texteSecondaire,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ] else ...[
+          // Titre de la campagne au sommet de la page
+          if (titreCampagne.isNotEmpty) ...[
+            Text(
+              titreCampagne,
+              style: GoogleFonts.inter(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: textePrincipal,
+                letterSpacing: -0.3,
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
+
+          // Justification moderne (juste sous le titre de la campagne)
+          if (justification != null) ...[
+            _buildAlerteJustification(justification, modeSombre),
+            const SizedBox(height: 14),
+          ],
+
+          // Statut du suivi / validation
+          _buildEtatSuiviStage(stage, completion, resultat, modeSombre),
+          const SizedBox(height: 16),
+
+          // Carte décomposée : Progression globale du stage (Inspirée de Présences dans Mon journal)
+          _buildCarteProgressionStageDirecte(
+            nomHopital: nomHopital,
+            joursEffectues: joursEffectues,
+            totalJours: totalJours,
+            rotationsEffectuees: rotationsEffectuees,
+            totalRotations: totalRotations,
+            onOuvrirMonStage: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => MonStagePage(
+                  assignmentReference: stage['assignment_uuid']?.toString(),
                 ),
               ),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _buildCarteOutilSuivi(
-                icone: CupertinoIcons.doc_text,
-                couleurIcone: const Color(0xFF1D61F2),
-                titre: 'Rapport',
-                modeSombre: modeSombre,
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Module Rapports disponible prochainement'),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _buildCarteOutilSuivi(
-                icone: CupertinoIcons.star,
-                couleurIcone: const Color(0xFF1D61F2),
-                titre: 'Évaluations',
-                modeSombre: modeSombre,
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Module Évaluations disponible prochainement',
-                      ),
-                    ),
-                  );
-                },
-              ),
+            modeSombre: modeSombre,
+            couleurCarte: couleurCarte,
+            couleurBordure: couleurBordure,
+            textePrincipal: textePrincipal,
+            texteSecondaire: texteSecondaire,
+          ),
+
+          const SizedBox(height: 18),
+
+          // 1. CARTE "SERVICE ACTUEL"
+          _buildCarteServiceRotationResume(
+            titreSection: 'Service actuel',
+            iconeSection: Icons.medical_services_rounded,
+            couleurIcone: const Color(0xFF1D61F2),
+            nomService: nomServiceAffiche,
+            nomUnite: nomUniteAffiche,
+            nomDepartement: nomDepartementActuel,
+            nomHopital: nomHopital,
+            periodeTexte: periodeActuel,
+            nomEncadreur: nomEncadreurActuel,
+            estDeroule: _actuelServiceDeroule,
+            surChangementDeroule: () => setState(() {
+              _actuelServiceDeroule = !_actuelServiceDeroule;
+            }),
+            modeSombre: modeSombre,
+            couleurCarte: couleurCarte,
+            couleurBordure: couleurBordure,
+            textePrincipal: textePrincipal,
+            texteSecondaire: texteSecondaire,
+          ),
+
+          // 2. CARTE "PROCHAIN SERVICE" (si présent)
+          if (prochainRotationAffichee != null) ...[
+            const SizedBox(height: 14),
+            _buildCarteServiceRotationResume(
+              titreSection: 'Prochain service',
+              iconeSection: Icons.arrow_forward_rounded,
+              couleurIcone: const Color(0xFF6366F1),
+              nomService: nomServiceProchain,
+              nomUnite: nomUniteProchain,
+              nomDepartement: nomDepartementProchain,
+              nomHopital: nomHopital,
+              periodeTexte: periodeProchain,
+              nomEncadreur: nomEncadreurProchain,
+              estDeroule: _prochainServiceDeroule,
+              surChangementDeroule: () => setState(() {
+                _prochainServiceDeroule = !_prochainServiceDeroule;
+              }),
+              modeSombre: modeSombre,
+              couleurCarte: couleurCarte,
+              couleurBordure: couleurBordure,
+              textePrincipal: textePrincipal,
+              texteSecondaire: texteSecondaire,
             ),
           ],
-        ),
+        ],
       ],
     );
   }
 
-  Widget _buildCarteOutilSuivi({
-    required IconData icone,
-    required Color couleurIcone,
-    required String titre,
+  /// Carte directe de progression du stage (Inspirée du design Présence de Mon journal)
+  Widget _buildCarteProgressionStageDirecte({
+    required String nomHopital,
+    required int joursEffectues,
+    required int totalJours,
+    required int rotationsEffectuees,
+    required int totalRotations,
+    required VoidCallback onOuvrirMonStage,
     required bool modeSombre,
-    required VoidCallback onTap,
+    required Color couleurCarte,
+    required Color couleurBordure,
+    required Color textePrincipal,
+    required Color texteSecondaire,
   }) {
-    final couleurCarte = modeSombre ? const Color(0xFF1E293B) : Colors.white;
-    final couleurBordure = modeSombre
-        ? const Color(0xFF334155)
-        : const Color(0xFFE2E8F0);
-    final textePrincipal = modeSombre ? Colors.white : const Color(0xFF0F172A);
+    final double progressionRatio = totalJours > 0
+        ? (joursEffectues / totalJours).clamp(0.0, 1.0)
+        : 0.0;
+    final int pourcentage = (progressionRatio * 100).round();
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          height: 90,
-          decoration: BoxDecoration(
-            color: couleurCarte,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: couleurBordure),
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: couleurCarte,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: couleurBordure),
+        boxShadow: [
+          BoxShadow(
+            color: modeSombre
+                ? const Color(0x30000000)
+                : const Color(0x05000000),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+        ],
+      ),
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Ligne Établissement et badge de progression
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icone, color: couleurIcone, size: 24),
-              const SizedBox(height: 6),
-              Text(
-                titre,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: textePrincipal,
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1D61F2).withValues(
+                    alpha: modeSombre ? 0.2 : 0.1,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.local_hospital_rounded,
+                  size: 20,
+                  color: Color(0xFF1D61F2),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Établissement d\'accueil',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: const Color(0xFF94A3B8),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      nomHopital.isNotEmpty ? nomHopital : 'Établissement non renseigné',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.w800,
+                        color: textePrincipal,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4.5,
+                ),
+                decoration: BoxDecoration(
+                  color: modeSombre
+                      ? const Color(0xFF1E3A8A).withValues(alpha: 0.5)
+                      : const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '$pourcentage%',
+                  style: GoogleFonts.inter(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF1D61F2),
+                  ),
                 ),
               ),
             ],
           ),
-        ),
+
+          const SizedBox(height: 16),
+
+          // Barre de progression
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: progressionRatio,
+              minHeight: 7,
+              backgroundColor: modeSombre
+                  ? const Color(0xFF334155)
+                  : const Color(0xFFE2E8F0),
+              valueColor: const AlwaysStoppedAnimation<Color>(
+                Color(0xFF1D61F2),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Indicateurs métriques clés (style Présences)
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: modeSombre
+                        ? const Color(0xFF0F172A).withValues(alpha: 0.4)
+                        : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: couleurBordure),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Jours validés',
+                        style: GoogleFonts.inter(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF94A3B8),
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            '$joursEffectues',
+                            style: GoogleFonts.inter(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w900,
+                              color: const Color(0xFF16A34A),
+                            ),
+                          ),
+                          Text(
+                            ' / $totalJours j',
+                            style: GoogleFonts.inter(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: texteSecondaire,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: modeSombre
+                        ? const Color(0xFF0F172A).withValues(alpha: 0.4)
+                        : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: couleurBordure),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Services validés',
+                        style: GoogleFonts.inter(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF94A3B8),
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            '$rotationsEffectuees',
+                            style: GoogleFonts.inter(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w900,
+                              color: const Color(0xFF1D61F2),
+                            ),
+                          ),
+                          Text(
+                            ' / $totalRotations',
+                            style: GoogleFonts.inter(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: texteSecondaire,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 14),
+
+          // Bouton d'action pour ouvrir le dossier complet
+          SizedBox(
+            width: double.infinity,
+            height: 42,
+            child: OutlinedButton.icon(
+              onPressed: onOuvrirMonStage,
+              icon: const Icon(
+                Icons.assignment_outlined,
+                size: 17,
+                color: Color(0xFF1D61F2),
+              ),
+              label: Text(
+                'Consulter le dossier du stage',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF1D61F2),
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(
+                  color: const Color(0xFF1D61F2).withValues(
+                    alpha: modeSombre ? 0.5 : 0.3,
+                  ),
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCarteServiceRotationResume({
+    required String titreSection,
+    required IconData iconeSection,
+    required Color couleurIcone,
+    required String nomService,
+    required String? nomUnite,
+    required String nomDepartement,
+    required String nomHopital,
+    required String periodeTexte,
+    required String nomEncadreur,
+    required bool estDeroule,
+    required VoidCallback surChangementDeroule,
+    required bool modeSombre,
+    required Color couleurCarte,
+    required Color couleurBordure,
+    required Color textePrincipal,
+    required Color texteSecondaire,
+  }) {
+    final aUnDepartement = nomDepartement.isNotEmpty;
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: couleurCarte,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: couleurBordure),
+        boxShadow: [
+          BoxShadow(
+            color: modeSombre
+                ? const Color(0x33000000)
+                : const Color(0x06000000),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // En-tête principal : icône + Service + flèche déroulante
+          InkWell(
+            onTap: surChangementDeroule,
+            borderRadius: BorderRadius.circular(18),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: couleurIcone.withValues(
+                        alpha: modeSombre ? 0.2 : 0.12,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      iconeSection,
+                      size: 22,
+                      color: couleurIcone,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          titreSection,
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF94A3B8),
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          nomService.isNotEmpty
+                              ? (nomUnite != null && nomUnite.isNotEmpty
+                                  ? '$nomService • $nomUnite'
+                                  : nomService)
+                              : 'Service non défini',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: textePrincipal,
+                          ),
+                        ),
+                        if (periodeTexte.isNotEmpty) ...[
+                          const SizedBox(height: 3),
+                          Text(
+                            periodeTexte,
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: texteSecondaire,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: modeSombre
+                          ? const Color(0xFF334155).withValues(alpha: 0.5)
+                          : const Color(0xFFF1F5F9),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      estDeroule
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.keyboard_arrow_down_rounded,
+                      size: 20,
+                      color: texteSecondaire,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Section déroulante affichant le Département et les infos associées
+          if (estDeroule) ...[
+            Divider(height: 1, color: couleurBordure),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+              decoration: BoxDecoration(
+                color: modeSombre
+                    ? const Color(0xFF0F172A).withValues(alpha: 0.5)
+                    : const Color(0xFFF8FAFC),
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(18),
+                  bottomRight: Radius.circular(18),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: modeSombre
+                              ? const Color(0xFF0C4A6E).withValues(alpha: 0.4)
+                              : const Color(0xFFE0F2FE),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.domain_rounded,
+                          size: 18,
+                          color: Color(0xFF0284C7),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Département',
+                              style: GoogleFonts.inter(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF94A3B8),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              aUnDepartement ? nomDepartement : 'Non renseigné',
+                              style: GoogleFonts.inter(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700,
+                                color: textePrincipal,
+                              ),
+                            ),
+                            if (nomHopital.isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                nomHopital,
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: texteSecondaire,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (nomEncadreur.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 12,
+                          backgroundColor: modeSombre
+                              ? const Color(0xFF334155)
+                              : const Color(0xFFE2E8F0),
+                          child: Icon(
+                            Icons.person,
+                            size: 14,
+                            color: texteSecondaire,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          'Encadreur : ',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: texteSecondaire,
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            nomEncadreur,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF1D61F2),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -1842,6 +2319,469 @@ class _MesStagesPageState extends State<MesStagesPage> {
       ],
     );
   }
+
+  Widget _buildAlerteJustification(
+    Map<String, dynamic> justification,
+    bool modeSombre,
+  ) {
+    final statut = justification['justification_status']
+        ?.toString()
+        .toUpperCase();
+    final (titre, couleur, icone, badgeTexte) = switch (statut) {
+      'ACCEPTEE' => (
+        'Justification acceptée',
+        const Color(0xFF16A34A),
+        CupertinoIcons.checkmark_seal_fill,
+        'Validée',
+      ),
+      'REJETEE' => (
+        'Justification rejetée',
+        const Color(0xFFDC2626),
+        CupertinoIcons.clear_circled_solid,
+        'Rejetée',
+      ),
+      'EN_ATTENTE' => (
+        'Justification en attente',
+        const Color(0xFFEA580C),
+        CupertinoIcons.clock_fill,
+        'En attente',
+      ),
+      _ => (
+        'Justification requise',
+        const Color(0xFFFF751F),
+        CupertinoIcons.exclamationmark_triangle_fill,
+        'À fournir',
+      ),
+    };
+    final description =
+        justification['decision_message']?.toString().trim().isNotEmpty == true
+        ? justification['decision_message'].toString().trim()
+        : justification['message']?.toString().trim().isNotEmpty == true
+        ? justification['message'].toString().trim()
+        : 'Une démarche de justification est requise pour ce stage.';
+    final assignmentUuid = justification['assignment_uuid']?.toString() ?? '';
+    final couleurCarte = modeSombre ? const Color(0xFF1E293B) : Colors.white;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: assignmentUuid.isEmpty
+            ? null
+            : () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) =>
+                        JustificationStagePage(assignmentUuid: assignmentUuid),
+                  ),
+                );
+                if (mounted) await _actualiser();
+              },
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: couleurCarte,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: couleur.withValues(alpha: modeSombre ? 0.35 : 0.25),
+              width: 1.2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: modeSombre
+                    ? const Color(0x30000000)
+                    : const Color(0x05000000),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: couleur.withValues(alpha: modeSombre ? 0.18 : 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                alignment: Alignment.center,
+                child: Icon(icone, color: couleur, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            titre,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: modeSombre
+                                  ? Colors.white
+                                  : const Color(0xFF0F172A),
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: couleur.withValues(
+                              alpha: modeSombre ? 0.2 : 0.1,
+                            ),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            badgeTexte,
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: couleur,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      description,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w500,
+                        color: modeSombre
+                            ? const Color(0xFF94A3B8)
+                            : const Color(0xFF64748B),
+                        height: 1.35,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Text(
+                          'Gérer la justification',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF1D61F2),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          CupertinoIcons.chevron_right,
+                          color: Color(0xFF1D61F2),
+                          size: 13,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Map<String, dynamic>? _justificationPourAffectation(
+    Map<String, dynamic> donnees,
+    String? assignmentUuid,
+  ) {
+    if (assignmentUuid == null || assignmentUuid.isEmpty) return null;
+    for (final item in _maps(donnees['items'])) {
+      if (item['assignment_uuid']?.toString() != assignmentUuid) continue;
+      final situation = item['situation']?.toString().trim() ?? '';
+      final justificationUuid =
+          item['justification_uuid']?.toString().trim() ?? '';
+      final statut = item['justification_status']?.toString().trim() ?? '';
+      final allowedType = item['allowed_type']?.toString().trim() ?? '';
+      if (situation.isNotEmpty ||
+          justificationUuid.isNotEmpty ||
+          statut.isNotEmpty ||
+          allowedType.isNotEmpty) {
+        return item;
+      }
+    }
+    return null;
+  }
+
+  Widget _buildFiltresSuivi(bool modeSombre) {
+    const filtres = [
+      'Tous',
+      'En cours',
+      'Clôturé',
+      'En cours de validation',
+      'Validé',
+    ];
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: filtres.map((filtre) {
+          final actif = _filtreSuiviStage == filtre;
+          final couleurFond = actif
+              ? const Color(0xFF1D61F2)
+              : (modeSombre ? const Color(0xFF1E293B) : Colors.white);
+          final couleurBordure = actif
+              ? const Color(0xFF1D61F2)
+              : (modeSombre
+                    ? const Color(0xFF334155)
+                    : const Color(0xFFE2E8F0));
+          final couleurTexte = actif
+              ? Colors.white
+              : (modeSombre
+                    ? const Color(0xFF94A3B8)
+                    : const Color(0xFF64748B));
+
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: GestureDetector(
+              onTap: () => setState(() => _filtreSuiviStage = filtre),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8.5,
+                ),
+                decoration: BoxDecoration(
+                  color: couleurFond,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: couleurBordure),
+                ),
+                child: Text(
+                  filtre,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: actif ? FontWeight.w700 : FontWeight.w500,
+                    color: couleurTexte,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildEtatSuiviStage(
+    Map<String, dynamic> stage,
+    Map<String, dynamic>? completion,
+    Map<String, dynamic>? resultat,
+    bool modeSombre,
+  ) {
+    final libelle = _libelleSuivi(stage, completion, resultat);
+    final (couleurFond, couleurTexte, icone, sousTitre) = switch (libelle) {
+      'Stage validé' => (
+        modeSombre
+            ? const Color(0xFF14532D).withValues(alpha: 0.35)
+            : const Color(0xFFDCFCE7),
+        modeSombre ? const Color(0xFF86EFAC) : const Color(0xFF16A34A),
+        CupertinoIcons.checkmark_seal_fill,
+        'Stage évalué et validé académiquement',
+      ),
+      'Validation universitaire en attente' => (
+        modeSombre
+            ? const Color(0xFF78350F).withValues(alpha: 0.35)
+            : const Color(0xFFFEF3C7),
+        modeSombre ? const Color(0xFFFCD34D) : const Color(0xFFD97706),
+        CupertinoIcons.hourglass,
+        'Dossier transmis pour validation universitaire',
+      ),
+      'Clôture en cours' => (
+        modeSombre
+            ? const Color(0xFF312E81).withValues(alpha: 0.35)
+            : const Color(0xFFE0E7FF),
+        modeSombre ? const Color(0xFFA5B4FC) : const Color(0xFF4338CA),
+        CupertinoIcons.archivebox_fill,
+        'Période terminée — finalisation du rapport et clôture',
+      ),
+      _ => (
+        modeSombre
+            ? const Color(0xFF0C4A6E).withValues(alpha: 0.35)
+            : const Color(0xFFE0F2FE),
+        modeSombre ? const Color(0xFF7DD3FC) : const Color(0xFF0284C7),
+        CupertinoIcons.sparkles,
+        'Période de stage en déroulement normal',
+      ),
+    };
+
+    final couleurCarte = modeSombre ? const Color(0xFF1E293B) : Colors.white;
+    final couleurBordure = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFE2E8F0);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: couleurCarte,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: couleurBordure),
+        boxShadow: [
+          BoxShadow(
+            color: modeSombre
+                ? const Color(0x30000000)
+                : const Color(0x05000000),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: couleurFond,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            alignment: Alignment.center,
+            child: Icon(icone, color: couleurTexte, size: 22),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        libelle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w800,
+                          color: modeSombre
+                              ? Colors.white
+                              : const Color(0xFF0F172A),
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: couleurFond,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        libelle == 'Stage validé'
+                            ? 'Validé'
+                            : libelle == 'Validation universitaire en attente'
+                            ? 'En validation'
+                            : libelle == 'Clôture en cours'
+                            ? 'Clôturé'
+                            : 'En cours',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: couleurTexte,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  sousTitre,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: modeSombre
+                        ? const Color(0xFF94A3B8)
+                        : const Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  bool _correspondAuFiltre(
+    Map<String, dynamic> stage,
+    Map<String, dynamic>? completion,
+    Map<String, dynamic>? resultat,
+  ) {
+    if (_filtreSuiviStage == 'Tous') return true;
+    final libelle = _libelleSuivi(stage, completion, resultat);
+    return switch (_filtreSuiviStage) {
+      'En cours' => libelle == 'Stage en cours',
+      'Clôturé' || 'Clôture' => libelle == 'Clôture en cours',
+      'En cours de validation' ||
+      'Validation' => libelle == 'Validation universitaire en attente',
+      'Validé' || 'Validés' => libelle == 'Stage validé',
+      _ => true,
+    };
+  }
+
+  String _libelleSuivi(
+    Map<String, dynamic> stage,
+    Map<String, dynamic>? completion,
+    Map<String, dynamic>? resultat,
+  ) {
+    final processus = _map(resultat?['administrative_process']);
+    final transmission = _map(processus['university_transmission']);
+    final transmissionStatus = transmission['status']?.toString().toUpperCase();
+    if (const {'VALIDE', 'ARCHIVE'}.contains(transmissionStatus) ||
+        processus['status']?.toString().toUpperCase() == 'COMPLETED') {
+      return 'Stage validé';
+    }
+    final statutCloture = completion?['status']?.toString().toUpperCase();
+    if (statutCloture == 'VALIDE') {
+      return 'Validation universitaire en attente';
+    }
+    if (completion != null ||
+        const {
+          'TERMINEE',
+          'CLOTUREE',
+        }.contains(stage['assignment_status']?.toString().toUpperCase())) {
+      return 'Clôture en cours';
+    }
+    return 'Stage en cours';
+  }
+
+  Map<String, dynamic>? _parAffectation(
+    List<Map<String, dynamic>> items,
+    String? reference,
+  ) {
+    if (reference == null || reference.isEmpty) return null;
+    for (final item in items) {
+      if (_map(item['assignment'])['uuid']?.toString() == reference ||
+          item['assignment_uuid']?.toString() == reference) {
+        return item;
+      }
+    }
+    return null;
+  }
+
+  static List<Map<String, dynamic>> _maps(Object? valeur) => valeur is List
+      ? valeur.whereType<Map>().map(Map<String, dynamic>.from).toList()
+      : <Map<String, dynamic>>[];
+
+  static Map<String, dynamic> _map(Object? valeur) =>
+      valeur is Map ? Map<String, dynamic>.from(valeur) : <String, dynamic>{};
 
   String _formaterDateCandidature(String brute) {
     final parsed = DateTime.tryParse(brute);

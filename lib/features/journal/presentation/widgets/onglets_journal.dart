@@ -14,13 +14,21 @@ class OngletsJournal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final modeSombre = Theme.of(context).brightness == Brightness.dark;
-    return Row(
-      children: [
-        _buildOnglet(index: 0, titre: 'Mes tâches', actif: indexActif == 0, modeSombre: modeSombre),
-        _buildOnglet(index: 1, titre: 'Présences', actif: indexActif == 1, modeSombre: modeSombre),
-        _buildOnglet(index: 2, titre: 'Evaluations', actif: indexActif == 2, modeSombre: modeSombre),
-        _buildOnglet(index: 3, titre: 'Journal', actif: indexActif == 3, modeSombre: modeSombre),
-      ],
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildOnglet(index: 0, titre: 'Mes tâches', actif: indexActif == 0, modeSombre: modeSombre),
+          const SizedBox(width: 6),
+          _buildOnglet(index: 1, titre: 'Présences', actif: indexActif == 1, modeSombre: modeSombre),
+          const SizedBox(width: 6),
+          _buildOnglet(index: 2, titre: 'Evaluations', actif: indexActif == 2, modeSombre: modeSombre),
+          const SizedBox(width: 6),
+          _buildOnglet(index: 3, titre: 'Journal', actif: indexActif == 3, modeSombre: modeSombre),
+        ],
+      ),
     );
   }
 
@@ -33,10 +41,11 @@ class OngletsJournal extends StatelessWidget {
     final couleurActive = modeSombre ? const Color(0xFF38BDF8) : const Color(0xFF1D61F2);
     final couleurInactive = modeSombre ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
-    return Expanded(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => onChangementOnglet(index),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => onChangementOnglet(index),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -45,8 +54,6 @@ class OngletsJournal extends StatelessWidget {
               child: Text(
                 titre,
                 textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.inter(
                   fontSize: 14,
                   fontWeight: actif ? FontWeight.w700 : FontWeight.w500,

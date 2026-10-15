@@ -1,10 +1,12 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:iconsax/iconsax.dart';
 import '../../../../core/network/client_api_http.dart';
 import '../../../../core/network/source_etudiant_distante.dart';
 import '../../../messagerie/presentation/pages/messagerie_page.dart';
 import '../../../notifications/presentation/pages/notifications_page.dart';
+import '../../../stage/presentation/widgets/barre_recherche_stages.dart';
 import 'detail_journal_page.dart';
 import 'saisir_journal_page.dart';
 
@@ -64,6 +66,15 @@ class _MesJournauxPageState extends State<MesJournauxPage> {
 
   @override
   Widget build(BuildContext context) {
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
+    final fondPage = modeSombre
+        ? const Color(0xFF0F172A)
+        : const Color(0xFFF8FAFC);
+    final textePrincipal = modeSombre ? Colors.white : const Color(0xFF0F172A);
+    final texteSecondaire = modeSombre
+        ? const Color(0xFF94A3B8)
+        : const Color(0xFF64748B);
+
     final query = _rechercheController.text.trim().toLowerCase();
     final filtrer = _journaux.where((j) {
       final statut = (j['statut'] ?? j['status'] ?? 'BROUILLON')
@@ -71,8 +82,8 @@ class _MesJournauxPageState extends State<MesJournauxPage> {
           .toUpperCase();
       final matchFiltre = switch (_filtreActif) {
         'Brouillons' => statut == 'BROUILLON',
-        'Soumis' => statut == 'SOUMISE',
-        'Validés' => statut == 'VALIDEE',
+        'Soumis' => statut == 'SOUMISE' || statut == 'SOUMIS',
+        'Validés' => statut == 'VALIDEE' || statut == 'VALIDE',
         _ => true,
       };
       final description =
@@ -90,19 +101,19 @@ class _MesJournauxPageState extends State<MesJournauxPage> {
         _stats['validated'] ??
         _journaux.where((j) {
           final s = (j['statut'] ?? j['status'] ?? '').toString().toUpperCase();
-          return s == 'VALIDEE';
+          return s == 'VALIDEE' || s == 'VALIDE';
         }).length;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: fondPage,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF8FAFC),
+        backgroundColor: fondPage,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(
+          icon: Icon(
             CupertinoIcons.chevron_left,
-            color: Color(0xFF0F172A),
+            color: textePrincipal,
             size: 24,
           ),
           onPressed: () => Navigator.of(context).pop(),
@@ -112,7 +123,7 @@ class _MesJournauxPageState extends State<MesJournauxPage> {
           style: GoogleFonts.inter(
             fontSize: 20,
             fontWeight: FontWeight.w800,
-            color: const Color(0xFF0F172A),
+            color: textePrincipal,
           ),
         ),
         actions: [
@@ -120,9 +131,9 @@ class _MesJournauxPageState extends State<MesJournauxPage> {
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute<void>(builder: (_) => const MessageriePage()),
             ),
-            icon: const Icon(
-              CupertinoIcons.chat_bubble_2,
-              color: Color(0xFF0F172A),
+            icon: Icon(
+              Iconsax.message,
+              color: textePrincipal,
               size: 24,
             ),
           ),
@@ -132,9 +143,9 @@ class _MesJournauxPageState extends State<MesJournauxPage> {
                 builder: (_) => const NotificationsPage(),
               ),
             ),
-            icon: const Icon(
+            icon: Icon(
               CupertinoIcons.bell,
-              color: Color(0xFF0F172A),
+              color: textePrincipal,
               size: 24,
             ),
           ),
@@ -153,40 +164,11 @@ class _MesJournauxPageState extends State<MesJournauxPage> {
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(16, 10, 16, 28),
                   children: [
-                    // Barre de recherche
-                    Container(
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            CupertinoIcons.search,
-                            color: Color(0xFF94A3B8),
-                            size: 20,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: TextField(
-                              controller: _rechercheController,
-                              onChanged: (_) => setState(() {}),
-                              decoration: InputDecoration(
-                                hintText: 'Rechercher une activité, un jour...',
-                                hintStyle: GoogleFonts.inter(
-                                  fontSize: 14,
-                                  color: const Color(0xFF94A3B8),
-                                ),
-                                border: InputBorder.none,
-                                isDense: true,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                    // Barre de recherche standardisée
+                    BarreRechercheStages(
+                      controller: _rechercheController,
+                      onChanged: (_) => setState(() {}),
+                      hintText: 'Rechercher une activité, un jour...',
                     ),
 
                     const SizedBox(height: 16),
@@ -266,13 +248,13 @@ class _MesJournauxPageState extends State<MesJournauxPage> {
                       physics: const BouncingScrollPhysics(),
                       child: Row(
                         children: [
-                          _buildFiltreChip('Tous'),
+                          _buildFiltreChip('Tous', modeSombre),
                           const SizedBox(width: 8),
-                          _buildFiltreChip('Brouillons'),
+                          _buildFiltreChip('Brouillons', modeSombre),
                           const SizedBox(width: 8),
-                          _buildFiltreChip('Soumis'),
+                          _buildFiltreChip('Soumis', modeSombre),
                           const SizedBox(width: 8),
-                          _buildFiltreChip('Validés'),
+                          _buildFiltreChip('Validés', modeSombre),
                         ],
                       ),
                     ),
@@ -287,7 +269,7 @@ class _MesJournauxPageState extends State<MesJournauxPage> {
                           child: Text(
                             'Aucun journal trouvé.',
                             style: GoogleFonts.inter(
-                              color: const Color(0xFF94A3B8),
+                              color: texteSecondaire,
                               fontSize: 14,
                             ),
                           ),
@@ -297,7 +279,7 @@ class _MesJournauxPageState extends State<MesJournauxPage> {
                       ...filtrer.map(
                         (j) => Padding(
                           padding: const EdgeInsets.only(bottom: 12),
-                          child: _buildCarteJournal(j),
+                          child: _buildCarteJournal(j, modeSombre),
                         ),
                       ),
                   ],
@@ -307,19 +289,27 @@ class _MesJournauxPageState extends State<MesJournauxPage> {
     );
   }
 
-  Widget _buildFiltreChip(String label) {
+  Widget _buildFiltreChip(String label, bool modeSombre) {
     final estSelectionne = _filtreActif == label;
+    final fondInactif = modeSombre ? const Color(0xFF1E293B) : Colors.white;
+    final bordureInactif = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFE2E8F0);
+    final texteInactif = modeSombre
+        ? const Color(0xFF94A3B8)
+        : const Color(0xFF64748B);
+
     return GestureDetector(
       onTap: () => setState(() => _filtreActif = label),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: estSelectionne ? const Color(0xFF0F172A) : Colors.white,
+          color: estSelectionne ? const Color(0xFF1D61F2) : fondInactif,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: estSelectionne
-                ? const Color(0xFF0F172A)
-                : const Color(0xFFE2E8F0),
+                ? const Color(0xFF1D61F2)
+                : bordureInactif,
           ),
         ),
         child: Text(
@@ -327,33 +317,58 @@ class _MesJournauxPageState extends State<MesJournauxPage> {
           style: GoogleFonts.inter(
             fontSize: 13,
             fontWeight: FontWeight.w700,
-            color: estSelectionne ? Colors.white : const Color(0xFF64748B),
+            color: estSelectionne ? Colors.white : texteInactif,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildCarteJournal(Map<String, dynamic> j) {
+  Widget _buildCarteJournal(Map<String, dynamic> j, bool modeSombre) {
+    final fondCarte = modeSombre ? const Color(0xFF1E293B) : Colors.white;
+    final bordureCouleur = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFE2E8F0);
+    final textePrincipal = modeSombre ? Colors.white : const Color(0xFF0F172A);
+    final texteSecondaire = modeSombre
+        ? const Color(0xFF94A3B8)
+        : const Color(0xFF64748B);
+
     final statutBrut = (j['statut'] ?? j['status'] ?? 'BROUILLON')
         .toString()
         .toUpperCase();
-    Color statutCouleur = const Color(0xFF64748B);
-    Color statutBg = const Color(0xFFF1F5F9);
-    String statutAffiche = 'BROUILLON';
+    Color statutCouleur = modeSombre
+        ? const Color(0xFF94A3B8)
+        : const Color(0xFF64748B);
+    Color statutBg = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFF1F5F9);
+    String statutAffiche = 'Brouillon';
 
-    if (statutBrut == 'VALIDEE') {
-      statutCouleur = const Color(0xFF16A34A);
-      statutBg = const Color(0xFFDCFCE7);
-      statutAffiche = 'VALIDÉ';
-    } else if (statutBrut == 'SOUMISE') {
-      statutCouleur = const Color(0xFF0284C7);
-      statutBg = const Color(0xFFE0F2FE);
-      statutAffiche = 'SOUMIS';
-    } else if (statutBrut == 'REJETEE') {
-      statutCouleur = const Color(0xFFEA580C);
-      statutBg = const Color(0xFFFFF7ED);
-      statutAffiche = 'À CORRIGER';
+    if (statutBrut == 'VALIDEE' || statutBrut == 'VALIDE') {
+      statutCouleur = modeSombre
+          ? const Color(0xFF4ADE80)
+          : const Color(0xFF16A34A);
+      statutBg = modeSombre
+          ? const Color(0xFF14532D)
+          : const Color(0xFFDCFCE7);
+      statutAffiche = 'Validé';
+    } else if (statutBrut == 'SOUMISE' || statutBrut == 'SOUMIS') {
+      statutCouleur = modeSombre
+          ? const Color(0xFF38BDF8)
+          : const Color(0xFF0284C7);
+      statutBg = modeSombre
+          ? const Color(0xFF0C4A6E)
+          : const Color(0xFFE0F2FE);
+      statutAffiche = 'Soumis';
+    } else if (statutBrut == 'REJETEE' || statutBrut == 'REJETE') {
+      statutCouleur = modeSombre
+          ? const Color(0xFFFB923C)
+          : const Color(0xFFEA580C);
+      statutBg = modeSombre
+          ? const Color(0xFF7C2D12).withValues(alpha: 0.5)
+          : const Color(0xFFFFF7ED);
+      statutAffiche = 'À corriger';
     }
 
     final date = j['date']?.toString() ?? '';
@@ -392,7 +407,7 @@ class _MesJournauxPageState extends State<MesJournauxPage> {
                 donneesJournal: j,
                 dateStage: date,
                 statutTexte: statutAffiche,
-                estValide: statutAffiche == 'VALIDÉ',
+                estValide: statutAffiche == 'Validé',
               ),
             ),
           );
@@ -402,14 +417,16 @@ class _MesJournauxPageState extends State<MesJournauxPage> {
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: fondCarte,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-            boxShadow: const [
+            border: Border.all(color: bordureCouleur),
+            boxShadow: [
               BoxShadow(
-                color: Color(0x05000000),
+                color: modeSombre
+                    ? const Color(0x30000000)
+                    : const Color(0x05000000),
                 blurRadius: 10,
-                offset: Offset(0, 2),
+                offset: const Offset(0, 2),
               ),
             ],
           ),
@@ -425,7 +442,7 @@ class _MesJournauxPageState extends State<MesJournauxPage> {
                     style: GoogleFonts.inter(
                       fontSize: 15.5,
                       fontWeight: FontWeight.w800,
-                      color: const Color(0xFF0F172A),
+                      color: textePrincipal,
                     ),
                   ),
                   Container(
@@ -459,7 +476,7 @@ class _MesJournauxPageState extends State<MesJournauxPage> {
                 style: GoogleFonts.inter(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
-                  color: const Color(0xFF64748B),
+                  color: texteSecondaire,
                 ),
               ),
 
@@ -468,10 +485,10 @@ class _MesJournauxPageState extends State<MesJournauxPage> {
               // Ligne nombre activités
               Row(
                 children: [
-                  const Icon(
+                  Icon(
                     CupertinoIcons.book,
                     size: 16,
-                    color: Color(0xFF64748B),
+                    color: texteSecondaire,
                   ),
                   const SizedBox(width: 6),
                   Text(
@@ -479,7 +496,7 @@ class _MesJournauxPageState extends State<MesJournauxPage> {
                     style: GoogleFonts.inter(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w500,
-                      color: const Color(0xFF64748B),
+                      color: texteSecondaire,
                     ),
                   ),
                 ],
@@ -493,9 +510,15 @@ class _MesJournauxPageState extends State<MesJournauxPage> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFFF7ED),
+                    color: modeSombre
+                        ? const Color(0xFF7C2D12).withValues(alpha: 0.35)
+                        : const Color(0xFFFFF7ED),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFFFEDD5)),
+                    border: Border.all(
+                      color: modeSombre
+                          ? const Color(0xFF9A3412).withValues(alpha: 0.5)
+                          : const Color(0xFFFFEDD5),
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -505,7 +528,9 @@ class _MesJournauxPageState extends State<MesJournauxPage> {
                         style: GoogleFonts.inter(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
-                          color: const Color(0xFFEA580C),
+                          color: modeSombre
+                              ? const Color(0xFFFB923C)
+                              : const Color(0xFFEA580C),
                         ),
                       ),
                       const SizedBox(height: 3),
@@ -514,7 +539,7 @@ class _MesJournauxPageState extends State<MesJournauxPage> {
                         style: GoogleFonts.inter(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w500,
-                          color: const Color(0xFF0F172A),
+                          color: textePrincipal,
                         ),
                       ),
                     ],

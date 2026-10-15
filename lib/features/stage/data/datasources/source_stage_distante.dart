@@ -5,6 +5,7 @@ import '../../../../core/network/reponse_api.dart';
 import '../../../../core/mocks/donnees_etudiant_mockees.dart';
 import '../../../../core/mocks/scenario_etudiant_ui.dart';
 import '../mappers/mappeur_affectation_stage_api.dart';
+import '../mappers/mappeur_visibilite_resultat_stage_api.dart';
 
 class SourceStageDistante {
   const SourceStageDistante(this._client);
@@ -38,17 +39,32 @@ class SourceStageDistante {
 
   Future<Map<String, dynamic>> candidatures({
     int page = 1,
-    String? statut,
+    int perPage = 20,
+    dynamic statut,
+    dynamic reservationStatus,
+    dynamic workflowStatus,
+    dynamic campaignId,
+    dynamic hospitalId,
   }) async {
     if (ConfigurationApi.utiliserDonneesMockees) {
-      return DonneesEtudiantMockees.pourEndpoint(
-        EndpointsApi.candidaturesEtudiant,
+      return MappeurVisibiliteResultatStageApi.normaliserCollection(
+        DonneesEtudiantMockees.pourEndpoint(EndpointsApi.candidaturesEtudiant),
       );
     }
 
     final reponse = await _client.get(
       EndpointsApi.candidaturesEtudiant,
-      parametres: {'page': page, 'status': ?statut},
+      parametres: {
+        if (statut != null) 'status': _filtreMultiple(statut),
+        if (reservationStatus != null)
+          'reservation_status': _filtreMultiple(reservationStatus),
+        if (workflowStatus != null)
+          'workflow_status': _filtreMultiple(workflowStatus),
+        'campaign_id': ?campaignId,
+        'hospital_id': ?hospitalId,
+        'page': page,
+        'per_page': perPage,
+      },
     );
     if (reponse['success'] != true) {
       throw ErreurApi(
@@ -57,7 +73,9 @@ class SourceStageDistante {
         details: reponse['data'],
       );
     }
-    return _normaliserListe(reponse['data']);
+    return MappeurVisibiliteResultatStageApi.normaliserCollection(
+      _normaliserListe(reponse['data']),
+    );
   }
 
   Future<Map<String, dynamic>> reservations() async {
@@ -80,8 +98,8 @@ class SourceStageDistante {
 
   Future<Map<String, dynamic>> admission({String? reservationUuid}) async {
     if (ConfigurationApi.utiliserDonneesMockees) {
-      return DonneesEtudiantMockees.pourEndpoint(
-        EndpointsApi.admissionEtudiant,
+      return MappeurVisibiliteResultatStageApi.normaliserCollection(
+        DonneesEtudiantMockees.pourEndpoint(EndpointsApi.admissionEtudiant),
       );
     }
 
@@ -98,7 +116,9 @@ class SourceStageDistante {
         details: reponse['data'],
       );
     }
-    return _normaliserListe(reponse['data']);
+    return MappeurVisibiliteResultatStageApi.normaliserCollection(
+      _normaliserListe(reponse['data']),
+    );
   }
 
   Future<Map<String, dynamic>> stages({
@@ -225,9 +245,6 @@ class SourceStageDistante {
     );
   }
 
-  Future<Map<String, dynamic>> confirmerReservation(String reservationUuid) =>
-      _client.post(EndpointsApi.confirmerReservationEtudiant(reservationUuid));
-
   Future<Map<String, dynamic>> annulerReservation(
     String reservationUuid,
   ) async {
@@ -330,4 +347,7 @@ class SourceStageDistante {
       message: 'Les données reçues du serveur sont invalides.',
     );
   }
+
+  static String _filtreMultiple(Object valeur) =>
+      valeur is List ? valeur.join(',') : valeur.toString();
 }

@@ -6,6 +6,12 @@ abstract final class SuiviStageService {
   static final ValueNotifier<int?> ongletStagesDemande = ValueNotifier<int?>(
     null,
   );
+  static final ValueNotifier<int?> ongletJournalDemande = ValueNotifier<int?>(
+    null,
+  );
+  static final ValueNotifier<int?> ongletNavigationDemande = ValueNotifier<int?>(
+    null,
+  );
 
   static void notifierChangement() {
     changements.value++;
@@ -13,5 +19,13 @@ abstract final class SuiviStageService {
 
   static void ouvrirOngletStages(int index) {
     ongletStagesDemande.value = index;
+  }
+
+  static void ouvrirOngletJournal(int index) {
+    ongletJournalDemande.value = index;
+  }
+
+  static void naviguerVersIndex(int index) {
+    ongletNavigationDemande.value = index;
   }
 }

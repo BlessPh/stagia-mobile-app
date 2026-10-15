@@ -12,6 +12,7 @@ import 'detail_journal_page.dart';
 import 'fiche_evaluation_page.dart';
 import 'mes_journaux_page.dart';
 import 'mes_taches_page.dart';
+import '../../../../core/services/suivi_stage_service.dart';
 import 'saisir_journal_page.dart';
 import '../widgets/barre_recherche_journal.dart';
 import '../widgets/calendrier_mois_entier.dart';
@@ -37,6 +38,9 @@ class _JournalPageState extends State<JournalPage> {
   // État onglet Journal
   String _filtreJournal = 'Aujourd\'hui';
 
+  // État onglet Evaluations
+  String _filtreEvaluation = 'Tous';
+
   int _nombreTachesAujourdhui = 0;
 
   // État pointage de présence
@@ -50,10 +54,26 @@ class _JournalPageState extends State<JournalPage> {
     super.initState();
     _dateSelectionneeTaches = DateTime.now();
     _chargement = _charger();
+    SuiviStageService.ongletJournalDemande.addListener(_onChangementOngletJournalDemande);
+    _verifierOngletJournalDemande();
+  }
+
+  void _verifierOngletJournalDemande() {
+    final index = SuiviStageService.ongletJournalDemande.value;
+    if (index != null && index >= 0 && index <= 3) {
+      if (mounted && _indexOnglet != index) {
+        setState(() => _indexOnglet = index);
+      }
+    }
+  }
+
+  void _onChangementOngletJournalDemande() {
+    _verifierOngletJournalDemande();
   }
 
   @override
   void dispose() {
+    SuiviStageService.ongletJournalDemande.removeListener(_onChangementOngletJournalDemande);
     _rechercheController.dispose();
     super.dispose();
   }
@@ -959,7 +979,7 @@ class _JournalPageState extends State<JournalPage> {
           const SizedBox(height: 8),
         ],
 
-        // Titre Fiches d'évaluations
+        // Section Fiches d'évaluations
         Text(
           'Fiches d\'évaluations (${items.length})',
           style: GoogleFonts.inter(
@@ -969,59 +989,105 @@ class _JournalPageState extends State<JournalPage> {
           ),
         ),
 
+        const SizedBox(height: 12),
+
+        // Filtres horizontaux par statut
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          child: Row(
+            children: [
+              _buildFiltreEvaluationChip('Tous'),
+              const SizedBox(width: 8),
+              _buildFiltreEvaluationChip('Validée'),
+              const SizedBox(width: 8),
+              _buildFiltreEvaluationChip('En attente'),
+              const SizedBox(width: 8),
+              _buildFiltreEvaluationChip('Rejetée'),
+            ],
+          ),
+        ),
+
         const SizedBox(height: 14),
 
-        if (items.isNotEmpty)
-          for (final ev in items)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 14),
-              child: _buildCarteEvaluation(
-                tagLibelle: ev['type']?.toString().replaceAll('_', ' ') ?? '',
-                tagCouleurFond: const Color(0xFFE0F2FE),
-                tagCouleurTexte: const Color(0xFF0284C7),
-                note: ev['note'] == null ? '—' : '${ev['note']}/20',
-                titre: _titreEvaluation(ev),
-                evaluateur:
-                    (ev['evaluator_name'] ?? ev['supervisor'])?.toString() ??
-                    '',
-                appreciation:
-                    (ev['appreciation'] ?? ev['comment'])?.toString() ?? '',
-                dateTexte:
-                    (ev['finalized_at'] ?? ev['validated_at'])?.toString() ??
-                    '',
-                donneesEvaluation: ev,
+        Builder(
+          builder: (context) {
+            final fichesFiltrees = items
+                .where(_evaluationCorrespondAuFiltre)
+                .toList(growable: false);
+
+            if (fichesFiltrees.isNotEmpty) {
+              return Column(
+                children: [
+                  for (final ev in fichesFiltrees)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 14),
+                      child: _buildCarteEvaluation(
+                        tagLibelle: _formaterStatutCapitalize(
+                          ev['status']?.toString().isNotEmpty == true
+                              ? ev['status'].toString()
+                              : (ev['type']?.toString() ?? ''),
+                        ),
+                        tagCouleurFond: const Color(0xFFE0F2FE),
+                        tagCouleurTexte: const Color(0xFF0284C7),
+                        note: ev['note'] == null ? '—' : '${ev['note']}/20',
+                        titre: _titreEvaluation(ev),
+                        evaluateur:
+                            (ev['evaluator_name'] ?? ev['supervisor'])?.toString() ??
+                            '',
+                        appreciation:
+                            (ev['appreciation'] ?? ev['comment'])?.toString() ?? '',
+                        dateTexte:
+                            (ev['finalized_at'] ?? ev['validated_at'])?.toString() ??
+                            '',
+                        donneesEvaluation: ev,
+                      ),
+                    ),
+                ],
+              );
+            }
+
+            if (items.isEmpty &&
+                ConfigurationApi.utiliserDonneesMockees &&
+                evaluationsData.containsKey('__legacy_ui_preview')) {
+              return Column(
+                children: [
+                  _buildCarteEvaluation(
+                    tagLibelle: 'Fin de rotation',
+                    tagCouleurFond: const Color(0xFFE0F2FE),
+                    tagCouleurTexte: const Color(0xFF0284C7),
+                    note: '17.5 / 20',
+                    titre: 'Stage Clinique - Urgences de Jour',
+                    evaluateur: 'Dr. Marie Dupont',
+                    appreciation:
+                        '"Très bon sens clinique. Aptitude remarquable à gérer le stress en période de forte affluence..."',
+                    dateTexte: '10 Janvier 2026',
+                  ),
+                  const SizedBox(height: 14),
+                  _buildCarteEvaluation(
+                    tagLibelle: 'Mi-parcours',
+                    tagCouleurFond: const Color(0xFFF3E8FF),
+                    tagCouleurTexte: const Color(0xFF7E22CE),
+                    note: '16.0 / 20',
+                    titre: 'Gestes Techniques & Sutures',
+                    evaluateur: 'Dr. Jean-Pierre Mwamba',
+                    appreciation:
+                        '"Maîtrise les bases aseptiques. Rapidité d’exécution à perfectionner."',
+                    dateTexte: '05 Janvier 2026',
+                  ),
+                ],
+              );
+            }
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: _etatVide(
+                'Aucune évaluation ne correspond à ce filtre.',
+                icone: Iconsax.search_status,
               ),
-            )
-        else if (ConfigurationApi.utiliserDonneesMockees &&
-            evaluationsData.containsKey('__legacy_ui_preview')) ...[
-          // Carte 1 : FIN DE ROTATION
-          _buildCarteEvaluation(
-            tagLibelle: 'FIN DE ROTATION',
-            tagCouleurFond: const Color(0xFFE0F2FE),
-            tagCouleurTexte: const Color(0xFF0284C7),
-            note: '17.5 / 20',
-            titre: 'Stage Clinique - Urgences de Jour',
-            evaluateur: 'Dr. Marie Dupont',
-            appreciation:
-                '"Très bon sens clinique. Aptitude remarquable à gérer le stress en période de forte affluence..."',
-            dateTexte: '10 Janvier 2026',
-          ),
-
-          const SizedBox(height: 14),
-
-          // Carte 2 : MI-PARCOURS
-          _buildCarteEvaluation(
-            tagLibelle: 'MI-PARCOURS',
-            tagCouleurFond: const Color(0xFFF3E8FF),
-            tagCouleurTexte: const Color(0xFF7E22CE),
-            note: '16.0 / 20',
-            titre: 'Gestes Techniques & Sutures',
-            evaluateur: 'Dr. Jean-Pierre Mwamba',
-            appreciation:
-                '"Maîtrise les bases aseptiques. Rapidité d’exécution à perfectionner."',
-            dateTexte: '05 Janvier 2026',
-          ),
-        ],
+            );
+          },
+        ),
       ],
     );
   }
@@ -1159,16 +1225,20 @@ class _JournalPageState extends State<JournalPage> {
 
           // Footer : Évalué le + Voir les détails
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Évalué le : $dateTexte',
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: const Color(0xFF94A3B8),
+              Expanded(
+                child: Text(
+                  'Évalué le : $dateTexte',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFF94A3B8),
+                  ),
                 ),
               ),
+              const SizedBox(width: 8),
               GestureDetector(
                 onTap: () {
                   Navigator.of(context).push(
@@ -1191,7 +1261,7 @@ class _JournalPageState extends State<JournalPage> {
                 child: Text(
                   'Voir les détails',
                   style: GoogleFonts.inter(
-                    fontSize: 13.5,
+                    fontSize: 13,
                     fontWeight: FontWeight.w700,
                     color: const Color(0xFF1D61F2),
                   ),
@@ -1250,7 +1320,7 @@ class _JournalPageState extends State<JournalPage> {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  type.replaceAll('_', ' '),
+                  _formaterStatutCapitalize(type),
                   style: GoogleFonts.inter(
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
@@ -1259,9 +1329,9 @@ class _JournalPageState extends State<JournalPage> {
                 ),
               ),
               Text(
-                lu ? 'LU' : 'NOUVEAU',
+                lu ? 'Lu' : 'Nouveau',
                 style: GoogleFonts.inter(
-                  fontSize: 11,
+                  fontSize: 11.5,
                   fontWeight: FontWeight.w800,
                   color: lu ? const Color(0xFF94A3B8) : const Color(0xFF1D61F2),
                 ),
@@ -1646,6 +1716,68 @@ class _JournalPageState extends State<JournalPage> {
         campaign['name']?.toString() ??
         evaluation['campaign_title']?.toString() ??
         '';
+  }
+
+  String _formaterStatutCapitalize(String brut) {
+    final texte = brut.trim().replaceAll('_', ' ');
+    if (texte.isEmpty) return '';
+    return texte
+        .split(' ')
+        .where((mot) => mot.isNotEmpty)
+        .map((mot) {
+          final premier = mot.substring(0, 1).toUpperCase();
+          final reste = mot.length > 1 ? mot.substring(1).toLowerCase() : '';
+          return '$premier$reste';
+        })
+        .join(' ');
+  }
+
+  bool _evaluationCorrespondAuFiltre(Map<String, dynamic> evaluation) {
+    if (_filtreEvaluation == 'Tous') return true;
+    final statut = (evaluation['status'] ?? '').toString().toUpperCase().trim();
+    return switch (_filtreEvaluation) {
+      'Validée' || 'Validées' =>
+        statut == 'VALIDEE' || statut == 'VALIDE' || statut == 'FINALISEE' || statut == 'FINALISE',
+      'En attente' =>
+        statut == 'EN_ATTENTE' || statut == 'PENDING' || statut == 'SOUMISE' || statut == 'SOUMIS',
+      'Rejetée' || 'Rejetées' =>
+        statut == 'REJETEE' || statut == 'REJETE',
+      _ => statut == _filtreEvaluation.toUpperCase(),
+    };
+  }
+
+  Widget _buildFiltreEvaluationChip(String titre) {
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
+    final actif = _filtreEvaluation == titre;
+    final fondInactif = modeSombre ? const Color(0xFF1E293B) : Colors.white;
+    final bordureInactif = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFE2E8F0);
+    final texteInactif = modeSombre
+        ? const Color(0xFF94A3B8)
+        : const Color(0xFF64748B);
+
+    return GestureDetector(
+      onTap: () => setState(() => _filtreEvaluation = titre),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8.5),
+        decoration: BoxDecoration(
+          color: actif ? const Color(0xFF1D61F2) : fondInactif,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: actif ? const Color(0xFF1D61F2) : bordureInactif,
+          ),
+        ),
+        child: Text(
+          titre,
+          style: GoogleFonts.inter(
+            fontSize: 13,
+            fontWeight: actif ? FontWeight.w700 : FontWeight.w500,
+            color: actif ? Colors.white : texteInactif,
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _etatVide(String message, {IconData icone = Iconsax.document}) {

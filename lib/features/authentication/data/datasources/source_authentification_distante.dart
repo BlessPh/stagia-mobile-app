@@ -14,7 +14,7 @@ class SourceAuthentificationDistante {
   ///
   /// En mode mock (`ConfigurationApi.utiliserDonneesMockees == true`),
   /// renvoie la charge utile exacte `LoginResponse` du contrat OpenAPI PHP.
-  /// En mode API réelle, appelle l'endpoint PHP `/auth/login.php`.
+  /// En mode API réelle, appelle l'endpoint mobile `/login`.
   Future<Map<String, dynamic>> connecter({
     required String identifiant,
     required String motDePasse,
@@ -62,6 +62,7 @@ class SourceAuthentificationDistante {
         'token_type': 'Bearer',
         'expires_in': 3600,
         'refresh_expires_in': 2592000,
+        'account_reactivated': false,
         'user': utilisateur,
         'student': etudiant,
       };

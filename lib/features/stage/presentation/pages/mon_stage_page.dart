@@ -32,7 +32,8 @@ class _MonStagePageState extends State<MonStagePage> {
 
   Future<List<Map<String, dynamic>>> _charger() => Future.wait([
     _source.stages(),
-    _source.documents(),
+    _source.cloturesStage(perPage: 100),
+    _source.documents(perPage: 100),
     _source.conventions(),
   ]);
 
@@ -43,13 +44,34 @@ class _MonStagePageState extends State<MonStagePage> {
   }
 
   Future<void> _ouvrirDocument(Map<String, dynamic> document) async {
+    final uuid = document['uuid']?.toString().trim() ?? '';
     final endpoint =
         document['file_endpoint']?.toString() ??
         document['view_endpoint']?.toString() ??
         document['download_endpoint']?.toString() ??
         document['pdf_endpoint']?.toString();
+    final typeDocument =
+        (document['type'] ?? document['type_document'])
+            ?.toString()
+            .toUpperCase() ??
+        '';
+    final estDocumentOfficiel =
+        (endpoint?.contains('/certificates/') ?? false) ||
+        typeDocument.contains('ATTESTATION') ||
+        typeDocument.contains('CERTIFICAT');
     final cheminLocal = document['local_path']?.toString();
+    if (estDocumentOfficiel && document['available'] != true) {
+      AlertInfo.show(
+        context: context,
+        text:
+            document['availability_reason']?.toString() ??
+            'Ce document n’est pas encore disponible.',
+        typeInfo: TypeInfo.warning,
+      );
+      return;
+    }
     if ((endpoint == null || endpoint.isEmpty) &&
+        uuid.isEmpty &&
         (cheminLocal == null || cheminLocal.isEmpty)) {
       AlertInfo.show(
         context: context,
@@ -62,6 +84,11 @@ class _MonStagePageState extends State<MonStagePage> {
     try {
       final chemin = cheminLocal != null && cheminLocal.isNotEmpty
           ? cheminLocal
+          : estDocumentOfficiel && uuid.isNotEmpty
+          ? await _telechargeur.enregistrerFichier(
+              contenu: await _source.fichierCertificat(uuid),
+              nom: document['reference']?.toString() ?? 'document-stagia',
+            )
           : await _telechargeur.telechargerPdf(
               endpoint: endpoint!,
               nom:
@@ -113,12 +140,43 @@ class _MonStagePageState extends State<MonStagePage> {
           }
           final reponses = snapshot.data!;
           final stages = _items(reponses[0]['items']);
-          final documentsOfficiels = _items(reponses[1]['items']);
-          final conventions = _items(reponses[2]['items']);
-          final tousDocuments = [...documentsOfficiels, ...conventions];
+          final completions = _items(reponses[1]['items']);
+          final documentsOfficiels = _items(reponses[2]['items']);
+          final conventions = _items(reponses[3]['items']);
+          final stage = _selectionnerStage(stages);
+          final reference = stage?['assignment_uuid']?.toString();
+          final completion = completions
+              .cast<Map<String, dynamic>?>()
+              .firstWhere(
+                (item) =>
+                    _map(item?['assignment'])['uuid']?.toString() == reference,
+                orElse: () => null,
+              );
+          final documentsDuStage = documentsOfficiels.where((document) {
+            final assignment = _map(document['assignment']);
+            final stageDocument = _map(document['stage']);
+            final documentReference =
+                assignment['uuid']?.toString() ??
+                stageDocument['assignment_uuid']?.toString() ??
+                document['assignment_uuid']?.toString();
+            return reference == null ||
+                documentReference == null ||
+                documentReference == reference;
+          });
+          final conventionsDuStage = conventions.where((document) {
+            final assignment = _map(document['assignment']);
+            final documentReference =
+                assignment['uuid']?.toString() ??
+                document['assignment_uuid']?.toString();
+            return reference == null ||
+                documentReference == null ||
+                documentReference == reference;
+          });
+          final tousDocuments = [...documentsDuStage, ...conventionsDuStage];
 
           return _ContenuStage(
-            stage: _selectionnerStage(stages),
+            stage: stage,
+            completion: completion,
             documents: tousDocuments,
             documentEnCours: _documentEnCours,
             onDocument: _ouvrirDocument,
@@ -146,12 +204,14 @@ class _MonStagePageState extends State<MonStagePage> {
 class _ContenuStage extends StatelessWidget {
   const _ContenuStage({
     required this.stage,
+    required this.completion,
     required this.documents,
     required this.documentEnCours,
     required this.onDocument,
     required this.onRefresh,
   });
   final Map<String, dynamic>? stage;
+  final Map<String, dynamic>? completion;
   final List<Map<String, dynamic>> documents;
   final String? documentEnCours;
   final ValueChanged<Map<String, dynamic>> onDocument;
@@ -192,6 +252,8 @@ class _ContenuStage extends StatelessWidget {
                 _DonneeFiche('Période', _periodeTexte(period)),
               ],
             ),
+            const SizedBox(height: 12),
+            _CarteClotureStage(stage: stage!, completion: completion),
             const SizedBox(height: 18),
             const _TitreSection(
               titre: 'Services et rotations',
@@ -288,6 +350,103 @@ class _CarteServiceRotation extends StatelessWidget {
             valeur: statut.toString(),
             valeurEnEvidence: true,
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CarteClotureStage extends StatelessWidget {
+  const _CarteClotureStage({required this.stage, required this.completion});
+
+  final Map<String, dynamic> stage;
+  final Map<String, dynamic>? completion;
+
+  @override
+  Widget build(BuildContext context) {
+    final statutAffectation =
+        stage['assignment_status']?.toString().toUpperCase() ?? '';
+    final statutCloture = completion?['status']?.toString().toUpperCase() ?? '';
+    final validation = _map(completion?['university_validation']);
+    final statutValidation =
+        validation['status']?.toString().toUpperCase() ?? '';
+    final stageTermine =
+        statutAffectation == 'TERMINEE' ||
+        statutAffectation == 'CLOTUREE' ||
+        completion != null;
+    if (!stageTermine) return const SizedBox.shrink();
+
+    final validationFinale = const {
+      'VALIDE',
+      'ARCHIVE',
+    }.contains(statutValidation);
+    final titre = validationFinale
+        ? 'Stage validé par l’université'
+        : statutCloture == 'VALIDE'
+        ? 'Validation universitaire en attente'
+        : 'Clôture du stage en cours';
+    final description = validationFinale
+        ? 'La clôture et le résultat de ce stage sont définitifs.'
+        : statutCloture == 'VALIDE'
+        ? 'Le stage est clôturé par l’établissement et attend la validation de l’université.'
+        : 'Le dossier de fin de stage est en cours de préparation.';
+    final couleur = validationFinale
+        ? const Color(0xFF16A34A)
+        : const Color(0xFFF59E0B);
+    final score = statutCloture == 'VALIDE' ? (completion?['score']) : null;
+    final presence = completion?['attendance_rate'];
+    final blockers = (_map(completion?['readiness'])['blockers'] as List? ?? [])
+        .map((item) => item.toString())
+        .where((item) => item.isNotEmpty)
+        .toList(growable: false);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: couleur.withValues(alpha: .08),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: couleur.withValues(alpha: .35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                validationFinale ? Icons.verified_outlined : Icons.schedule,
+                color: couleur,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  titre,
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(description),
+          if (presence != null || score != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              [
+                if (presence != null) 'Présence : $presence %',
+                if (score != null) 'Score : $score',
+              ].join('  •  '),
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ],
+          if (blockers.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              blockers.join('\n'),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
         ],
       ),
     );

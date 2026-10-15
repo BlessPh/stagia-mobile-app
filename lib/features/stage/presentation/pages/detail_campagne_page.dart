@@ -40,7 +40,9 @@ class _DetailCampagnePageState extends State<DetailCampagnePage> {
     super.initState();
     _suivi = widget.suiviCandidature;
     _chargerCounts();
-    _sseSubscription = SseNotificationsService.instance.fluxCompteurs.listen((counts) {
+    _sseSubscription = SseNotificationsService.instance.fluxCompteurs.listen((
+      counts,
+    ) {
       if (mounted) setState(() => _counts = counts);
     });
   }
@@ -70,7 +72,9 @@ class _DetailCampagnePageState extends State<DetailCampagnePage> {
         final modeSombre = Theme.of(ctx).brightness == Brightness.dark;
         return AlertDialog(
           backgroundColor: modeSombre ? const Color(0xFF1E293B) : Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: Text(
             'Annuler la réservation ?',
             style: GoogleFonts.inter(
@@ -81,7 +85,9 @@ class _DetailCampagnePageState extends State<DetailCampagnePage> {
           content: Text(
             'Votre place temporaire sera libérée immédiatement.',
             style: GoogleFonts.inter(
-              color: modeSombre ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+              color: modeSombre
+                  ? const Color(0xFF94A3B8)
+                  : const Color(0xFF64748B),
             ),
           ),
           actions: [
@@ -127,14 +133,15 @@ class _DetailCampagnePageState extends State<DetailCampagnePage> {
         );
       });
       final msg = rep['message']?.toString() ?? 'Réservation annulée.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg)),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } on ErreurApi catch (e) {
       if (!mounted) return;
       setState(() => _enCoursAnnulation = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message), backgroundColor: const Color(0xFFEF4444)),
+        SnackBar(
+          content: Text(e.message),
+          backgroundColor: const Color(0xFFEF4444),
+        ),
       );
     } catch (_) {
       if (!mounted) return;
@@ -148,10 +155,87 @@ class _DetailCampagnePageState extends State<DetailCampagnePage> {
     }
   }
 
+  Future<void> _ouvrirPaiement() async {
+    final reservationUuid = _suivi?.reservationUuid?.trim();
+    if (reservationUuid == null || reservationUuid.isEmpty) {
+      _afficherErreurPaiement(
+        'Aucune réservation ne permet de retrouver cette obligation financière.',
+      );
+      return;
+    }
+
+    try {
+      final donnees = await _sourceEtudiant.paiements();
+      final items = (donnees['items'] as List).whereType<Map>().map(
+        Map<String, dynamic>.from,
+      );
+      String? obligationUuid;
+
+      for (final item in items) {
+        if (item['reservation_uuid']?.toString() != reservationUuid) continue;
+        final obligation = item['obligation'];
+        if (obligation is Map) {
+          obligationUuid = obligation['uuid']?.toString().trim();
+        }
+        obligationUuid ??= item['obligation_uuid']?.toString().trim();
+        if (obligationUuid != null && obligationUuid.isNotEmpty) break;
+      }
+
+      if (obligationUuid == null || obligationUuid.isEmpty) {
+        final obligations = (donnees['obligations'] as List)
+            .whereType<Map>()
+            .map(Map<String, dynamic>.from);
+        for (final obligation in obligations) {
+          final contexte = obligation['context'];
+          final reservation = contexte is Map ? contexte['reservation'] : null;
+          if (reservation is Map &&
+              reservation['uuid']?.toString() == reservationUuid) {
+            obligationUuid = obligation['uuid']?.toString().trim();
+            break;
+          }
+        }
+      }
+
+      if (obligationUuid == null || obligationUuid.isEmpty) {
+        throw const ErreurApi(
+          code: 'OBLIGATION_INTROUVABLE',
+          message:
+              'Aucune obligation financière payable n’est associée à cette réservation.',
+        );
+      }
+
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => ApercuFacturePage(obligationUuid: obligationUuid!),
+        ),
+      );
+      if (mounted) SuiviStageService.notifierChangement();
+    } on ErreurApi catch (e) {
+      _afficherErreurPaiement(e.message);
+    } catch (_) {
+      _afficherErreurPaiement(
+        'Impossible de charger l’obligation financière pour le moment.',
+      );
+    }
+  }
+
+  void _afficherErreurPaiement(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: const Color(0xFFEF4444),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final modeSombre = Theme.of(context).brightness == Brightness.dark;
-    final fondPage = modeSombre ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final fondPage = modeSombre
+        ? const Color(0xFF0F172A)
+        : const Color(0xFFF8FAFC);
     final barreActionFond = modeSombre ? const Color(0xFF1E293B) : Colors.white;
 
     final infoCampagne =
@@ -193,18 +277,7 @@ class _DetailCampagnePageState extends State<DetailCampagnePage> {
                       enCoursAnnulation: _enCoursAnnulation,
                       onAnnuler: _suivi!.canCancel ? _annulerReservation : null,
                       onPayer: _suivi!.statut == 'EN_ATTENTE_PAIEMENT'
-                          ? () async {
-                              await Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  builder: (_) => const ApercuFacturePage(
-                                    obligationUuid: '109114cb-d48f-4220-8e67-0bc7469d6abd',
-                                  ),
-                                ),
-                              );
-                              if (mounted) {
-                                SuiviStageService.notifierChangement();
-                              }
-                            }
+                          ? _ouvrirPaiement
                           : null,
                     ),
                   ],
@@ -288,7 +361,9 @@ class _DetailCampagnePageState extends State<DetailCampagnePage> {
                 color: barreActionFond,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: modeSombre ? 0.3 : 0.04),
+                    color: Colors.black.withValues(
+                      alpha: modeSombre ? 0.3 : 0.04,
+                    ),
                     blurRadius: 10,
                     offset: const Offset(0, -4),
                   ),
@@ -310,7 +385,9 @@ class _DetailCampagnePageState extends State<DetailCampagnePage> {
                         ),
                   style: FilledButton.styleFrom(
                     backgroundColor: aUneReservationActive
-                        ? (modeSombre ? const Color(0xFF334155) : const Color(0xFF64748B))
+                        ? (modeSombre
+                              ? const Color(0xFF334155)
+                              : const Color(0xFF64748B))
                         : const Color(0xFFFF751F),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
@@ -344,8 +421,12 @@ class _DetailCampagnePageState extends State<DetailCampagnePage> {
 
   PreferredSizeWidget _buildAppBar(BuildContext context, bool modeSombre) {
     final texteCouleur = modeSombre ? Colors.white : const Color(0xFF0F172A);
-    final iconeCouleur = modeSombre ? const Color(0xFFE2E8F0) : const Color(0xFF0F172A);
-    final fondAppBar = modeSombre ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final iconeCouleur = modeSombre
+        ? const Color(0xFFE2E8F0)
+        : const Color(0xFF0F172A);
+    final fondAppBar = modeSombre
+        ? const Color(0xFF0F172A)
+        : const Color(0xFFF8FAFC);
 
     final unreadNotifs =
         int.tryParse(_counts?['notifications']?.toString() ?? '0') ?? 0;
@@ -386,11 +467,7 @@ class _DetailCampagnePageState extends State<DetailCampagnePage> {
                 );
                 _chargerCounts();
               },
-              icon: Icon(
-                CupertinoIcons.bell,
-                color: iconeCouleur,
-                size: 26,
-              ),
+              icon: Icon(CupertinoIcons.bell, color: iconeCouleur, size: 26),
               visualDensity: VisualDensity.compact,
             ),
             if (unreadNotifs > 0)
@@ -403,7 +480,10 @@ class _DetailCampagnePageState extends State<DetailCampagnePage> {
                     color: Color(0xFFEF4444),
                     shape: BoxShape.circle,
                   ),
-                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                  constraints: const BoxConstraints(
+                    minWidth: 16,
+                    minHeight: 16,
+                  ),
                   child: Text(
                     '$unreadNotifs',
                     textAlign: TextAlign.center,
@@ -582,15 +662,15 @@ class _CarteSuiviCandidature extends StatelessWidget {
 
     final fond = modeSombre
         ? (estErreur
-            ? const Color(0xFF451A1A)
-            : suivi.statut == 'EN_ATTENTE_PAIEMENT'
-            ? const Color(0xFF431407)
-            : const Color(0xFF1E293B))
+              ? const Color(0xFF451A1A)
+              : suivi.statut == 'EN_ATTENTE_PAIEMENT'
+              ? const Color(0xFF431407)
+              : const Color(0xFF1E293B))
         : (estErreur
-            ? const Color(0xFFFEF2F2)
-            : suivi.statut == 'EN_ATTENTE_PAIEMENT'
-            ? const Color(0xFFFFF7ED)
-            : const Color(0xFFEFF6FF));
+              ? const Color(0xFFFEF2F2)
+              : suivi.statut == 'EN_ATTENTE_PAIEMENT'
+              ? const Color(0xFFFFF7ED)
+              : const Color(0xFFEFF6FF));
 
     return Container(
       width: double.infinity,
@@ -601,8 +681,8 @@ class _CarteSuiviCandidature extends StatelessWidget {
         border: Border.all(
           color: modeSombre
               ? (estErreur
-                  ? const Color(0xFF991B1B)
-                  : couleur.withValues(alpha: 0.4))
+                    ? const Color(0xFF991B1B)
+                    : couleur.withValues(alpha: 0.4))
               : couleur.withValues(alpha: 0.22),
         ),
       ),
@@ -667,8 +747,8 @@ class _CarteSuiviCandidature extends StatelessWidget {
                     color: atteint
                         ? couleur
                         : (modeSombre
-                            ? const Color(0xFF334155)
-                            : const Color(0xFFCBD5E1)),
+                              ? const Color(0xFF334155)
+                              : const Color(0xFFCBD5E1)),
                     borderRadius: BorderRadius.circular(6),
                   ),
                 ),
@@ -740,14 +820,18 @@ class _CarteSuiviCandidature extends StatelessWidget {
                 _buildLigneEtape(
                   titre: 'Placement universitaire',
                   actif: suivi.placementExists,
-                  statut: suivi.placementStatus ?? (suivi.placementExists ? 'CONFIRME' : 'En attente'),
+                  statut:
+                      suivi.placementStatus ??
+                      (suivi.placementExists ? 'CONFIRME' : 'En attente'),
                   modeSombre: modeSombre,
                 ),
                 const SizedBox(height: 6),
                 _buildLigneEtape(
                   titre: 'Admission hospitalière',
                   actif: suivi.admissionExists,
-                  statut: suivi.admissionStatus ?? (suivi.admissionExists ? 'ADMIS' : 'En attente'),
+                  statut:
+                      suivi.admissionStatus ??
+                      (suivi.admissionExists ? 'ADMIS' : 'En attente'),
                   reference: suivi.admissionUuid != null
                       ? 'Réf: ${suivi.admissionUuid!.substring(0, 8)}...'
                       : null,
@@ -757,7 +841,9 @@ class _CarteSuiviCandidature extends StatelessWidget {
                 _buildLigneEtape(
                   titre: 'Affectation & rotations',
                   actif: suivi.assignmentExists,
-                  statut: suivi.assignmentStatus ?? (suivi.assignmentExists ? 'PLANIFIEE' : 'En attente'),
+                  statut:
+                      suivi.assignmentStatus ??
+                      (suivi.assignmentExists ? 'PLANIFIEE' : 'En attente'),
                   reference: suivi.assignmentUuid != null
                       ? 'Réf: ${suivi.assignmentUuid!.substring(0, 8)}...'
                       : null,
@@ -878,11 +964,11 @@ class _CarteSuiviCandidature extends StatelessWidget {
           decoration: BoxDecoration(
             color: actif
                 ? (modeSombre
-                    ? const Color(0xFF166534).withValues(alpha: 0.35)
-                    : const Color(0xFFDCFCE7))
+                      ? const Color(0xFF166534).withValues(alpha: 0.35)
+                      : const Color(0xFFDCFCE7))
                 : (modeSombre
-                    ? const Color(0xFF334155).withValues(alpha: 0.5)
-                    : const Color(0xFFF1F5F9)),
+                      ? const Color(0xFF334155).withValues(alpha: 0.5)
+                      : const Color(0xFFF1F5F9)),
             borderRadius: BorderRadius.circular(6),
           ),
           child: Text(
@@ -892,8 +978,8 @@ class _CarteSuiviCandidature extends StatelessWidget {
               fontWeight: FontWeight.w700,
               color: actif
                   ? (modeSombre
-                      ? const Color(0xFF4ADE80)
-                      : const Color(0xFF15803D))
+                        ? const Color(0xFF4ADE80)
+                        : const Color(0xFF15803D))
                   : const Color(0xFF64748B),
             ),
           ),
@@ -907,10 +993,7 @@ class _CarteSuiviCandidature extends StatelessWidget {
 // 2. GRILLE 2x2 D'INFORMATIONS
 // -------------------------------------------------------------
 class _GrilleInformations extends StatelessWidget {
-  const _GrilleInformations({
-    required this.campagne,
-    required this.modeSombre,
-  });
+  const _GrilleInformations({required this.campagne, required this.modeSombre});
 
   final CampagneStage campagne;
   final bool modeSombre;
@@ -1026,7 +1109,9 @@ class _ItemInformation extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: modeSombre ? Colors.black.withValues(alpha: 0.15) : const Color(0x06000000),
+            color: modeSombre
+                ? Colors.black.withValues(alpha: 0.15)
+                : const Color(0x06000000),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -1039,7 +1124,9 @@ class _ItemInformation extends StatelessWidget {
             width: 38,
             height: 38,
             decoration: BoxDecoration(
-              color: modeSombre ? const Color(0xFF2563EB).withValues(alpha: 0.2) : const Color(0xFFEFF6FF),
+              color: modeSombre
+                  ? const Color(0xFF2563EB).withValues(alpha: 0.2)
+                  : const Color(0xFFEFF6FF),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icone, color: const Color(0xFF2563EB), size: 20),
@@ -1082,10 +1169,7 @@ class _ItemInformation extends StatelessWidget {
 // 3. SECTION CONSIGNES GÉNÉRALES
 // -------------------------------------------------------------
 class _SectionConsignes extends StatelessWidget {
-  const _SectionConsignes({
-    required this.consignes,
-    required this.modeSombre,
-  });
+  const _SectionConsignes({required this.consignes, required this.modeSombre});
 
   final List<String> consignes;
   final bool modeSombre;
@@ -1111,11 +1195,15 @@ class _SectionConsignes extends StatelessWidget {
             color: modeSombre ? const Color(0xFF1E293B) : Colors.white,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: modeSombre ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+              color: modeSombre
+                  ? const Color(0xFF334155)
+                  : const Color(0xFFF1F5F9),
             ),
             boxShadow: [
               BoxShadow(
-                color: modeSombre ? Colors.black.withValues(alpha: 0.15) : const Color(0x06000000),
+                color: modeSombre
+                    ? Colors.black.withValues(alpha: 0.15)
+                    : const Color(0x06000000),
                 blurRadius: 10,
                 offset: const Offset(0, 2),
               ),
@@ -1193,10 +1281,14 @@ class _SectionEligibilite extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: modeSombre ? const Color(0xFF064E3B).withValues(alpha: 0.25) : const Color(0xFFF0FDF4),
+            color: modeSombre
+                ? const Color(0xFF064E3B).withValues(alpha: 0.25)
+                : const Color(0xFFF0FDF4),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: modeSombre ? const Color(0xFF059669).withValues(alpha: 0.4) : const Color(0xFFBBF7D0),
+              color: modeSombre
+                  ? const Color(0xFF059669).withValues(alpha: 0.4)
+                  : const Color(0xFFBBF7D0),
               width: 1.2,
             ),
           ),
@@ -1217,7 +1309,9 @@ class _SectionEligibilite extends StatelessWidget {
                       style: GoogleFonts.inter(
                         fontSize: 14.5,
                         fontWeight: FontWeight.w800,
-                        color: modeSombre ? const Color(0xFF4ADE80) : const Color(0xFF15803D),
+                        color: modeSombre
+                            ? const Color(0xFF4ADE80)
+                            : const Color(0xFF15803D),
                       ),
                     ),
                   ),
@@ -1227,7 +1321,9 @@ class _SectionEligibilite extends StatelessWidget {
               Container(
                 width: double.infinity,
                 height: 1,
-                color: modeSombre ? const Color(0xFF059669).withValues(alpha: 0.25) : const Color(0xFFDCFCE7),
+                color: modeSombre
+                    ? const Color(0xFF059669).withValues(alpha: 0.25)
+                    : const Color(0xFFDCFCE7),
               ),
               const SizedBox(height: 14),
               ...criteres.map((critere) {
@@ -1336,11 +1432,15 @@ class _SectionHopitauxRetenus extends StatelessWidget {
               color: modeSombre ? const Color(0xFF1E293B) : Colors.white,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: modeSombre ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                color: modeSombre
+                    ? const Color(0xFF334155)
+                    : const Color(0xFFF1F5F9),
               ),
               boxShadow: [
                 BoxShadow(
-                  color: modeSombre ? Colors.black.withValues(alpha: 0.15) : const Color(0x06000000),
+                  color: modeSombre
+                      ? Colors.black.withValues(alpha: 0.15)
+                      : const Color(0x06000000),
                   blurRadius: 10,
                   offset: const Offset(0, 2),
                 ),
@@ -1383,7 +1483,9 @@ class _SectionHopitauxRetenus extends StatelessWidget {
                               style: GoogleFonts.inter(
                                 fontSize: 14.5,
                                 fontWeight: FontWeight.w700,
-                                color: modeSombre ? Colors.white : const Color(0xFF0F172A),
+                                color: modeSombre
+                                    ? Colors.white
+                                    : const Color(0xFF0F172A),
                               ),
                             ),
                             const SizedBox(height: 3),

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'client_api.dart';
 import 'endpoints_api.dart';
@@ -7,6 +8,8 @@ import '../mocks/donnees_etudiant_mockees.dart';
 import '../mocks/depot_mock_etudiant.dart';
 import '../mocks/scenario_etudiant_ui.dart';
 import '../../features/stage/data/mappers/mappeur_affectation_stage_api.dart';
+import '../../features/stage/data/mappers/mappeur_visibilite_resultat_stage_api.dart';
+import '../../features/stage/data/mappers/mappeur_fin_stage_api.dart';
 import '../../features/journal/data/mappers/mappeur_presence_api.dart';
 import '../../features/journal/data/mappers/mappeur_contexte_execution_api.dart';
 import '../../features/journal/data/mappers/mappeur_tache_stage_api.dart';
@@ -24,6 +27,61 @@ class SourceEtudiantDistante {
 
   Future<Map<String, dynamic>> profilActif() =>
       _donnees(EndpointsApi.profilActifEtudiant);
+
+  Future<Map<String, dynamic>> desactiverCompte({
+    required String password,
+    required String confirmation,
+  }) async {
+    if (password.isEmpty) {
+      throw const ErreurApi(
+        code: 'MOT_DE_PASSE_REQUIS',
+        message: 'Le mot de passe actuel est requis.',
+      );
+    }
+    if (confirmation != 'DESACTIVER') {
+      throw const ErreurApi(
+        code: 'CONFIRMATION_DESACTIVATION_INVALIDE',
+        message: 'Saisissez exactement DESACTIVER pour confirmer.',
+      );
+    }
+
+    if (ConfigurationApi.utiliserDonneesMockees) {
+      final maintenant = DateTime.now();
+      return {
+        'deletion_request': {
+          'uuid': 'mock-deletion-request',
+          'status': 'PENDING',
+          'requested_at': maintenant.toIso8601String(),
+          'delete_after': maintenant
+              .add(const Duration(days: 30))
+              .toIso8601String(),
+          'grace_period_days': 30,
+        },
+      };
+    }
+
+    final reponse = await _client.post(
+      EndpointsApi.desactiverCompteEtudiant,
+      corps: {'password': password, 'confirmation': confirmation},
+    );
+    if (reponse['success'] != true) {
+      throw ErreurApi(
+        code: 'DESACTIVATION_COMPTE_REFUSEE',
+        message:
+            reponse['message']?.toString() ??
+            'Impossible de désactiver le compte.',
+        details: reponse['data'],
+      );
+    }
+    final donnees = reponse['data'];
+    if (donnees is! Map || donnees['deletion_request'] is! Map) {
+      throw const ErreurApi(
+        code: 'DONNEES_DESACTIVATION_INVALIDES',
+        message: 'La confirmation reçue du serveur est invalide.',
+      );
+    }
+    return Map<String, dynamic>.from(donnees);
+  }
 
   Future<Map<String, dynamic>> rattachements() =>
       _donnees(EndpointsApi.rattachementsEtudiant);
@@ -55,11 +113,388 @@ class SourceEtudiantDistante {
     return Map<String, dynamic>.from(donnees);
   }
 
-  Future<Map<String, dynamic>> tableauDeBord() =>
-      _donnees(EndpointsApi.tableauDeBordEtudiant);
+  Future<Map<String, dynamic>> tableauDeBord() async {
+    final donnees = await _donnees(EndpointsApi.tableauDeBordEtudiant);
+    return MappeurVisibiliteResultatStageApi.normaliserTableauDeBord(donnees);
+  }
 
-  Future<Map<String, dynamic>> documents() =>
-      _donnees(EndpointsApi.documentsEtudiant);
+  Future<Map<String, dynamic>> documents({
+    dynamic type,
+    dynamic status,
+    bool? available,
+    String? assignmentUuid,
+    String? campaignUuid,
+    int page = 1,
+    int perPage = 20,
+  }) async {
+    if (ConfigurationApi.utiliserDonneesMockees) {
+      return MappeurFinStageApi.documents(
+        DonneesEtudiantMockees.pourEndpoint(EndpointsApi.documentsEtudiant),
+      );
+    }
+    final reponse = await _client.get(
+      EndpointsApi.documentsEtudiant,
+      parametres: {
+        if (type != null) 'type': _filtreMultiple(type),
+        if (status != null) 'status': _filtreMultiple(status),
+        'available': ?available,
+        'assignment_uuid': ?assignmentUuid,
+        'campaign_uuid': ?campaignUuid,
+        'page': page,
+        'per_page': perPage,
+      },
+    );
+    return MappeurFinStageApi.documents(
+      _exigerCollection(reponse, 'documents de fin de stage'),
+    );
+  }
+
+  Future<List<int>> fichierCertificat(
+    String uuid, {
+    bool download = false,
+  }) async {
+    final identifiant = uuid.trim();
+    if (identifiant.isEmpty) {
+      throw const ErreurApi(
+        code: 'CERTIFICAT_UUID_REQUIS',
+        message: 'L’identifiant du document est requis.',
+      );
+    }
+    if (ConfigurationApi.utiliserDonneesMockees) {
+      return utf8.encode(
+        '<html><body><h1>Attestation de stage</h1>'
+        '<p>Document de démonstration.</p></body></html>',
+      );
+    }
+    return _client.getBytes(
+      EndpointsApi.fichierCertificat(identifiant),
+      parametres: download ? const {'download': 1} : null,
+    );
+  }
+
+  Future<Map<String, dynamic>> cloturesStage({
+    dynamic status,
+    String? assignmentUuid,
+    String? campaignUuid,
+    dynamic hospitalId,
+    String? dateFrom,
+    String? dateTo,
+    int page = 1,
+    int perPage = 20,
+  }) async {
+    if (ConfigurationApi.utiliserDonneesMockees) {
+      return MappeurFinStageApi.completions(
+        DonneesEtudiantMockees.pourEndpoint(EndpointsApi.cloturesStageEtudiant),
+      );
+    }
+    final reponse = await _client.get(
+      EndpointsApi.cloturesStageEtudiant,
+      parametres: {
+        if (status != null) 'status': _filtreMultiple(status),
+        'assignment_uuid': ?assignmentUuid,
+        'campaign_uuid': ?campaignUuid,
+        'hospital_id': ?hospitalId,
+        'date_from': ?dateFrom,
+        'date_to': ?dateTo,
+        'page': page,
+        'per_page': perPage,
+      },
+    );
+    return MappeurFinStageApi.completions(
+      _exigerCollection(reponse, 'clôtures de stage'),
+    );
+  }
+
+  Future<Map<String, dynamic>> resultatsStage({
+    dynamic decision,
+    dynamic transmissionStatus,
+    String? assignmentUuid,
+    String? campaignUuid,
+    dynamic hospitalId,
+    int page = 1,
+    int perPage = 20,
+  }) async {
+    if (ConfigurationApi.utiliserDonneesMockees) {
+      return MappeurFinStageApi.resultats(
+        DonneesEtudiantMockees.pourEndpoint(
+          EndpointsApi.resultatsStageEtudiant,
+        ),
+      );
+    }
+    final reponse = await _client.get(
+      EndpointsApi.resultatsStageEtudiant,
+      parametres: {
+        if (decision != null) 'decision': _filtreMultiple(decision),
+        if (transmissionStatus != null)
+          'transmission_status': _filtreMultiple(transmissionStatus),
+        'assignment_uuid': ?assignmentUuid,
+        'campaign_uuid': ?campaignUuid,
+        'hospital_id': ?hospitalId,
+        'page': page,
+        'per_page': perPage,
+      },
+    );
+    return MappeurFinStageApi.resultats(
+      _exigerCollection(reponse, 'résultats de stage'),
+    );
+  }
+
+  Future<Map<String, dynamic>> rapportsStage({
+    dynamic status,
+    String? assignmentUuid,
+    String? campaignUuid,
+    String? dateFrom,
+    String? dateTo,
+    int page = 1,
+    int perPage = 20,
+  }) async {
+    if (ConfigurationApi.utiliserDonneesMockees) {
+      return DonneesEtudiantMockees.pourEndpoint(
+        EndpointsApi.rapportsStageEtudiant,
+      );
+    }
+    final reponse = await _client.get(
+      EndpointsApi.rapportsStageEtudiant,
+      parametres: {
+        if (status != null) 'status': _filtreMultiple(status),
+        'assignment_uuid': ?assignmentUuid,
+        'campaign_uuid': ?campaignUuid,
+        'date_from': ?dateFrom,
+        'date_to': ?dateTo,
+        'page': page,
+        'per_page': perPage,
+      },
+    );
+    return _exigerCollection(reponse, 'rapports de stage');
+  }
+
+  Future<Map<String, dynamic>> detailRapportStage(String uuid) async {
+    final identifiant = uuid.trim();
+    if (identifiant.isEmpty) {
+      throw const ErreurApi(
+        code: 'RAPPORT_UUID_REQUIS',
+        message: 'L’identifiant du rapport est requis.',
+      );
+    }
+    if (ConfigurationApi.utiliserDonneesMockees) {
+      final rapports = DonneesEtudiantMockees.pourEndpoint(
+        EndpointsApi.rapportsStageEtudiant,
+      );
+      for (final item in _listeDeMaps(rapports['items'])) {
+        if (item['uuid']?.toString() == identifiant) {
+          return {'report': item};
+        }
+      }
+      throw const ErreurApi(
+        code: 'RAPPORT_INTROUVABLE',
+        message: 'Ce rapport est introuvable.',
+      );
+    }
+    final reponse = await _client.get(
+      EndpointsApi.detailRapportStageEtudiant(identifiant),
+    );
+    if (reponse['success'] != true || reponse['data'] is! Map) {
+      throw ErreurApi(
+        code: 'RAPPORT_INTROUVABLE',
+        message:
+            reponse['message']?.toString() ?? 'Ce rapport est introuvable.',
+        details: reponse['data'],
+      );
+    }
+    final donnees = Map<String, dynamic>.from(reponse['data'] as Map);
+    if (donnees['report'] is! Map) {
+      throw const ErreurApi(
+        code: 'DONNEES_API_INVALIDES',
+        message: 'Le détail du rapport reçu du serveur est invalide.',
+      );
+    }
+    return donnees;
+  }
+
+  Future<Map<String, dynamic>> soumettreRapportStage({
+    required String assignmentUuid,
+    required String cheminFichier,
+    String? title,
+    String? description,
+  }) async {
+    final affectation = assignmentUuid.trim();
+    final chemin = cheminFichier.trim();
+    if (affectation.isEmpty || chemin.isEmpty) {
+      throw const ErreurApi(
+        code: 'RAPPORT_INCOMPLET',
+        message: 'Le stage et le fichier du rapport sont requis.',
+      );
+    }
+    if (ConfigurationApi.utiliserDonneesMockees) {
+      return ScenarioEtudiantUi.soumettreRapport(
+        assignmentUuid: affectation,
+        cheminFichier: chemin,
+        title: title,
+        description: description,
+      );
+    }
+    final reponse = await _client.envoyerFichier(
+      EndpointsApi.rapportsStageEtudiant,
+      cheminFichier: chemin,
+      cleFichier: 'report',
+      champs: {
+        'assignment_uuid': affectation,
+        if (title?.trim().isNotEmpty == true) 'title': title!.trim(),
+        if (description?.trim().isNotEmpty == true)
+          'description': description!.trim(),
+      },
+    );
+    if (reponse['success'] != true || reponse['data'] is! Map) {
+      throw ErreurApi(
+        code: 'SOUMISSION_RAPPORT_REFUSEE',
+        message:
+            reponse['message']?.toString() ??
+            'Impossible de soumettre ce rapport.',
+        details: reponse['data'],
+      );
+    }
+    return Map<String, dynamic>.from(reponse['data'] as Map);
+  }
+
+  Future<List<int>> fichierRapportStage(
+    String uuid, {
+    bool download = false,
+  }) async {
+    final identifiant = uuid.trim();
+    if (identifiant.isEmpty) {
+      throw const ErreurApi(
+        code: 'RAPPORT_UUID_REQUIS',
+        message: 'L’identifiant du rapport est requis.',
+      );
+    }
+    if (ConfigurationApi.utiliserDonneesMockees) {
+      return utf8.encode('Rapport de stage de démonstration.');
+    }
+    return _client.getBytes(
+      EndpointsApi.fichierRapportStageEtudiant(identifiant),
+      parametres: download ? const {'download': 1} : null,
+    );
+  }
+
+  Future<Map<String, dynamic>> justificationsStage() async {
+    if (ConfigurationApi.utiliserDonneesMockees) {
+      return DonneesEtudiantMockees.pourEndpoint(
+        EndpointsApi.justificationsStageEtudiant,
+      );
+    }
+    final reponse = await _client.get(EndpointsApi.justificationsStageEtudiant);
+    return _exigerCollection(reponse, 'justifications de stage');
+  }
+
+  Future<Map<String, dynamic>> soumettreJustificationStage({
+    required String assignmentUuid,
+    required String typeSituation,
+    required String motif,
+    String? explication,
+    String? cheminDocument,
+  }) async {
+    final affectation = assignmentUuid.trim();
+    final type = typeSituation.trim().toUpperCase();
+    final raison = motif.trim().toUpperCase();
+    final explicationNormalisee = explication?.trim() ?? '';
+    final document = cheminDocument?.trim() ?? '';
+    if (affectation.isEmpty || type.isEmpty || raison.isEmpty) {
+      throw const ErreurApi(
+        code: 'JUSTIFICATION_INCOMPLETE',
+        message: 'Le stage, la situation et le motif sont requis.',
+      );
+    }
+    if (raison == 'AUTRE' && explicationNormalisee.isEmpty) {
+      throw const ErreurApi(
+        code: 'EXPLICATION_REQUISE',
+        message: 'Une explication est requise pour le motif « Autre ».',
+      );
+    }
+    if (ConfigurationApi.utiliserDonneesMockees) {
+      return ScenarioEtudiantUi.soumettreJustification(
+        assignmentUuid: affectation,
+        typeSituation: type,
+        motif: raison,
+        explication: explicationNormalisee,
+        cheminDocument: document,
+      );
+    }
+    final champs = <String, String>{
+      'assignment_uuid': affectation,
+      'type_situation': type,
+      'motif': raison,
+      if (explicationNormalisee.isNotEmpty)
+        'explication': explicationNormalisee,
+    };
+    final reponse = document.isNotEmpty
+        ? await _client.envoyerFichier(
+            EndpointsApi.justificationsStageEtudiant,
+            cheminFichier: document,
+            cleFichier: 'document',
+            champs: champs,
+          )
+        : await _client.post(
+            EndpointsApi.justificationsStageEtudiant,
+            corps: champs,
+          );
+    if (reponse['success'] != true || reponse['data'] is! Map) {
+      throw ErreurApi(
+        code: 'SOUMISSION_JUSTIFICATION_REFUSEE',
+        message:
+            reponse['message']?.toString() ??
+            'Impossible d’envoyer cette justification.',
+        details: reponse['data'],
+      );
+    }
+    return Map<String, dynamic>.from(reponse['data'] as Map);
+  }
+
+  Future<List<int>> fichierJustificationStage(
+    String uuid, {
+    bool download = false,
+  }) async {
+    final identifiant = uuid.trim();
+    if (identifiant.isEmpty) {
+      throw const ErreurApi(
+        code: 'JUSTIFICATION_UUID_REQUIS',
+        message: 'L’identifiant de la justification est requis.',
+      );
+    }
+    if (ConfigurationApi.utiliserDonneesMockees) {
+      return utf8.encode('Justificatif de stage de démonstration.');
+    }
+    return _client.getBytes(
+      EndpointsApi.fichierJustificationStageEtudiant(identifiant),
+      parametres: download ? const {'download': 1} : null,
+    );
+  }
+
+  Future<void> marquerDecisionJustificationLue(String uuid) async {
+    final identifiant = uuid.trim();
+    if (identifiant.isEmpty) {
+      throw const ErreurApi(
+        code: 'JUSTIFICATION_UUID_REQUIS',
+        message: 'L’identifiant de la justification est requis.',
+      );
+    }
+    if (ConfigurationApi.utiliserDonneesMockees) {
+      ScenarioEtudiantUi.marquerDecisionJustificationLue(identifiant);
+      return;
+    }
+    final reponse = await _client.post(
+      EndpointsApi.lireDecisionJustificationStageEtudiant(identifiant),
+      corps: const <String, dynamic>{},
+    );
+    if (reponse['success'] != true) {
+      throw ErreurApi(
+        code: 'LECTURE_DECISION_REFUSEE',
+        message:
+            reponse['message']?.toString() ??
+            'Impossible de marquer cette décision comme lue.',
+        details: reponse['data'],
+      );
+    }
+  }
 
   Future<Map<String, dynamic>> stages({
     dynamic status,
@@ -128,23 +563,6 @@ class SourceEtudiantDistante {
   Future<Map<String, dynamic>> reservations() =>
       _donnees(EndpointsApi.reservationsEtudiant);
 
-  Future<Map<String, dynamic>> confirmerReservation(String uuid) async {
-    final reponse = await _client.post(
-      EndpointsApi.confirmerReservationEtudiant(uuid),
-    );
-    if (reponse['success'] != true) {
-      throw ErreurApi(
-        code: 'CONFIRMATION_REFUSEE',
-        message: reponse['message']?.toString() ?? 'Confirmation refusée.',
-        details: reponse['data'],
-      );
-    }
-    final donnees = reponse['data'];
-    return donnees is Map
-        ? Map<String, dynamic>.from(donnees)
-        : <String, dynamic>{};
-  }
-
   Future<Map<String, dynamic>> annulerReservation(String uuid) async {
     if (ConfigurationApi.utiliserDonneesMockees) {
       return ScenarioEtudiantUi.annulerReservation(uuid);
@@ -167,8 +585,8 @@ class SourceEtudiantDistante {
 
   Future<Map<String, dynamic>> admissions([String? reservationUuid]) async {
     if (ConfigurationApi.utiliserDonneesMockees) {
-      return DonneesEtudiantMockees.pourEndpoint(
-        EndpointsApi.admissionEtudiant,
+      return MappeurVisibiliteResultatStageApi.normaliserCollection(
+        DonneesEtudiantMockees.pourEndpoint(EndpointsApi.admissionEtudiant),
       );
     }
     final reponse = await _client.get(
@@ -191,7 +609,9 @@ class SourceEtudiantDistante {
         message: 'Les données reçues du serveur sont invalides.',
       );
     }
-    return Map<String, dynamic>.from(donnees);
+    return MappeurVisibiliteResultatStageApi.normaliserCollection(
+      Map<String, dynamic>.from(donnees),
+    );
   }
 
   Future<Map<String, dynamic>> admission() => admissions();
@@ -199,8 +619,53 @@ class SourceEtudiantDistante {
   Future<Map<String, dynamic>> optionsStage() =>
       _donnees(EndpointsApi.optionsStageEtudiant);
 
-  Future<Map<String, dynamic>> candidatures() =>
-      _donnees(EndpointsApi.candidaturesEtudiant);
+  Future<Map<String, dynamic>> candidatures({
+    dynamic status,
+    dynamic reservationStatus,
+    dynamic workflowStatus,
+    dynamic campaignId,
+    dynamic hospitalId,
+    int page = 1,
+    int perPage = 20,
+  }) async {
+    if (ConfigurationApi.utiliserDonneesMockees) {
+      return MappeurVisibiliteResultatStageApi.normaliserCollection(
+        DonneesEtudiantMockees.pourEndpoint(EndpointsApi.candidaturesEtudiant),
+      );
+    }
+    final parametres = <String, dynamic>{
+      if (status != null) 'status': _filtreMultiple(status),
+      if (reservationStatus != null)
+        'reservation_status': _filtreMultiple(reservationStatus),
+      if (workflowStatus != null)
+        'workflow_status': _filtreMultiple(workflowStatus),
+      'campaign_id': ?campaignId,
+      'hospital_id': ?hospitalId,
+      'page': page,
+      'per_page': perPage,
+    };
+    final reponse = await _client.get(
+      EndpointsApi.candidaturesEtudiant,
+      parametres: parametres,
+    );
+    if (reponse['success'] != true) {
+      throw ErreurApi(
+        code: 'REPONSE_API_REFUSEE',
+        message: reponse['message']?.toString() ?? 'Requête refusée.',
+        details: reponse['data'],
+      );
+    }
+    final donnees = reponse['data'];
+    if (donnees is! Map) {
+      throw const ErreurApi(
+        code: 'DONNEES_API_INVALIDES',
+        message: 'Les candidatures reçues du serveur sont invalides.',
+      );
+    }
+    return MappeurVisibiliteResultatStageApi.normaliserCollection(
+      Map<String, dynamic>.from(donnees),
+    );
+  }
 
   Future<Map<String, dynamic>> contexteExecution({
     String? assignmentUuid,
@@ -802,51 +1267,54 @@ class SourceEtudiantDistante {
     );
   }
 
-  Future<Map<String, dynamic>> paiements([
-    Map<String, dynamic>? filtres,
-  ]) async {
+  Future<Map<String, dynamic>> paiements({dynamic status, String? type}) async {
     if (ConfigurationApi.utiliserDonneesMockees) {
       return DepotMockEtudiant.listePaiements();
     }
-    try {
-      final reponse = await _client.get(
-        EndpointsApi.paiementsEtudiant,
-        parametres: filtres,
+    final parametres = <String, dynamic>{
+      if (status != null) 'status': _filtreMultiple(status),
+      if (type != null && type.trim().isNotEmpty) 'type': type.trim(),
+    };
+    final reponse = await _client.get(
+      EndpointsApi.paiementsEtudiant,
+      parametres: parametres.isEmpty ? null : parametres,
+    );
+    if (reponse['success'] != true) {
+      throw ErreurApi(
+        code: 'PAIEMENTS_REFUSES',
+        message:
+            reponse['message']?.toString() ??
+            'Impossible de récupérer les obligations financières.',
+        details: reponse['data'],
       );
-      if (reponse['success'] != true) {
-        // En cas de non-déploiement ou réponse négative du serveur de test, fallback gracieux
-        return DepotMockEtudiant.listePaiements();
-      }
-      final donnees = reponse['data'];
-      if (donnees is Map) {
-        return Map<String, dynamic>.from(donnees);
-      }
-      return DepotMockEtudiant.listePaiements();
-    } catch (_) {
-      // Tolérance aux erreurs réseau ou 500 du serveur backend distant en cours de dev
-      return DepotMockEtudiant.listePaiements();
     }
+    return _normaliserCollectionPaiements(reponse['data']);
   }
 
   Future<Map<String, dynamic>> detailPaiement(String obligationUuid) async {
     if (ConfigurationApi.utiliserDonneesMockees) {
       return DepotMockEtudiant.detailObligation(obligationUuid);
     }
-    try {
-      final reponse = await _client.get(
-        EndpointsApi.detailPaiementEtudiant(obligationUuid),
+    final uuid = obligationUuid.trim();
+    if (uuid.isEmpty) {
+      throw const ErreurApi(
+        code: 'OBLIGATION_UUID_REQUIS',
+        message: 'L’identifiant de l’obligation financière est requis.',
       );
-      if (reponse['success'] != true) {
-        return DepotMockEtudiant.detailObligation(obligationUuid);
-      }
-      final donnees = reponse['data'];
-      return donnees is Map
-          ? Map<String, dynamic>.from(donnees)
-          : <String, dynamic>{};
-    } catch (_) {
-      // Tolérance si le module de paiement n'est pas encore déployé sur le backend distant
-      return DepotMockEtudiant.detailObligation(obligationUuid);
     }
+    final reponse = await _client.get(
+      EndpointsApi.detailPaiementEtudiant(uuid),
+    );
+    if (reponse['success'] != true) {
+      throw ErreurApi(
+        code: 'OBLIGATION_INTROUVABLE',
+        message:
+            reponse['message']?.toString() ??
+            'Impossible de charger cette obligation financière.',
+        details: reponse['data'],
+      );
+    }
+    return _normaliserDetailPaiement(reponse['data']);
   }
 
   Future<Map<String, dynamic>> initierPaiement({
@@ -856,24 +1324,58 @@ class SourceEtudiantDistante {
     String? idempotencyKey,
     String? reservationUuid,
   }) async {
+    final uuid = obligationUuid.trim();
+    final canal = channel.trim().toUpperCase();
+    final telephone = phoneNumber.trim();
     final cle =
-        idempotencyKey ??
-        'idem-${DateTime.now().millisecondsSinceEpoch}-${obligationUuid.hashCode.abs()}';
+        (idempotencyKey ??
+                'mobile-${DateTime.now().microsecondsSinceEpoch}-${uuid.hashCode.abs()}')
+            .trim();
+
+    if (uuid.isEmpty) {
+      throw const ErreurApi(
+        code: 'OBLIGATION_UUID_REQUIS',
+        message: 'L’identifiant de l’obligation financière est requis.',
+      );
+    }
+    if (!const {
+      'MPESA',
+      'ORANGE_MONEY',
+      'AIRTEL_MONEY',
+      'AFRIMONEY',
+    }.contains(canal)) {
+      throw const ErreurApi(
+        code: 'CANAL_PAIEMENT_INVALIDE',
+        message: 'Le canal Mobile Money sélectionné n’est pas pris en charge.',
+      );
+    }
+    if (telephone.isEmpty) {
+      throw const ErreurApi(
+        code: 'TELEPHONE_PAIEMENT_REQUIS',
+        message: 'Le numéro Mobile Money est requis.',
+      );
+    }
+    if (cle.isEmpty || cle.length > 100) {
+      throw const ErreurApi(
+        code: 'CLE_IDEMPOTENCE_INVALIDE',
+        message: 'La clé d’idempotence du paiement est invalide.',
+      );
+    }
 
     if (ConfigurationApi.utiliserDonneesMockees) {
       return DepotMockEtudiant.initierPaiement(
-        obligationUuid: obligationUuid,
-        channel: channel,
-        phoneNumber: phoneNumber,
+        obligationUuid: uuid,
+        channel: canal,
+        phoneNumber: telephone,
         idempotencyKey: cle,
       );
     }
     final reponse = await _client.post(
       EndpointsApi.initierPaiementEtudiant,
       corps: {
-        'obligation_uuid': obligationUuid,
-        'channel': channel,
-        'phone_number': phoneNumber.trim(),
+        'obligation_uuid': uuid,
+        'channel': canal,
+        'phone_number': telephone,
         'idempotency_key': cle,
         'reservation_uuid': ?reservationUuid,
       },
@@ -887,27 +1389,26 @@ class SourceEtudiantDistante {
         details: reponse['data'],
       );
     }
-    final donnees = reponse['data'];
-    return donnees is Map
-        ? Map<String, dynamic>.from(donnees)
-        : <String, dynamic>{};
+    return _normaliserInitiationPaiement(reponse['data']);
   }
 
   Future<Map<String, dynamic>> paiementSync({
     required String obligationUuid,
     String? reservationUuid,
   }) async {
-    if (ConfigurationApi.utiliserDonneesMockees) {
-      return DepotMockEtudiant.synchroniserPaiement(
-        obligationUuid: obligationUuid,
+    final uuid = obligationUuid.trim();
+    if (uuid.isEmpty) {
+      throw const ErreurApi(
+        code: 'OBLIGATION_UUID_REQUIS',
+        message: 'L’identifiant de l’obligation financière est requis.',
       );
+    }
+    if (ConfigurationApi.utiliserDonneesMockees) {
+      return DepotMockEtudiant.synchroniserPaiement(obligationUuid: uuid);
     }
     final reponse = await _client.post(
       EndpointsApi.paiementSync,
-      corps: {
-        'obligation_uuid': obligationUuid,
-        'reservation_uuid': ?reservationUuid,
-      },
+      corps: {'obligation_uuid': uuid, 'reservation_uuid': ?reservationUuid},
     );
     if (reponse['success'] != true) {
       throw ErreurApi(
@@ -916,10 +1417,7 @@ class SourceEtudiantDistante {
         details: reponse['data'],
       );
     }
-    final donnees = reponse['data'];
-    return donnees is Map
-        ? Map<String, dynamic>.from(donnees)
-        : <String, dynamic>{};
+    return _normaliserSynchronisationPaiement(reponse['data']);
   }
 
   // Notes & Cursus
@@ -1400,4 +1898,136 @@ class SourceEtudiantDistante {
     }
     return Map<String, dynamic>.from(donnees);
   }
+
+  static Map<String, dynamic> _exigerCollection(
+    Map<String, dynamic> reponse,
+    String libelle,
+  ) {
+    if (reponse['success'] != true) {
+      throw ErreurApi(
+        code: 'REPONSE_API_REFUSEE',
+        message:
+            reponse['message']?.toString() ??
+            'Impossible de charger les $libelle.',
+        details: reponse['data'],
+      );
+    }
+    final donnees = reponse['data'];
+    if (donnees is! Map || donnees['items'] is! List) {
+      throw ErreurApi(
+        code: 'DONNEES_API_INVALIDES',
+        message: 'La liste des $libelle reçue du serveur est invalide.',
+        details: donnees,
+      );
+    }
+    return Map<String, dynamic>.from(donnees);
+  }
+
+  static Map<String, dynamic> _normaliserCollectionPaiements(Object? donnees) {
+    if (donnees is! Map ||
+        donnees['items'] is! List ||
+        donnees['obligations'] is! List ||
+        donnees['obligation_stats'] is! Map ||
+        donnees['stats'] is! Map ||
+        donnees['channels'] is! Map) {
+      throw const ErreurApi(
+        code: 'DONNEES_PAIEMENTS_INVALIDES',
+        message:
+            'La liste des obligations financières reçue du serveur est invalide.',
+      );
+    }
+
+    final resultat = Map<String, dynamic>.from(donnees);
+    final items = _listeDeMaps(donnees['items']);
+    final obligations = _listeDeMaps(donnees['obligations']);
+    if (items.length != (donnees['items'] as List).length ||
+        obligations.length != (donnees['obligations'] as List).length ||
+        obligations.any(
+          (obligation) => (obligation['uuid']?.toString().trim() ?? '').isEmpty,
+        )) {
+      throw const ErreurApi(
+        code: 'DONNEES_PAIEMENTS_INVALIDES',
+        message:
+            'La liste des obligations financières reçue du serveur est incomplète.',
+      );
+    }
+    resultat['items'] = items;
+    resultat['obligations'] = obligations;
+    resultat['obligation_stats'] = Map<String, dynamic>.from(
+      donnees['obligation_stats'] as Map,
+    );
+    resultat['stats'] = Map<String, dynamic>.from(donnees['stats'] as Map);
+    resultat['channels'] = Map<String, dynamic>.from(
+      donnees['channels'] as Map,
+    );
+    return resultat;
+  }
+
+  static Map<String, dynamic> _normaliserDetailPaiement(Object? donnees) {
+    if (donnees is! Map || donnees['obligation'] is! Map) {
+      throw const ErreurApi(
+        code: 'DONNEES_OBLIGATION_INVALIDES',
+        message: 'L’obligation financière reçue du serveur est invalide.',
+      );
+    }
+    final obligation = Map<String, dynamic>.from(donnees['obligation'] as Map);
+    if ((obligation['uuid']?.toString().trim() ?? '').isEmpty ||
+        obligation['actions'] is! Map ||
+        (obligation['actions'] as Map)['initiate'] is! Map ||
+        (obligation['actions'] as Map)['sync'] is! Map) {
+      throw const ErreurApi(
+        code: 'DONNEES_OBLIGATION_INVALIDES',
+        message: 'L’obligation financière reçue du serveur est incomplète.',
+      );
+    }
+    return {...Map<String, dynamic>.from(donnees), 'obligation': obligation};
+  }
+
+  static Map<String, dynamic> _normaliserInitiationPaiement(Object? donnees) {
+    if (donnees is! Map ||
+        donnees['payment'] is! Map ||
+        donnees['obligation'] is! Map) {
+      throw const ErreurApi(
+        code: 'DONNEES_INITIATION_PAIEMENT_INVALIDES',
+        message: 'La confirmation d’initiation du paiement est invalide.',
+      );
+    }
+    final paiement = Map<String, dynamic>.from(donnees['payment'] as Map);
+    final obligation = Map<String, dynamic>.from(donnees['obligation'] as Map);
+    if ((paiement['uuid']?.toString().trim() ?? '').isEmpty ||
+        (paiement['status']?.toString().trim() ?? '').isEmpty ||
+        (obligation['uuid']?.toString().trim() ?? '').isEmpty) {
+      throw const ErreurApi(
+        code: 'DONNEES_INITIATION_PAIEMENT_INVALIDES',
+        message: 'La confirmation d’initiation du paiement est incomplète.',
+      );
+    }
+    return {
+      ...Map<String, dynamic>.from(donnees),
+      'payment': paiement,
+      'obligation': obligation,
+    };
+  }
+
+  static Map<String, dynamic> _normaliserSynchronisationPaiement(
+    Object? donnees,
+  ) {
+    if (donnees is! Map ||
+        (donnees['payment_status']?.toString().trim() ?? '').isEmpty) {
+      throw const ErreurApi(
+        code: 'DONNEES_SYNCHRONISATION_PAIEMENT_INVALIDES',
+        message: 'L’état du paiement reçu du serveur est invalide.',
+      );
+    }
+    return Map<String, dynamic>.from(donnees);
+  }
+
+  static List<Map<String, dynamic>> _listeDeMaps(Object? valeur) =>
+      (valeur as List)
+          .whereType<Map>()
+          .map(Map<String, dynamic>.from)
+          .toList(growable: false);
+
+  static String _filtreMultiple(Object valeur) =>
+      valeur is List ? valeur.join(',') : valeur.toString();
 }

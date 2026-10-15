@@ -14,13 +14,14 @@ import '../../../../core/widgets/contenu_adaptatif.dart';
 import '../../../authentication/data/datasources/source_authentification_distante.dart';
 import '../../../journal/presentation/pages/journal_page.dart';
 import '../../../journal/presentation/widgets/section_rapport.dart';
-import '../../../stage/presentation/pages/candidatures_stage_page.dart';
+import '../../../stage/presentation/pages/mes_stages_page.dart';
 import '../../data/models/etudiant_profil.dart';
 import '../widgets/section_parametres_profil.dart';
 import 'modifier_informations_academiques_page.dart';
 import 'gestion_email_page.dart';
 import 'modifier_informations_personnelles_page.dart';
 import 'notes_academiques_page.dart';
+import 'documents_officiels_page.dart';
 import '../../../planning/presentation/pages/planning_page.dart';
 import '../../../stage/presentation/pages/mes_paiements_page.dart';
 
@@ -131,16 +132,30 @@ class _ProfilePageState extends State<ProfilePage> {
         builder: (context) {
           final modeSombre = Theme.of(context).brightness == Brightness.dark;
           final fond = modeSombre
-              ? const Color(0xFF0B1220)
+              ? const Color(0xFF0F172A)
               : const Color(0xFFF8FAFC);
+          final texte = modeSombre ? Colors.white : const Color(0xFF0F172A);
           return Scaffold(
             backgroundColor: fond,
             appBar: AppBar(
               backgroundColor: fond,
               surfaceTintColor: Colors.transparent,
+              elevation: 0,
+              leading: IconButton(
+                icon: Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  size: 20,
+                  color: texte,
+                ),
+                onPressed: () => Navigator.of(context).maybePop(),
+              ),
               title: Text(
                 'Mes rapports',
-                style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+                style: GoogleFonts.inter(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: texte,
+                ),
               ),
             ),
             body: const ContenuAdaptatif(
@@ -161,7 +176,18 @@ class _ProfilePageState extends State<ProfilePage> {
 
   void _ouvrirHistoriqueStage() {
     Navigator.of(context, rootNavigator: true).push(
-      MaterialPageRoute<void>(builder: (_) => const CandidaturesStagePage()),
+      MaterialPageRoute<void>(
+        builder: (_) => const MesStagesPage(
+          filtreSuiviInitial: 'Validés',
+          depuisProfil: true,
+        ),
+      ),
+    );
+  }
+
+  void _ouvrirDocumentsOfficiels() {
+    Navigator.of(context, rootNavigator: true).push(
+      MaterialPageRoute<void>(builder: (_) => const DocumentsOfficielsPage()),
     );
   }
 
@@ -654,6 +680,13 @@ class _ProfilePageState extends State<ProfilePage> {
                                             const NotesAcademiquesPage(),
                                       ),
                                     ),
+                              ),
+                              Divider(height: 1, color: separateurCouleur),
+                              _ItemMenu(
+                                icone: Icons.workspace_premium_outlined,
+                                titre: 'Attestations et certificats',
+                                couleurTexte: texteCouleur,
+                                onTap: _ouvrirDocumentsOfficiels,
                               ),
                             ],
                           ),

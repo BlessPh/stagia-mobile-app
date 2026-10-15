@@ -64,7 +64,7 @@ class _ConnexionPageState extends State<ConnexionPage> {
       if (!mounted) return;
       setState(() {
         final message = _messageErreurConnexion(erreur);
-        if (_erreurReseau(erreur)) {
+        if (_erreurReseau(erreur) || erreur.code == 'HTTP_429') {
           _erreurGenerale = message;
         } else if (_erreurConcerneIdentifiant(erreur)) {
           _erreurIdentifiant = message;
@@ -545,6 +545,13 @@ class _ConnexionPageState extends State<ConnexionPage> {
   }.contains(erreur.code);
 
   static String _messageErreurConnexion(ErreurApi erreur) {
+    if (erreur.code == 'HTTP_429') {
+      final delai = int.tryParse(erreur.retryAfter ?? '');
+      if (delai != null && delai > 0) {
+        return 'Trop de tentatives. Réessayez dans $delai seconde${delai > 1 ? 's' : ''}.';
+      }
+      return 'Trop de tentatives. Veuillez patienter avant de réessayer.';
+    }
     if (erreur.code == 'DELAI_DEPASSE') {
       return 'Vérifiez votre connexion internet.';
     }

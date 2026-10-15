@@ -49,12 +49,19 @@ class SuiviCandidatureStage {
     final campagneApi = _map(json['campaign']);
     final hopital = _map(json['hospital']);
     final reservation = _map(json['reservation']);
+    final application = _map(json['application']);
     final statut = json['workflow_status']?.toString().toUpperCase() ?? '';
     final debut = campagneApi['start_date']?.toString() ?? '';
     final fin = campagneApi['end_date']?.toString() ?? '';
-    final code = (campagneApi['code'] ?? json['campaign_code'])?.toString() ?? '';
-    final nomHopital = (hopital['name'] ?? json['hospital_name'])?.toString() ?? '';
-    final messageApi = (json['workflow_message'] ?? _map(json['workflow'])['message'])?.toString().trim() ?? '';
+    final code =
+        (campagneApi['code'] ?? json['campaign_code'])?.toString() ?? '';
+    final nomHopital =
+        (hopital['name'] ?? json['hospital_name'])?.toString() ?? '';
+    final messageApi =
+        (json['workflow_message'] ?? _map(json['workflow'])['message'])
+            ?.toString()
+            .trim() ??
+        '';
     final actions = _map(json['actions']);
     final cancelAction = _map(actions['cancel']);
 
@@ -66,7 +73,9 @@ class SuiviCandidatureStage {
       campagne: CampagneStage(
         id: code,
         code: code,
-        titre: (campagneApi['title'] ?? json['campaign_title'])?.toString() ?? 'Candidature de stage',
+        titre:
+            (campagneApi['title'] ?? json['campaign_title'])?.toString() ??
+            'Candidature de stage',
         sousTitre: nomHopital,
         dateDebut: debut,
         dateFin: fin,
@@ -90,18 +99,23 @@ class SuiviCandidatureStage {
           : 'Votre candidature est en cours de traitement.',
       nomHopital: nomHopital,
       estTermine: statutsTermines.contains(statut),
-      reservationUuid: (reservation['uuid'] ?? json['reservation_uuid'])?.toString(),
-      reservationStatus: (reservation['status'] ?? json['reservation_status'])?.toString(),
-      applicationStatus: json['application_status']?.toString(),
+      reservationUuid: (reservation['uuid'] ?? json['reservation_uuid'])
+          ?.toString(),
+      reservationStatus: (reservation['status'] ?? json['reservation_status'])
+          ?.toString(),
+      applicationStatus: (application['status'] ?? json['application_status'])
+          ?.toString(),
       canCancel: cancelAction['allowed'] == true,
       cancelEndpoint: cancelAction['endpoint']?.toString(),
       placementExists: placement['exists'] == true,
       placementStatus: placement['status']?.toString(),
       admissionExists: admission['exists'] == true,
-      admissionUuid: admission['uuid']?.toString() ?? json['admission_uuid']?.toString(),
+      admissionUuid:
+          admission['uuid']?.toString() ?? json['admission_uuid']?.toString(),
       admissionStatus: admission['status']?.toString(),
       assignmentExists: assignment['exists'] == true,
-      assignmentUuid: assignment['uuid']?.toString() ?? json['assignment_uuid']?.toString(),
+      assignmentUuid:
+          assignment['uuid']?.toString() ?? json['assignment_uuid']?.toString(),
       assignmentStatus: assignment['status']?.toString(),
       workflowMessage: messageApi,
     );
@@ -126,23 +140,25 @@ class SuiviCandidatureStage {
                 json['entreprise'])
             ?.toString() ??
         '';
-    final message = (json['workflow_message'] ??
-            _map(json['workflow'])['message'])
-        ?.toString()
-        .trim() ??
+    final message =
+        (json['workflow_message'] ?? _map(json['workflow'])['message'])
+            ?.toString()
+            .trim() ??
         '';
     final libelle = libellePour(statut);
-    final resUuid = (json['reservation_uuid'] ??
-            _map(json['reservation'])['uuid'] ??
-            json['uuid'])
-        ?.toString();
-    final resStatus = (json['reservation_status'] ??
-            _map(json['reservation'])['status'])
-        ?.toString();
-    final appStatus = (json['application_status'] ??
-            _map(json['application'])['status'] ??
-            json['statut'])
-        ?.toString();
+    final resUuid =
+        (json['reservation_uuid'] ??
+                _map(json['reservation'])['uuid'] ??
+                json['uuid'])
+            ?.toString();
+    final resStatus =
+        (json['reservation_status'] ?? _map(json['reservation'])['status'])
+            ?.toString();
+    final appStatus =
+        (json['application_status'] ??
+                _map(json['application'])['status'] ??
+                json['statut'])
+            ?.toString();
     final actions = _map(json['actions']);
     final cancelAction = _map(actions['cancel']);
     final placement = _map(json['placement']);
@@ -161,18 +177,25 @@ class SuiviCandidatureStage {
       reservationUuid: resUuid,
       reservationStatus: resStatus,
       applicationStatus: appStatus,
-      canCancel: cancelAction['allowed'] == true ||
+      canCancel:
+          cancelAction['allowed'] == true ||
           (resStatus == 'RESERVEE_TEMPORAIREMENT' &&
               statut == 'DECISION_UNIVERSITAIRE_EN_ATTENTE'),
       cancelEndpoint: cancelAction['endpoint']?.toString(),
       placementExists: placement['exists'] == true || json['placement'] != null,
       placementStatus: placement['status']?.toString(),
-      admissionExists: admission['exists'] == true || json['admission_uuid'] != null,
-      admissionUuid: admission['uuid']?.toString() ?? json['admission_uuid']?.toString(),
+      admissionExists:
+          admission['exists'] == true || json['admission_uuid'] != null,
+      admissionUuid:
+          admission['uuid']?.toString() ?? json['admission_uuid']?.toString(),
       admissionStatus: admission['status']?.toString(),
-      assignmentExists: assignment['exists'] == true || json['assignment_uuid'] != null,
-      assignmentUuid: assignment['uuid']?.toString() ?? json['assignment_uuid']?.toString(),
-      assignmentStatus: assignment['status']?.toString() ?? json['assignment_status']?.toString(),
+      assignmentExists:
+          assignment['exists'] == true || json['assignment_uuid'] != null,
+      assignmentUuid:
+          assignment['uuid']?.toString() ?? json['assignment_uuid']?.toString(),
+      assignmentStatus:
+          assignment['status']?.toString() ??
+          json['assignment_status']?.toString(),
       workflowMessage: message,
     );
   }

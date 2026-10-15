@@ -89,32 +89,80 @@ class _SaisirJournalPageState extends State<SaisirJournalPage> {
   void _ajouterActiviteDialog() {
     String? typeSelectionne;
     final titreCtrl = TextEditingController();
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
+    final fondCarte = modeSombre ? const Color(0xFF1E293B) : Colors.white;
+    final textePrincipal = modeSombre ? Colors.white : const Color(0xFF0F172A);
+    final texteSecondaire = modeSombre
+        ? const Color(0xFF94A3B8)
+        : const Color(0xFF64748B);
+    final bordure = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFE2E8F0);
 
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: fondCarte,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: bordure),
+        ),
         title: Text(
           'Ajouter une activité',
-          style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 17),
+          style: GoogleFonts.inter(
+            fontWeight: FontWeight.w800,
+            fontSize: 17,
+            color: textePrincipal,
+          ),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             DropdownButtonFormField<String>(
               initialValue: null,
+              dropdownColor: fondCarte,
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                color: textePrincipal,
+              ),
               items: [
                 'RÉALISATION',
                 'OBSERVATION',
                 'ASSISTANCE',
-              ].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+              ].map((e) => DropdownMenuItem(
+                value: e,
+                child: Text(e, style: TextStyle(color: textePrincipal)),
+              )).toList(),
               onChanged: (v) => typeSelectionne = v,
-              decoration: const InputDecoration(labelText: 'Type'),
+              decoration: InputDecoration(
+                labelText: 'Type',
+                labelStyle: GoogleFonts.inter(color: texteSecondaire),
+                enabledBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: bordure),
+                ),
+                focusedBorder: const UnderlineInputBorder(
+                  borderSide: BorderSide(color: Color(0xFF1D61F2)),
+                ),
+              ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: titreCtrl,
-              decoration: const InputDecoration(
+              cursorColor: const Color(0xFF1D61F2),
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                color: textePrincipal,
+              ),
+              decoration: InputDecoration(
                 labelText: 'Intitulé de l\'activité',
+                labelStyle: GoogleFonts.inter(color: texteSecondaire),
+                enabledBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: bordure),
+                ),
+                focusedBorder: const UnderlineInputBorder(
+                  borderSide: BorderSide(color: Color(0xFF1D61F2)),
+                ),
               ),
             ),
           ],
@@ -122,9 +170,15 @@ class _SaisirJournalPageState extends State<SaisirJournalPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Annuler'),
+            child: Text(
+              'Annuler',
+              style: GoogleFonts.inter(color: texteSecondaire),
+            ),
           ),
           FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF1D61F2),
+            ),
             onPressed: () {
               if (typeSelectionne != null && titreCtrl.text.trim().isNotEmpty) {
                 setState(() {
@@ -397,11 +451,17 @@ class _SaisirJournalPageState extends State<SaisirJournalPage> {
                 controller: _apprentissageController,
                 readOnly: _saisieVerrouillee,
                 maxLines: 3,
+                cursorColor: const Color(0xFF1D61F2),
                 style: GoogleFonts.inter(fontSize: 13.5, color: textePrincipal),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   border: InputBorder.none,
                   isDense: true,
                   contentPadding: EdgeInsets.zero,
+                  hintText: 'Décrivez ce que vous avez appris aujourd\'hui...',
+                  hintStyle: GoogleFonts.inter(
+                    fontSize: 13.5,
+                    color: texteSecondaire,
+                  ),
                 ),
               ),
             ),
@@ -429,11 +489,17 @@ class _SaisirJournalPageState extends State<SaisirJournalPage> {
                 controller: _difficultesController,
                 readOnly: _saisieVerrouillee,
                 maxLines: 3,
+                cursorColor: const Color(0xFF1D61F2),
                 style: GoogleFonts.inter(fontSize: 13.5, color: textePrincipal),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   border: InputBorder.none,
                   isDense: true,
                   contentPadding: EdgeInsets.zero,
+                  hintText: 'Difficultés ou obstacles rencontrés...',
+                  hintStyle: GoogleFonts.inter(
+                    fontSize: 13.5,
+                    color: texteSecondaire,
+                  ),
                 ),
               ),
             ),

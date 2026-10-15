@@ -33,7 +33,9 @@ class _MesPaiementsPageState extends State<MesPaiementsPage> {
   @override
   Widget build(BuildContext context) {
     final modeSombre = Theme.of(context).brightness == Brightness.dark;
-    final fondPage = modeSombre ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final fondPage = modeSombre
+        ? const Color(0xFF0F172A)
+        : const Color(0xFFF8FAFC);
     final texteCouleur = modeSombre ? Colors.white : const Color(0xFF0F172A);
 
     return Scaffold(
@@ -83,20 +85,17 @@ class _MesPaiementsPageState extends State<MesPaiementsPage> {
                 .map(Map<String, dynamic>.from)
                 .toList();
 
-            final itemsRaw = (data['items'] as List? ?? [])
-                .whereType<Map>()
-                .map(Map<String, dynamic>.from)
-                .toList();
-
             final stats = data['obligation_stats'] is Map
                 ? Map<String, dynamic>.from(data['obligation_stats'] as Map)
                 : (data['stats'] is Map
-                    ? Map<String, dynamic>.from(data['stats'] as Map)
-                    : null);
+                      ? Map<String, dynamic>.from(data['stats'] as Map)
+                      : null);
 
-            final totalAPayer = stats?['payable'] ??
+            final totalAPayer =
+                stats?['payable'] ??
                 obligationsRaw.where((o) => o['payable'] == true).length;
-            final totalPayes = stats?['paid'] ??
+            final totalPayes =
+                stats?['paid'] ??
                 obligationsRaw.where((o) => o['status'] == 'PAID').length;
 
             final obligationsFiltrees = obligationsRaw.where((obl) {
@@ -120,31 +119,31 @@ class _MesPaiementsPageState extends State<MesPaiementsPage> {
                 ),
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
                 children: [
-                  // Carte de synthèse financière
-                  _buildCarteSynthese(
-                    modeSombre: modeSombre,
-                    totalAPayer: totalAPayer,
-                    totalPayes: totalPayes,
-                    obligations: obligationsRaw,
-                  ),
-
-                  const SizedBox(height: 18),
-
-                  // Sélecteur de filtres
-                  Row(
-                    children: [
-                      _buildChipFiltre('Tous', modeSombre),
-                      const SizedBox(width: 8),
-                      _buildChipFiltre('À payer', modeSombre),
-                      const SizedBox(width: 8),
-                      _buildChipFiltre('Payés', modeSombre),
-                    ],
-                  ),
-
-                  const SizedBox(height: 18),
-
-                  if (obligationsFiltrees.isEmpty && itemsRaw.isEmpty)
+                  if (obligationsRaw.isNotEmpty) ...[
+                    // Carte de synthèse financière
+                    _buildCarteSynthese(
+                      modeSombre: modeSombre,
+                      totalAPayer: totalAPayer,
+                      totalPayes: totalPayes,
+                      obligations: obligationsRaw,
+                    ),
+                    const SizedBox(height: 18),
+                    // Sélecteur de filtres
+                    Row(
+                      children: [
+                        _buildChipFiltre('Tous', modeSombre),
+                        const SizedBox(width: 8),
+                        _buildChipFiltre('À payer', modeSombre),
+                        const SizedBox(width: 8),
+                        _buildChipFiltre('Payés', modeSombre),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                  ],
+                  if (obligationsRaw.isEmpty)
                     _buildEtatVide(modeSombre)
+                  else if (obligationsFiltrees.isEmpty)
+                    _buildEtatFiltreVide(modeSombre)
                   else ...[
                     // Liste des obligations financières
                     ...obligationsFiltrees.map((obl) {
@@ -154,13 +153,11 @@ class _MesPaiementsPageState extends State<MesPaiementsPage> {
                           obligation: obl,
                           modeSombre: modeSombre,
                           onTap: () async {
-                            final uuid = obl['uuid']?.toString() ?? '';
+                            final uuid = obl['uuid'].toString();
                             await Navigator.of(context).push(
                               MaterialPageRoute<void>(
-                                builder: (_) => ApercuFacturePage(
-                                  obligationUuid: uuid,
-                                  obligationInitiale: obl,
-                                ),
+                                builder: (_) =>
+                                    ApercuFacturePage(obligationUuid: uuid),
                               ),
                             );
                             if (mounted) {
@@ -184,7 +181,9 @@ class _MesPaiementsPageState extends State<MesPaiementsPage> {
     final actif = _filtreActuel == titre;
     final fondActif = const Color(0xFFFF751F);
     final fondInactif = modeSombre ? const Color(0xFF1E293B) : Colors.white;
-    final texteInactif = modeSombre ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final texteInactif = modeSombre
+        ? const Color(0xFF94A3B8)
+        : const Color(0xFF64748B);
 
     return InkWell(
       onTap: () => setState(() => _filtreActuel = titre),
@@ -197,7 +196,9 @@ class _MesPaiementsPageState extends State<MesPaiementsPage> {
           border: Border.all(
             color: actif
                 ? Colors.transparent
-                : (modeSombre ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                : (modeSombre
+                      ? const Color(0xFF334155)
+                      : const Color(0xFFE2E8F0)),
           ),
         ),
         child: Text(
@@ -218,14 +219,25 @@ class _MesPaiementsPageState extends State<MesPaiementsPage> {
     required dynamic totalPayes,
     required List<Map<String, dynamic>> obligations,
   }) {
-    num totalMontantRestant = 0;
-    String devise = 'USD';
+    final montantsParDevise = <String, num>{};
     for (final o in obligations) {
       if (o['payable'] == true || o['status'] == 'PENDING') {
-        totalMontantRestant += (o['amount_remaining'] as num? ?? o['amount'] as num? ?? 0);
-        if (o['currency'] != null) devise = o['currency'].toString();
+        final montant = o['amount_remaining'] as num? ?? o['amount'] as num?;
+        final devise = o['currency']?.toString().trim();
+        if (montant != null && devise != null && devise.isNotEmpty) {
+          montantsParDevise.update(
+            devise,
+            (total) => total + montant,
+            ifAbsent: () => montant,
+          );
+        }
       }
     }
+    final solde = montantsParDevise.isEmpty
+        ? '—'
+        : montantsParDevise.entries
+              .map((entree) => '${entree.value} ${entree.key}')
+              .join(' · ');
 
     return Container(
       width: double.infinity,
@@ -260,7 +272,10 @@ class _MesPaiementsPageState extends State<MesPaiementsPage> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(10),
@@ -278,7 +293,7 @@ class _MesPaiementsPageState extends State<MesPaiementsPage> {
           ),
           const SizedBox(height: 10),
           Text(
-            '$totalMontantRestant $devise',
+            solde,
             style: GoogleFonts.inter(
               fontSize: 28,
               fontWeight: FontWeight.w900,
@@ -331,13 +346,17 @@ class _MesPaiementsPageState extends State<MesPaiementsPage> {
               width: 68,
               height: 68,
               decoration: BoxDecoration(
-                color: modeSombre ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                color: modeSombre
+                    ? const Color(0xFF1E293B)
+                    : const Color(0xFFF1F5F9),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.payments_outlined,
                 size: 32,
-                color: modeSombre ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                color: modeSombre
+                    ? const Color(0xFF64748B)
+                    : const Color(0xFF94A3B8),
               ),
             ),
             const SizedBox(height: 16),
@@ -356,10 +375,27 @@ class _MesPaiementsPageState extends State<MesPaiementsPage> {
               style: GoogleFonts.inter(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
-                color: modeSombre ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                color: modeSombre
+                    ? const Color(0xFF94A3B8)
+                    : const Color(0xFF64748B),
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEtatFiltreVide(bool modeSombre) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 36),
+      child: Text(
+        'Aucune obligation ne correspond à ce filtre.',
+        textAlign: TextAlign.center,
+        style: GoogleFonts.inter(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: modeSombre ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
         ),
       ),
     );
@@ -381,30 +417,51 @@ class _CarteObligationItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final status = (obligation['status'] ?? '').toString().toUpperCase();
     final payable = obligation['payable'] == true;
-    final montant = obligation['amount'] ?? 0;
+    final montant = obligation['amount'];
     final montantRestant = obligation['amount_remaining'] ?? montant;
-    final devise = obligation['currency'] ?? 'USD';
-    final reference = obligation['reference'] ?? 'OBL-STAGE';
-    final label = obligation['label'] ?? 'Frais de réservation de stage';
+    final devise = obligation['currency']?.toString() ?? '';
+    final reference = obligation['reference']?.toString() ?? '—';
+    final label = obligation['label']?.toString() ?? 'Obligation financière';
 
-    final contextData = obligation['context'] is Map ? obligation['context'] as Map : null;
-    final hospital = contextData?['hospital'] is Map ? contextData!['hospital'] as Map : null;
-    final nomHopital = hospital?['name']?.toString() ?? 'Hôpital';
+    final contextData = obligation['context'] is Map
+        ? obligation['context'] as Map
+        : null;
+    final hospital = contextData?['hospital'] is Map
+        ? contextData!['hospital'] as Map
+        : null;
+    final nomHopital = hospital?['name']?.toString();
 
     final estPaye = status == 'PAID';
     final estEnAttente = payable || status == 'PENDING';
+    final estErreur = const {'FAILED', 'CANCELLED', 'EXPIRED'}.contains(status);
 
     final couleurBadge = estPaye
         ? (modeSombre ? const Color(0xFF4ADE80) : const Color(0xFF16A34A))
+        : estErreur
+        ? (modeSombre ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626))
         : (modeSombre ? const Color(0xFFFDBA74) : const Color(0xFFEA580C));
 
     final fondBadge = estPaye
-        ? (modeSombre ? const Color(0xFF064E3B).withValues(alpha: 0.35) : const Color(0xFFDCFCE7))
-        : (modeSombre ? const Color(0xFF7C2D12).withValues(alpha: 0.35) : const Color(0xFFFFEDD5));
+        ? (modeSombre
+              ? const Color(0xFF064E3B).withValues(alpha: 0.35)
+              : const Color(0xFFDCFCE7))
+        : estErreur
+        ? (modeSombre
+              ? const Color(0xFF7F1D1D).withValues(alpha: 0.35)
+              : const Color(0xFFFEE2E2))
+        : (modeSombre
+              ? const Color(0xFF7C2D12).withValues(alpha: 0.35)
+              : const Color(0xFFFFEDD5));
 
     final libelleBadge = estPaye
         ? 'Réglé'
-        : (obligation['payment_pending'] == true ? 'En cours' : 'À payer');
+        : switch (status) {
+            'FAILED' => 'Échec',
+            'CANCELLED' => 'Annulé',
+            'EXPIRED' => 'Expiré',
+            'PARTIALLY_PAID' => 'Partiel',
+            _ => obligation['payment_pending'] == true ? 'En cours' : 'À payer',
+          };
 
     return Container(
       decoration: BoxDecoration(
@@ -415,7 +472,9 @@ class _CarteObligationItem extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: modeSombre ? Colors.black.withValues(alpha: 0.15) : const Color(0x06000000),
+            color: modeSombre
+                ? Colors.black.withValues(alpha: 0.15)
+                : const Color(0x06000000),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -436,9 +495,14 @@ class _CarteObligationItem extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 9,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
-                        color: modeSombre ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                        color: modeSombre
+                            ? const Color(0xFF334155)
+                            : const Color(0xFFF1F5F9),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -446,12 +510,17 @@ class _CarteObligationItem extends StatelessWidget {
                         style: GoogleFonts.inter(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w700,
-                          color: modeSombre ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                          color: modeSombre
+                              ? const Color(0xFFCBD5E1)
+                              : const Color(0xFF475569),
                         ),
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: fondBadge,
                         borderRadius: BorderRadius.circular(12),
@@ -477,18 +546,23 @@ class _CarteObligationItem extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 3),
-                Text(
-                  nomHopital,
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: modeSombre ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                if (nomHopital != null && nomHopital.isNotEmpty)
+                  Text(
+                    nomHopital,
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: modeSombre
+                          ? const Color(0xFF94A3B8)
+                          : const Color(0xFF64748B),
+                    ),
                   ),
-                ),
                 const SizedBox(height: 12),
                 Divider(
                   height: 1,
-                  color: modeSombre ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                  color: modeSombre
+                      ? const Color(0xFF334155)
+                      : const Color(0xFFF1F5F9),
                 ),
                 const SizedBox(height: 12),
                 Row(
@@ -507,12 +581,14 @@ class _CarteObligationItem extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          estPaye ? '$montant $devise' : '$montantRestant $devise',
+                          '${estPaye ? montant ?? '—' : montantRestant ?? '—'}${devise.isEmpty ? '' : ' $devise'}',
                           style: GoogleFonts.inter(
                             fontSize: 16,
                             fontWeight: FontWeight.w900,
                             color: estPaye
-                                ? (modeSombre ? const Color(0xFF4ADE80) : const Color(0xFF16A34A))
+                                ? (modeSombre
+                                      ? const Color(0xFF4ADE80)
+                                      : const Color(0xFF16A34A))
                                 : const Color(0xFFFF751F),
                           ),
                         ),
