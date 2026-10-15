@@ -454,7 +454,11 @@ class _SaisirJournalPageState extends State<SaisirJournalPage> {
                 cursorColor: const Color(0xFF1D61F2),
                 style: GoogleFonts.inter(fontSize: 13.5, color: textePrincipal),
                 decoration: InputDecoration(
+                  filled: true,
+                  fillColor: fondCarte,
                   border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
                   isDense: true,
                   contentPadding: EdgeInsets.zero,
                   hintText: 'Décrivez ce que vous avez appris aujourd\'hui...',
@@ -492,7 +496,11 @@ class _SaisirJournalPageState extends State<SaisirJournalPage> {
                 cursorColor: const Color(0xFF1D61F2),
                 style: GoogleFonts.inter(fontSize: 13.5, color: textePrincipal),
                 decoration: InputDecoration(
+                  filled: true,
+                  fillColor: fondCarte,
                   border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
                   isDense: true,
                   contentPadding: EdgeInsets.zero,
                   hintText: 'Difficultés ou obstacles rencontrés...',

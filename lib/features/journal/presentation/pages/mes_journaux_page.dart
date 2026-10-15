@@ -511,12 +511,12 @@ class _MesJournauxPageState extends State<MesJournauxPage> {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: modeSombre
-                        ? const Color(0xFF7C2D12).withValues(alpha: 0.35)
+                        ? const Color(0xFF431407)
                         : const Color(0xFFFFF7ED),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: modeSombre
-                          ? const Color(0xFF9A3412).withValues(alpha: 0.5)
+                          ? const Color(0xFFEA580C).withValues(alpha: 0.4)
                           : const Color(0xFFFFEDD5),
                     ),
                   ),
