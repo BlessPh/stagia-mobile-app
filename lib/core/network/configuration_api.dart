@@ -16,4 +16,9 @@ abstract final class ConfigurationApi {
   );
 
   static const dureeExpiration = Duration(seconds: 30);
+
+  static const urlBibliotheque = String.fromEnvironment(
+    'BIBLIOTHEQUE_URL',
+    defaultValue: 'https://stagia-biblitheque.net',
+  );
 }
