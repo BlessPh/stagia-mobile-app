@@ -20,7 +20,6 @@ import '../../domain/entities/suivi_candidature_stage.dart';
 import '../routes/routes_stage.dart';
 import 'detail_campagne_page.dart';
 import 'justification_stage_page.dart';
-import 'mon_stage_page.dart';
 import '../widgets/barre_recherche_stages.dart';
 import '../widgets/carte_candidature_moderne.dart';
 import '../widgets/carte_stage_explorer.dart';
@@ -866,13 +865,10 @@ class _MesStagesPageState extends State<MesStagesPage> {
             totalJours: totalJours,
             rotationsEffectuees: rotationsEffectuees,
             totalRotations: totalRotations,
-            onOuvrirMonStage: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => MonStagePage(
-                  assignmentReference: stage['assignment_uuid']?.toString(),
-                ),
-              ),
-            ),
+            onOuvrirMonStage: () {
+              SuiviStageService.ouvrirOngletJournal(3);
+              SuiviStageService.naviguerVersIndex(2);
+            },
             modeSombre: modeSombre,
             couleurCarte: couleurCarte,
             couleurBordure: couleurBordure,
@@ -1178,12 +1174,12 @@ class _MesStagesPageState extends State<MesStagesPage> {
             child: OutlinedButton.icon(
               onPressed: onOuvrirMonStage,
               icon: const Icon(
-                Icons.assignment_outlined,
+                Iconsax.book,
                 size: 17,
                 color: Color(0xFF1D61F2),
               ),
               label: Text(
-                'Consulter le dossier du stage',
+                'Consulter mon journal',
                 style: GoogleFonts.inter(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,

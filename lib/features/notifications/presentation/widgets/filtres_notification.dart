@@ -76,8 +76,8 @@ class _PuceFiltre extends StatelessWidget {
     final modeSombre = Theme.of(context).brightness == Brightness.dark;
 
     final fond = selectionne
-        ? const Color(0xFFFF7417)
-        : (modeSombre ? const Color(0xFF202020) : Colors.white);
+        ? const Color(0xFFFF751F)
+        : (modeSombre ? const Color(0xFF1E293B) : Colors.white);
 
     final texteCouleur = selectionne
         ? Colors.white
@@ -102,7 +102,7 @@ class _PuceFiltre extends StatelessWidget {
             boxShadow: selectionne
                 ? [
                     BoxShadow(
-                      color: const Color(0xFFFF7417).withValues(alpha: 0.25),
+                      color: const Color(0xFFFF751F).withValues(alpha: 0.25),
                       blurRadius: 8,
                       offset: const Offset(0, 3),
                     ),

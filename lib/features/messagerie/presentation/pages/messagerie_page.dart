@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:iconsax/iconsax.dart';
 import '../../../../core/widgets/contenu_adaptatif.dart';
 import '../../../../core/network/client_api_http.dart';
 import '../../../../core/network/source_etudiant_distante.dart';
@@ -115,22 +116,26 @@ class _MessageriePageState extends State<MessageriePage>
     ).then((_) => _chargerConversations());
   }
 
-
   @override
   Widget build(BuildContext context) {
     final modeSombre = Theme.of(context).brightness == Brightness.dark;
+    final fondPage = modeSombre ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final texteCouleur = modeSombre ? Colors.white : const Color(0xFF0F172A);
+    final iconeCouleur = modeSombre ? const Color(0xFFCBD5E1) : const Color(0xFF475569);
+    final bordureSeparateur = modeSombre ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: fondPage,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        backgroundColor: fondPage,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
+          tooltip: 'Retour',
           icon: Icon(
             Icons.arrow_back_ios_new_rounded,
             size: 20,
-            color: modeSombre ? Colors.white : const Color(0xFF0F172A),
+            color: iconeCouleur,
           ),
           onPressed: () => Navigator.pop(context),
         ),
@@ -141,7 +146,7 @@ class _MessageriePageState extends State<MessageriePage>
               style: GoogleFonts.inter(
                 fontSize: 20,
                 fontWeight: FontWeight.w900,
-                color: modeSombre ? Colors.white : const Color(0xFF0F172A),
+                color: texteCouleur,
                 letterSpacing: -0.4,
               ),
             ),
@@ -150,7 +155,7 @@ class _MessageriePageState extends State<MessageriePage>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFF7417),
+                  color: const Color(0xFFFF751F),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -168,16 +173,20 @@ class _MessageriePageState extends State<MessageriePage>
         actions: [
           IconButton(
             tooltip: 'Nouvelle discussion',
-            icon: const Icon(
-              Icons.edit_square,
+            icon: Icon(
+              Iconsax.edit,
               size: 22,
-              color: Color(0xFF1D61F2),
+              color: iconeCouleur,
             ),
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Annuaire médical des encadreurs ouvert.'),
-                  duration: Duration(seconds: 2),
+                SnackBar(
+                  backgroundColor: modeSombre ? const Color(0xFF1E293B) : const Color(0xFF0F172A),
+                  content: Text(
+                    'Annuaire médical des encadreurs ouvert.',
+                    style: GoogleFonts.inter(color: Colors.white),
+                  ),
+                  duration: const Duration(seconds: 2),
                 ),
               );
             },
@@ -203,10 +212,10 @@ class _MessageriePageState extends State<MessageriePage>
                 controller: _tabController,
                 isScrollable: true,
                 tabAlignment: TabAlignment.start,
-                indicatorColor: const Color(0xFFFF7417),
+                indicatorColor: const Color(0xFFFF751F),
                 indicatorWeight: 3,
                 indicatorSize: TabBarIndicatorSize.label,
-                labelColor: const Color(0xFFFF7417),
+                labelColor: const Color(0xFFFF751F),
                 unselectedLabelColor: const Color(0xFF64748B),
                 labelStyle: GoogleFonts.inter(
                   fontSize: 13.5,
@@ -237,12 +246,12 @@ class _MessageriePageState extends State<MessageriePage>
 
             if (_chargement) {
               return const Center(
-                child: CircularProgressIndicator(color: Color(0xFFFF7417)),
+                child: CircularProgressIndicator(color: Color(0xFFFF751F)),
               );
             }
 
             return RefreshIndicator(
-              color: const Color(0xFFFF7417),
+              color: const Color(0xFFFF751F),
               onRefresh: _chargerConversations,
               child: liste.isEmpty
                   ? ListView(
@@ -256,12 +265,14 @@ class _MessageriePageState extends State<MessageriePage>
                                 width: 68,
                                 height: 68,
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF1D61F2).withValues(alpha: 0.1),
+                                  color: modeSombre
+                                      ? const Color(0xFF1E293B)
+                                      : const Color(0xFFFF751F).withValues(alpha: 0.1),
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(
-                                  Icons.chat_bubble_outline_rounded,
-                                  color: Color(0xFF1D61F2),
+                                child: Icon(
+                                  Iconsax.message_text,
+                                  color: iconeCouleur,
                                   size: 32,
                                 ),
                               ),
@@ -289,9 +300,7 @@ class _MessageriePageState extends State<MessageriePage>
                         height: 1,
                         indent: 78,
                         endIndent: 16,
-                        color: modeSombre
-                            ? const Color(0xFF262626)
-                            : const Color(0xFFF1F5F9),
+                        color: bordureSeparateur,
                       ),
                       itemBuilder: (context, index) {
                         final discussion = liste[index];
@@ -305,7 +314,6 @@ class _MessageriePageState extends State<MessageriePage>
           }),
         ),
       ),
-
     );
   }
 }

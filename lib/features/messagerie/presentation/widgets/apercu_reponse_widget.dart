@@ -18,23 +18,24 @@ class ApercuReponseWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
     final couleurBarre = estMien && estDansBulle
         ? Colors.white
-        : const Color(0xFF1D61F2);
+        : const Color(0xFFFF751F);
 
     final fond = estDansBulle
         ? (estMien
             ? Colors.white.withValues(alpha: 0.18)
-            : const Color(0xFFE2E8F0).withValues(alpha: 0.6))
-        : const Color(0xFFF1F5F9);
+            : (modeSombre ? const Color(0xFF0F172A) : const Color(0xFFE2E8F0).withValues(alpha: 0.6)))
+        : (modeSombre ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9));
 
     final couleurAuteur = estDansBulle
-        ? (estMien ? Colors.white : const Color(0xFF1D61F2))
-        : const Color(0xFF1D61F2);
+        ? (estMien ? Colors.white : (modeSombre ? const Color(0xFFCBD5E1) : const Color(0xFF1D61F2)))
+        : (modeSombre ? const Color(0xFFCBD5E1) : const Color(0xFF1D61F2));
 
     final couleurTexte = estDansBulle
-        ? (estMien ? Colors.white.withValues(alpha: 0.85) : const Color(0xFF475569))
-        : const Color(0xFF475569);
+        ? (estMien ? Colors.white.withValues(alpha: 0.85) : (modeSombre ? const Color(0xFF94A3B8) : const Color(0xFF475569)))
+        : (modeSombre ? const Color(0xFF94A3B8) : const Color(0xFF475569));
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),

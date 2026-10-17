@@ -97,7 +97,7 @@ class ElementDiscussion extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.inter(
                         fontSize: 12,
-                        color: const Color(0xFF64748B),
+                        color: modeSombre ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -128,7 +128,9 @@ class ElementDiscussion extends StatelessWidget {
                                   ? (modeSombre
                                       ? Colors.white
                                       : const Color(0xFF1E293B))
-                                  : const Color(0xFF64748B),
+                                  : (modeSombre
+                                      ? const Color(0xFF94A3B8)
+                                      : const Color(0xFF64748B)),
                             ),
                           ),
                         ),

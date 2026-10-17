@@ -1125,11 +1125,17 @@ class _ItemInformation extends StatelessWidget {
             height: 38,
             decoration: BoxDecoration(
               color: modeSombre
-                  ? const Color(0xFF2563EB).withValues(alpha: 0.2)
+                  ? const Color(0xFF334155)
                   : const Color(0xFFEFF6FF),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icone, color: const Color(0xFF2563EB), size: 20),
+            child: Icon(
+              icone,
+              color: modeSombre
+                  ? const Color(0xFFCBD5E1)
+                  : const Color(0xFF2563EB),
+              size: 20,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -1220,8 +1226,10 @@ class _SectionConsignes extends StatelessWidget {
                       margin: const EdgeInsets.only(top: 6, right: 10),
                       width: 5,
                       height: 5,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF2563EB),
+                      decoration: BoxDecoration(
+                        color: modeSombre
+                            ? const Color(0xFFCBD5E1)
+                            : const Color(0xFF2563EB),
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -1404,10 +1412,12 @@ class _SectionHopitauxRetenus extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.location_on_outlined,
                       size: 16,
-                      color: Color(0xFF2563EB),
+                      color: modeSombre
+                          ? const Color(0xFFCBD5E1)
+                          : const Color(0xFF2563EB),
                     ),
                     const SizedBox(width: 4),
                     Text(
@@ -1415,7 +1425,9 @@ class _SectionHopitauxRetenus extends StatelessWidget {
                       style: GoogleFonts.inter(
                         fontSize: 13.5,
                         fontWeight: FontWeight.w700,
-                        color: const Color(0xFF2563EB),
+                        color: modeSombre
+                            ? const Color(0xFFCBD5E1)
+                            : const Color(0xFF2563EB),
                       ),
                     ),
                   ],
@@ -1461,14 +1473,16 @@ class _SectionHopitauxRetenus extends StatelessWidget {
                         height: 42,
                         decoration: BoxDecoration(
                           color: modeSombre
-                              ? const Color(0xFF2563EB).withValues(alpha: 0.2)
+                              ? const Color(0xFF334155)
                               : const Color(0xFFEFF6FF),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Center(
+                        child: Center(
                           child: FaIcon(
                             FontAwesomeIcons.hospital,
-                            color: Color(0xFF2563EB),
+                            color: modeSombre
+                                ? const Color(0xFFCBD5E1)
+                                : const Color(0xFF2563EB),
                             size: 18,
                           ),
                         ),

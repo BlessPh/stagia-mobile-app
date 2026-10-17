@@ -24,6 +24,15 @@ class StatutLectureIcone extends StatelessWidget {
         : const Color(0xFF94A3B8);
 
     switch (statut) {
+      case StatutMessage.enCours:
+        return SizedBox(
+          width: taille - 2,
+          height: taille - 2,
+          child: CircularProgressIndicator(
+            strokeWidth: 1.5,
+            color: couleurAttente,
+          ),
+        );
       case StatutMessage.envoye:
         return Icon(
           Icons.check_rounded,

@@ -5,7 +5,6 @@ import '../pages/candidatures_stage_page.dart';
 import '../pages/detail_campagne_page.dart';
 import '../pages/hopitaux_disponibles_page.dart';
 import '../pages/mes_stages_page.dart';
-import '../pages/mon_stage_page.dart';
 import '../pages/parcours_candidature_page.dart';
 import '../pages/reservation_page.dart';
 
@@ -23,7 +22,7 @@ abstract final class RoutesStage {
     final Widget page = switch (parametres.name) {
       postuler => const MesStagesPage(),
       candidatures => const CandidaturesStagePage(),
-      monStage => const MonStagePage(),
+      monStage => const MesStagesPage(),
       detailCampagne
           when parametres.arguments is CampagneStage ||
               ConfigurationApi.utiliserDonneesMockees =>

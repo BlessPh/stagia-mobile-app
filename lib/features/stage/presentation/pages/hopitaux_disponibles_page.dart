@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../../core/network/configuration_api.dart';
 import '../../../notifications/presentation/pages/notifications_page.dart';
@@ -84,20 +85,28 @@ class _HopitauxDisponiblesPageState extends State<HopitauxDisponiblesPage> {
 
   @override
   Widget build(BuildContext context) {
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
+    final fondPage = modeSombre ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final fondCarte = modeSombre ? const Color(0xFF1E293B) : Colors.white;
+    final bordure = modeSombre ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final textePrincipal = modeSombre ? Colors.white : const Color(0xFF0F172A);
+    final texteSecondaire = modeSombre ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final iconeCouleur = modeSombre ? const Color(0xFFCBD5E1) : const Color(0xFF475569);
+
     final centreCarte = LatLng(
       _hopitalSelectionne.latitude ?? -4.3060,
       _hopitalSelectionne.longitude ?? 15.2866,
     );
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: _buildAppBar(context),
+      backgroundColor: fondPage,
+      appBar: _buildAppBar(context, modeSombre, textePrincipal, iconeCouleur),
       body: SafeArea(
         child: Column(
           children: [
             // 1. CARTE INTERACTIVE
             Expanded(
-              flex: 42,
+              flex: 40,
               child: Stack(
                 children: [
                   FlutterMap(
@@ -130,33 +139,52 @@ class _HopitauxDisponiblesPageState extends State<HopitauxDisponiblesPage> {
                               if (estSelectionne) {
                                 return Marker(
                                   point: LatLng(lat, lng),
-                                  width: 150,
-                                  height: 80,
+                                  width: 170,
+                                  height: 84,
                                   alignment: Alignment.topCenter,
                                   child: GestureDetector(
                                     onTap: () => _selectionnerHopital(hopital),
                                     child: Column(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        const Icon(
-                                          Icons.location_on,
-                                          color: Color(0xFFEF4444),
-                                          size: 42,
+                                        Container(
+                                          padding: const EdgeInsets.all(5),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFEF4444),
+                                            shape: BoxShape.circle,
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: const Color(0xFFEF4444).withValues(alpha: 0.4),
+                                                blurRadius: 10,
+                                                offset: const Offset(0, 3),
+                                              ),
+                                            ],
+                                          ),
+                                          child: const Icon(
+                                            Icons.location_on_rounded,
+                                            color: Colors.white,
+                                            size: 20,
+                                          ),
                                         ),
+                                        const SizedBox(height: 4),
                                         Container(
                                           padding: const EdgeInsets.symmetric(
                                             horizontal: 10,
-                                            vertical: 3.5,
+                                            vertical: 4,
                                           ),
                                           decoration: BoxDecoration(
-                                            color: const Color(0xFF1D61F2),
-                                            borderRadius: BorderRadius.circular(
-                                              20,
+                                            color: modeSombre
+                                                ? const Color(0xFF1E293B)
+                                                : const Color(0xFF0F172A),
+                                            borderRadius: BorderRadius.circular(20),
+                                            border: Border.all(
+                                              color: const Color(0xFF38BDF8),
+                                              width: 1.5,
                                             ),
                                             boxShadow: const [
                                               BoxShadow(
                                                 color: Color(0x33000000),
-                                                blurRadius: 6,
+                                                blurRadius: 8,
                                                 offset: Offset(0, 2),
                                               ),
                                             ],
@@ -196,14 +224,31 @@ class _HopitauxDisponiblesPageState extends State<HopitauxDisponiblesPage> {
 
                               return Marker(
                                 point: LatLng(lat, lng),
-                                width: 36,
-                                height: 36,
+                                width: 38,
+                                height: 38,
                                 child: GestureDetector(
                                   onTap: () => _selectionnerHopital(hopital),
-                                  child: Icon(
-                                    Icons.location_on,
-                                    color: couleurMarker,
-                                    size: 34,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: couleurMarker,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: Colors.white,
+                                        width: 2,
+                                      ),
+                                      boxShadow: const [
+                                        BoxShadow(
+                                          color: Color(0x2E000000),
+                                          blurRadius: 5,
+                                          offset: Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    child: const Icon(
+                                      Icons.local_hospital_rounded,
+                                      color: Colors.white,
+                                      size: 18,
+                                    ),
                                   ),
                                 ),
                               );
@@ -215,13 +260,17 @@ class _HopitauxDisponiblesPageState extends State<HopitauxDisponiblesPage> {
 
                   // Bouton recentrer en bas à droite de la carte
                   Positioned(
-                    right: 12,
-                    bottom: 12,
+                    right: 14,
+                    bottom: 14,
                     child: FloatingActionButton.small(
                       heroTag: 'recentrer_carte',
-                      backgroundColor: Colors.white,
-                      foregroundColor: const Color(0xFF1D61F2),
-                      elevation: 3,
+                      backgroundColor: fondCarte,
+                      foregroundColor: iconeCouleur,
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: bordure),
+                      ),
                       onPressed: () {
                         if (_hopitalSelectionne.latitude != null &&
                             _hopitalSelectionne.longitude != null) {
@@ -234,7 +283,47 @@ class _HopitauxDisponiblesPageState extends State<HopitauxDisponiblesPage> {
                           );
                         }
                       },
-                      child: const Icon(Icons.my_location_rounded, size: 20),
+                      child: Icon(Iconsax.radar_2, size: 20, color: iconeCouleur),
+                    ),
+                  ),
+
+                  // Pill indicateur du nombre d'hôpitaux
+                  Positioned(
+                    left: 14,
+                    top: 14,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: (modeSombre ? const Color(0xFF0F172A) : Colors.white).withValues(alpha: 0.92),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: bordure),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x15000000),
+                            blurRadius: 8,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Iconsax.hospital,
+                            size: 14,
+                            color: iconeCouleur,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '${_campagne.hopitaux.length} hôpitaux',
+                            style: GoogleFonts.inter(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: textePrincipal,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -243,14 +332,43 @@ class _HopitauxDisponiblesPageState extends State<HopitauxDisponiblesPage> {
 
             // 2. CARROUSEL HORIZONTAL DES HÔPITAUX + DÉTAIL EN BAS
             Expanded(
-              flex: 58,
+              flex: 60,
               child: ListView(
                 physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.only(top: 14, bottom: 20),
+                padding: const EdgeInsets.only(top: 14, bottom: 24),
                 children: [
+                  // En-tête carrousel
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Établissements partenaires',
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.2,
+                            color: texteSecondaire,
+                          ),
+                        ),
+                        Text(
+                          'Faites défiler',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: texteSecondaire,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
                   // Carrousel horizontal des cartes d'hôpitaux
                   SizedBox(
-                    height: 122,
+                    height: 130,
                     child: ListView.separated(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       scrollDirection: Axis.horizontal,
@@ -265,6 +383,8 @@ class _HopitauxDisponiblesPageState extends State<HopitauxDisponiblesPage> {
                         return _CarteHopitalHorizontal(
                           hopital: hopital,
                           estSelectionne: estSelectionne,
+                          modeSombre: modeSombre,
+                          iconeCouleur: iconeCouleur,
                           onSelectionner: () => _selectionnerHopital(hopital),
                           onReserver:
                               _campagne.autoriseReservationAutonome &&
@@ -291,10 +411,12 @@ class _HopitauxDisponiblesPageState extends State<HopitauxDisponiblesPage> {
                             }
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
+                                backgroundColor: modeSombre ? const Color(0xFF1E293B) : const Color(0xFF0F172A),
                                 content: Text(
                                   latitude != null && longitude != null
                                       ? 'Itinéraire vers ${hopital.nom} (${hopital.distanceKm} km)'
                                       : 'Coordonnées indisponibles pour ${hopital.nom}.',
+                                  style: GoogleFonts.inter(color: Colors.white),
                                 ),
                                 duration: const Duration(seconds: 2),
                               ),
@@ -305,13 +427,15 @@ class _HopitauxDisponiblesPageState extends State<HopitauxDisponiblesPage> {
                     ),
                   ),
 
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 16),
 
                   // Fiche détaillée de l'hôpital sélectionné
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: _FicheDetailHopital(
                       hopital: _hopitalSelectionne,
+                      modeSombre: modeSombre,
+                      iconeCouleur: iconeCouleur,
                       onReserver:
                           _campagne.autoriseReservationAutonome &&
                               _hopitalSelectionne.peutReserver
@@ -337,21 +461,27 @@ class _HopitauxDisponiblesPageState extends State<HopitauxDisponiblesPage> {
     );
   }
 
-  PreferredSizeWidget _buildAppBar(BuildContext context) {
+  PreferredSizeWidget _buildAppBar(
+    BuildContext context,
+    bool modeSombre,
+    Color textePrincipal,
+    Color iconeCouleur,
+  ) {
     final unreadNotifs =
         int.tryParse(_counts?['notifications']?.toString() ?? '0') ?? 0;
+    final fondAppBar = modeSombre ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
 
     return AppBar(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: fondAppBar,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       centerTitle: true,
       leading: IconButton(
         tooltip: 'Retour',
-        icon: const Icon(
+        icon: Icon(
           Icons.arrow_back_ios_new_rounded,
-          size: 20,
-          color: Color(0xFF0F172A),
+          size: 19,
+          color: iconeCouleur,
         ),
         onPressed: () => Navigator.of(context).maybePop(),
       ),
@@ -360,7 +490,7 @@ class _HopitauxDisponiblesPageState extends State<HopitauxDisponiblesPage> {
         style: GoogleFonts.inter(
           fontSize: 17,
           fontWeight: FontWeight.w800,
-          color: const Color(0xFF0F172A),
+          color: textePrincipal,
         ),
       ),
       actions: [
@@ -377,10 +507,10 @@ class _HopitauxDisponiblesPageState extends State<HopitauxDisponiblesPage> {
                 );
                 _chargerCounts();
               },
-              icon: const Icon(
-                Icons.notifications_none_rounded,
-                color: Color(0xFF0F172A),
-                size: 26,
+              icon: Icon(
+                Iconsax.notification,
+                color: iconeCouleur,
+                size: 23,
               ),
               visualDensity: VisualDensity.compact,
             ),
@@ -422,6 +552,8 @@ class _CarteHopitalHorizontal extends StatelessWidget {
   const _CarteHopitalHorizontal({
     required this.hopital,
     required this.estSelectionne,
+    required this.modeSombre,
+    required this.iconeCouleur,
     required this.onSelectionner,
     required this.onReserver,
     required this.onVoirItineraire,
@@ -429,33 +561,50 @@ class _CarteHopitalHorizontal extends StatelessWidget {
 
   final HopitalCampagne hopital;
   final bool estSelectionne;
+  final bool modeSombre;
+  final Color iconeCouleur;
   final VoidCallback onSelectionner;
   final VoidCallback? onReserver;
   final VoidCallback onVoirItineraire;
 
   @override
   Widget build(BuildContext context) {
+    final fond = modeSombre ? const Color(0xFF1E293B) : Colors.white;
+    final bordureNormale = modeSombre ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final bordureActive = const Color(0xFF1D61F2);
+    final textePrincipal = modeSombre ? Colors.white : const Color(0xFF0F172A);
+    final texteSecondaire = modeSombre ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
+    final placesRestantes = hopital.placesRestantesEffectives;
+    final bool aDesPlaces = placesRestantes > 0;
+
+    final badgeFond = aDesPlaces
+        ? (modeSombre ? const Color(0xFF431407) : const Color(0xFFFFF1EB))
+        : (modeSombre ? const Color(0xFF450A0A) : const Color(0xFFFEE2E2));
+    final badgeTexte = aDesPlaces
+        ? (modeSombre ? const Color(0xFFFB923C) : const Color(0xFFEA580C))
+        : (modeSombre ? const Color(0xFFF87171) : const Color(0xFFDC2626));
+
     return InkWell(
       onTap: onSelectionner,
       borderRadius: BorderRadius.circular(16),
-      child: Container(
-        width: 258,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: 268,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: fond,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: estSelectionne
-                ? const Color(0xFF1D61F2)
-                : const Color(0xFFE2E8F0),
+            color: estSelectionne ? bordureActive : bordureNormale,
             width: estSelectionne ? 2.0 : 1.0,
           ),
           boxShadow: [
             BoxShadow(
               color: estSelectionne
-                  ? const Color(0xFF1D61F2).withValues(alpha: 0.08)
-                  : const Color(0x06000000),
-              blurRadius: 10,
+                  ? const Color(0xFF1D61F2).withValues(alpha: modeSombre ? 0.25 : 0.12)
+                  : (modeSombre ? const Color(0x33000000) : const Color(0x08000000)),
+              blurRadius: estSelectionne ? 12 : 6,
               offset: const Offset(0, 3),
             ),
           ],
@@ -466,7 +615,6 @@ class _CarteHopitalHorizontal extends StatelessWidget {
           children: [
             // Ligne Titre + Badge places restantes
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
                   child: Text(
@@ -474,9 +622,9 @@ class _CarteHopitalHorizontal extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.inter(
-                      fontSize: 14.5,
+                      fontSize: 14,
                       fontWeight: FontWeight.w800,
-                      color: const Color(0xFF0F172A),
+                      color: textePrincipal,
                     ),
                   ),
                 ),
@@ -487,38 +635,49 @@ class _CarteHopitalHorizontal extends StatelessWidget {
                     vertical: 3,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFFF1EB),
+                    color: badgeFond,
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    '${hopital.placesRestantesEffectives} places rest.',
+                    aDesPlaces ? '$placesRestantes places' : 'Complet',
                     style: GoogleFonts.inter(
-                      fontSize: 10.5,
+                      fontSize: 10,
                       fontWeight: FontWeight.w700,
-                      color: const Color(0xFFEA580C),
+                      color: badgeTexte,
                     ),
                   ),
                 ),
               ],
             ),
 
-            // Distance & Localisation
-            if (hopital.distanceKm > 0 || hopital.localisationCourte.isNotEmpty)
-              Text(
-                [
-                  if (hopital.distanceKm > 0)
-                    '${hopital.distanceKm.toStringAsFixed(1)} km',
-                  if (hopital.localisationCourte.isNotEmpty)
-                    hopital.localisationCourte,
-                ].join(' • '),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: const Color(0xFF64748B),
+            // Distance & Localisation avec icône neutre/grisâtre
+            Row(
+              children: [
+                Icon(
+                  Iconsax.location,
+                  size: 13,
+                  color: iconeCouleur,
                 ),
-              ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    [
+                      if (hopital.distanceKm > 0)
+                        '${hopital.distanceKm.toStringAsFixed(1)} km',
+                      if (hopital.localisationCourte.isNotEmpty)
+                        hopital.localisationCourte,
+                    ].join(' • '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w500,
+                      color: texteSecondaire,
+                    ),
+                  ),
+                ),
+              ],
+            ),
 
             // Ligne d'actions : "Voir itinéraire" + Bouton "Réserver"
             Row(
@@ -526,16 +685,27 @@ class _CarteHopitalHorizontal extends StatelessWidget {
               children: [
                 InkWell(
                   onTap: onVoirItineraire,
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(6),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Text(
-                      'Voir itinéraire',
-                      style: GoogleFonts.inter(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF1D61F2),
-                      ),
+                    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Iconsax.routing_2,
+                          size: 14,
+                          color: iconeCouleur,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Itinéraire',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: modeSombre ? const Color(0xFF60A5FA) : const Color(0xFF1D61F2),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -545,9 +715,9 @@ class _CarteHopitalHorizontal extends StatelessWidget {
                     child: FilledButton(
                       onPressed: onReserver,
                       style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF1D61F2),
+                        backgroundColor: const Color(0xFFFF751F),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -556,7 +726,7 @@ class _CarteHopitalHorizontal extends StatelessWidget {
                       child: Text(
                         hopital.peutReserver ? 'Réserver' : 'Complet',
                         style: GoogleFonts.inter(
-                          fontSize: 12,
+                          fontSize: 11.5,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -575,25 +745,40 @@ class _CarteHopitalHorizontal extends StatelessWidget {
 // FICHE DÉTAILLÉE DE L'HÔPITAL
 // -------------------------------------------------------------
 class _FicheDetailHopital extends StatelessWidget {
-  const _FicheDetailHopital({required this.hopital, required this.onReserver});
+  const _FicheDetailHopital({
+    required this.hopital,
+    required this.modeSombre,
+    required this.iconeCouleur,
+    required this.onReserver,
+  });
 
   final HopitalCampagne hopital;
+  final bool modeSombre;
+  final Color iconeCouleur;
   final VoidCallback? onReserver;
 
   @override
   Widget build(BuildContext context) {
+    final fond = modeSombre ? const Color(0xFF1E293B) : Colors.white;
+    final bordure = modeSombre ? const Color(0xFF334155) : const Color(0xFFF1F5F9);
+    final textePrincipal = modeSombre ? Colors.white : const Color(0xFF0F172A);
+    final texteSecondaire = modeSombre ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
+    final fondInfoTile = modeSombre ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final bordureInfoTile = modeSombre ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: fond,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFF1F5F9)),
-        boxShadow: const [
+        border: Border.all(color: bordure),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x08000000),
-            blurRadius: 12,
-            offset: Offset(0, 3),
+            color: modeSombre ? const Color(0x33000000) : const Color(0x08000000),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -601,117 +786,282 @@ class _FicheDetailHopital extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Titre et Description
-          Text(
-            hopital.nom,
-            style: GoogleFonts.inter(
-              fontSize: 18.5,
-              fontWeight: FontWeight.w800,
-              color: const Color(0xFF0F172A),
-            ),
-          ),
-          if (hopital.description.isNotEmpty) ...[
-            const SizedBox(height: 3),
-            Text(
-              hopital.description,
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFF64748B),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: modeSombre ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Iconsax.hospital,
+                  size: 22,
+                  color: iconeCouleur,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      hopital.nom,
+                      style: GoogleFonts.inter(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: textePrincipal,
+                      ),
+                    ),
+                    if (hopital.description.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        hopital.description,
+                        style: GoogleFonts.inter(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
+                          color: texteSecondaire,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // Coordonnées (Adresse & Téléphone)
           if ((hopital.adresse?.trim().isNotEmpty ?? false) ||
               hopital.localisationCourte.isNotEmpty) ...[
-            const SizedBox(height: 14),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(
-                  Icons.location_on_outlined,
-                  size: 18,
-                  color: Color(0xFF64748B),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    (hopital.adresse?.trim().isNotEmpty ?? false)
-                        ? hopital.adresse!
-                        : hopital.localisationCourte,
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: const Color(0xFF475569),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: fondInfoTile,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: bordureInfoTile),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Iconsax.location,
+                    size: 18,
+                    color: iconeCouleur,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      (hopital.adresse?.trim().isNotEmpty ?? false)
+                          ? hopital.adresse!
+                          : hopital.localisationCourte,
+                      style: GoogleFonts.inter(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w500,
+                        color: textePrincipal,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
+
           if (hopital.telephone.trim().isNotEmpty) ...[
             const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: fondInfoTile,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: bordureInfoTile),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Iconsax.call,
+                    size: 17,
+                    color: iconeCouleur,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    hopital.telephone,
+                    style: GoogleFonts.inter(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w500,
+                      color: textePrincipal,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 16),
+
+          // Grille des indicateurs Clés (Capacité / Places et Frais)
+          Row(
+            children: [
+              // Bloc Places
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: hopital.peutReserver
+                        ? (modeSombre ? const Color(0xFF14532D).withValues(alpha: 0.4) : const Color(0xFFDCFCE7))
+                        : (modeSombre ? const Color(0xFF7F1D1D).withValues(alpha: 0.35) : const Color(0xFFFEE2E2)),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: hopital.peutReserver
+                          ? (modeSombre ? const Color(0xFF166534) : const Color(0xFFBBF7D0))
+                          : (modeSombre ? const Color(0xFF991B1B) : const Color(0xFFFECACA)),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Iconsax.user_tag,
+                            size: 15,
+                            color: iconeCouleur,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Capacité',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: texteSecondaire,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${hopital.placesRestantesEffectives} / ${hopital.capacite} places',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: hopital.peutReserver
+                              ? (modeSombre ? const Color(0xFF4ADE80) : const Color(0xFF15803D))
+                              : (modeSombre ? const Color(0xFFF87171) : const Color(0xFFDC2626)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(width: 10),
+
+              // Bloc Frais
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: fondInfoTile,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: bordureInfoTile),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Iconsax.card,
+                            size: 15,
+                            color: iconeCouleur,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Frais requis',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: texteSecondaire,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        hopital.fraisRequis
+                            ? '${_formaterMontant(hopital.montantFrais)} ${hopital.devise}'
+                            : 'Gratuit',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: textePrincipal,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          if (hopital.conditions != null && hopital.conditions!.trim().isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: modeSombre ? const Color(0xFF1E293B) : const Color(0xFFFEF3C7).withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: modeSombre ? const Color(0xFF475569) : const Color(0xFFFDE68A),
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Iconsax.info_circle,
+                    size: 16,
+                    color: iconeCouleur,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      hopital.conditions!,
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: textePrincipal,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          if (hopital.services.isNotEmpty) ...[
+            const SizedBox(height: 18),
             Row(
               children: [
-                const Icon(
-                  Icons.phone_outlined,
-                  size: 17,
-                  color: Color(0xFF64748B),
+                Icon(
+                  Iconsax.firstline,
+                  size: 15,
+                  color: iconeCouleur,
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 Text(
-                  hopital.telephone,
+                  'SERVICES OUVERTS AUX STAGIAIRES',
                   style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: const Color(0xFF475569),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                    color: texteSecondaire,
                   ),
                 ),
               ],
-            ),
-          ],
-          const SizedBox(height: 14),
-          Text(
-            '${hopital.placesRestantesEffectives} place(s) disponible(s) sur ${hopital.capacite}',
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: hopital.peutReserver
-                  ? const Color(0xFF15803D)
-                  : const Color(0xFFDC2626),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            hopital.fraisRequis
-                ? 'Frais requis : ${_formaterMontant(hopital.montantFrais)} ${hopital.devise}'
-                      .trim()
-                : 'Aucun frais requis',
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF475569),
-            ),
-          ),
-          if (hopital.conditions != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              hopital.conditions!,
-              style: GoogleFonts.inter(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFF64748B),
-              ),
-            ),
-          ],
-          if (hopital.services.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            Text(
-              'SERVICES OUVERTS AUX STAGIAIRES',
-              style: GoogleFonts.inter(
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.6,
-                color: const Color(0xFF0F172A),
-              ),
             ),
             const SizedBox(height: 10),
             Wrap(
@@ -720,40 +1070,62 @@ class _FicheDetailHopital extends StatelessWidget {
               children: hopital.services.map((service) {
                 return Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6.5,
+                    horizontal: 11,
+                    vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEFF6FF),
+                    color: modeSombre ? const Color(0xFF0F172A) : const Color(0xFFEFF6FF),
                     borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: modeSombre ? const Color(0xFF334155) : const Color(0xFFDBEAFE),
+                    ),
                   ),
                   child: Text(
                     service,
                     style: GoogleFonts.inter(
-                      fontSize: 12.5,
+                      fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: const Color(0xFF2563EB),
+                      color: modeSombre ? const Color(0xFF93C5FD) : const Color(0xFF2563EB),
                     ),
                   ),
                 );
               }).toList(),
             ),
           ],
-          const SizedBox(height: 16),
+
+          const SizedBox(height: 20),
+
+          // Bouton principal d'action
           SizedBox(
             width: double.infinity,
+            height: 48,
             child: FilledButton(
               onPressed: onReserver,
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF1D61F2),
+                backgroundColor: const Color(0xFFFF751F),
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
+                elevation: 0,
               ),
-              child: Text(
-                hopital.peutReserver ? 'Réserver' : 'Aucune place disponible',
-                style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    hopital.peutReserver ? Iconsax.calendar_tick : Iconsax.close_circle,
+                    size: 18,
+                    color: Colors.white,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    hopital.peutReserver ? 'Réserver dans cet hôpital' : 'Aucune place disponible',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -763,9 +1135,10 @@ class _FicheDetailHopital extends StatelessWidget {
   }
 
   String _formaterMontant(double montant) {
-    if (montant <= 0) return 'Montant non communiqué';
+    if (montant <= 0) return 'Non communiqué';
     return montant == montant.roundToDouble()
         ? montant.toStringAsFixed(0)
         : montant.toStringAsFixed(2);
   }
 }
+

@@ -22,25 +22,27 @@ class CarteNotification extends StatelessWidget {
     final nonLue = !notification.lue;
 
     final fondCarte = nonLue
-        ? (modeSombre ? const Color(0xFF231C18) : const Color(0xFFFFFBF8))
-        : (modeSombre ? const Color(0xFF1E1E1E) : Colors.white);
+        ? (modeSombre ? const Color(0xFF1E293B) : const Color(0xFFFFFBF8))
+        : (modeSombre ? const Color(0xFF1E293B) : Colors.white);
 
     final bordureCarte = nonLue
-        ? const Color(0xFFFF7417).withValues(alpha: 0.3)
-        : (modeSombre ? const Color(0xFF2E2E2E) : const Color(0xFFEDF2F7));
+        ? const Color(0xFFFF751F).withValues(alpha: modeSombre ? 0.6 : 0.4)
+        : (modeSombre ? const Color(0xFF334155) : const Color(0xFFE2E8F0));
+
+    final iconeCouleurAction = modeSombre ? const Color(0xFFCBD5E1) : notification.couleur;
 
     return Container(
       decoration: BoxDecoration(
         color: fondCarte,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: bordureCarte, width: nonLue ? 1.2 : 1),
+        border: Border.all(color: bordureCarte, width: nonLue ? 1.5 : 1),
         boxShadow: [
           BoxShadow(
             color: nonLue
-                ? const Color(0xFFFF7417).withValues(alpha: 0.05)
-                : Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+                ? const Color(0xFFFF751F).withValues(alpha: modeSombre ? 0.12 : 0.06)
+                : (modeSombre ? const Color(0x33000000) : const Color(0x06000000)),
+            blurRadius: nonLue ? 10 : 6,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -66,7 +68,7 @@ class CarteNotification extends StatelessWidget {
                     // Icône du sujet
                     IconeNotification(
                       icone: notification.icone,
-                      couleur: notification.couleur,
+                      couleur: modeSombre ? const Color(0xFFCBD5E1) : notification.couleur,
                     ),
                     const SizedBox(width: 12),
 
@@ -103,7 +105,7 @@ class CarteNotification extends StatelessWidget {
                             notification.tempsRelatif,
                             style: GoogleFonts.inter(
                               fontSize: 12,
-                              color: const Color(0xFF64748B),
+                              color: const Color(0xFF94A3B8),
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -138,10 +140,14 @@ class CarteNotification extends StatelessWidget {
                   child: OutlinedButton(
                     onPressed: onAction,
                     style: OutlinedButton.styleFrom(
-                      backgroundColor: notification.couleur.withValues(alpha: 0.08),
-                      foregroundColor: notification.couleur,
+                      backgroundColor: modeSombre
+                          ? const Color(0xFF334155).withValues(alpha: 0.5)
+                          : notification.couleur.withValues(alpha: 0.08),
+                      foregroundColor: iconeCouleurAction,
                       side: BorderSide(
-                        color: notification.couleur.withValues(alpha: 0.35),
+                        color: modeSombre
+                            ? const Color(0xFF475569)
+                            : notification.couleur.withValues(alpha: 0.35),
                         width: 1,
                       ),
                       shape: RoundedRectangleBorder(

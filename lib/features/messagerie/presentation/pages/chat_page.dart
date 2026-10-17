@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:emoji_picker_flutter/emoji_picker_flutter.dart' as emoji_picker;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/widgets/contenu_adaptatif.dart';
@@ -35,6 +36,7 @@ class _ChatPageState extends State<ChatPage> {
   bool _chargementLotPrecedent = false;
   bool _aDesLotsAnciens = true;
   bool _chargementInitial = true;
+  bool _afficherEmojis = false;
   StreamSubscription? _sseSubscription;
 
   @override
@@ -55,6 +57,12 @@ class _ChatPageState extends State<ChatPage> {
           });
           _defilerVersBas();
         }
+      }
+    });
+
+    _focusNode.addListener(() {
+      if (_focusNode.hasFocus && _afficherEmojis) {
+        setState(() => _afficherEmojis = false);
       }
     });
   }
@@ -119,14 +127,15 @@ class _ChatPageState extends State<ChatPage> {
     if (texte.trim().isEmpty) return;
 
     final texteEnvoye = texte.trim();
+    final messageId = 'm_${DateTime.now().millisecondsSinceEpoch}';
     final nouveauMessage = MessageChat(
-      id: 'm_${DateTime.now().millisecondsSinceEpoch}',
+      id: messageId,
       texte: texteEnvoye,
       date: DateTime.now(),
       estMien: true,
       expediteurNom: 'Moi',
       reponseA: _messageEnReponse,
-      statut: StatutMessage.envoye,
+      statut: StatutMessage.enCours,
     );
 
     setState(() {
@@ -140,8 +149,22 @@ class _ChatPageState extends State<ChatPage> {
         widget.discussion.id,
         contenu: texteEnvoye,
       );
+      if (mounted) {
+        setState(() {
+          final idx = _messages.indexWhere((m) => m.id == messageId);
+          if (idx != -1) {
+            _messages[idx] = _messages[idx].copyWith(statut: StatutMessage.envoye);
+          }
+        });
+      }
     } catch (e) {
       if (mounted) {
+        setState(() {
+          final idx = _messages.indexWhere((m) => m.id == messageId);
+          if (idx != -1) {
+            _messages[idx] = _messages[idx].copyWith(statut: StatutMessage.envoye);
+          }
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erreur d\'envoi : $e'),
@@ -152,8 +175,61 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
-  void _envoyerVocal() {
-    _envoyerMessage('🎤 Message vocal (0:15)');
+  Future<void> _envoyerMessageVocal(Duration duree) async {
+    final messageId = 'm_voc_${DateTime.now().millisecondsSinceEpoch}';
+    final minutes = (duree.inSeconds ~/ 60).toString().padLeft(2, '0');
+    final secondes = (duree.inSeconds % 60).toString().padLeft(2, '0');
+    final messageVocal = MessageChat(
+      id: messageId,
+      texte: '🎤 Message vocal ($minutes:$secondes)',
+      date: DateTime.now(),
+      estMien: true,
+      expediteurNom: 'Moi',
+      type: TypeMessage.vocal,
+      dureeVocal: duree,
+      reponseA: _messageEnReponse,
+      statut: StatutMessage.enCours,
+    );
+
+    setState(() {
+      _messages.add(messageVocal);
+      _messageEnReponse = null;
+    });
+    _defilerVersBas();
+
+    try {
+      await _source.envoyerMessageConversation(
+        widget.discussion.id,
+        contenu: '🎤 Message vocal ($minutes:$secondes)',
+      );
+      if (mounted) {
+        setState(() {
+          final idx = _messages.indexWhere((m) => m.id == messageId);
+          if (idx != -1) {
+            _messages[idx] = _messages[idx].copyWith(statut: StatutMessage.envoye);
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          final idx = _messages.indexWhere((m) => m.id == messageId);
+          if (idx != -1) {
+            _messages[idx] = _messages[idx].copyWith(statut: StatutMessage.envoye);
+          }
+        });
+      }
+    }
+  }
+
+  void _basculerEmojis() {
+    if (_afficherEmojis) {
+      setState(() => _afficherEmojis = false);
+      _focusNode.requestFocus();
+    } else {
+      _focusNode.unfocus();
+      setState(() => _afficherEmojis = true);
+    }
   }
 
 
@@ -230,10 +306,11 @@ class _ChatPageState extends State<ChatPage> {
   @override
   Widget build(BuildContext context) {
     final modeSombre = Theme.of(context).brightness == Brightness.dark;
+    final fondPage = modeSombre ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: _construireAppBar(context, modeSombre),
+      backgroundColor: fondPage,
+      appBar: _construireAppBar(context, modeSombre, fondPage),
       body: ContenuAdaptatif(
         largeurMaximale: 820,
         enfant: Column(
@@ -248,7 +325,7 @@ class _ChatPageState extends State<ChatPage> {
                   height: 20,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: Color(0xFF1D61F2),
+                    color: Color(0xFFFF751F),
                   ),
                 ),
               ),
@@ -295,11 +372,48 @@ class _ChatPageState extends State<ChatPage> {
               controleur: _controleurTexte,
               focusNode: _focusNode,
               messageEnReponse: _messageEnReponse,
+              afficherEmojis: _afficherEmojis,
               onAnnulerReponse: () => setState(() => _messageEnReponse = null),
               onEnvoyerTexte: _envoyerMessage,
-              onEnvoyerVocal: _envoyerVocal,
+              onEnvoyerVocal: _envoyerMessageVocal,
               onOuvrirPiecesJointes: _ouvrirFeuillePiecesJointes,
+              onBasculerEmojis: _basculerEmojis,
             ),
+
+            // Sélecteur d'émojis
+            if (_afficherEmojis)
+              SizedBox(
+                height: 270,
+                child: emoji_picker.EmojiPicker(
+                  textEditingController: _controleurTexte,
+                  config: emoji_picker.Config(
+                    height: 270,
+                    checkPlatformCompatibility: false,
+                    emojiViewConfig: emoji_picker.EmojiViewConfig(
+                      backgroundColor: modeSombre ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                      columns: 7,
+                      emojiSizeMax: 30,
+                    ),
+                    categoryViewConfig: emoji_picker.CategoryViewConfig(
+                      backgroundColor: modeSombre ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                      indicatorColor: const Color(0xFFFF751F),
+                      iconColor: modeSombre ? const Color(0xFFCBD5E1) : const Color(0xFF64748B),
+                      iconColorSelected: const Color(0xFFFF751F),
+                      backspaceColor: const Color(0xFFFF751F),
+                    ),
+                    bottomActionBarConfig: emoji_picker.BottomActionBarConfig(
+                      backgroundColor: modeSombre ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                      buttonColor: modeSombre ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                      buttonIconColor: modeSombre ? const Color(0xFFCBD5E1) : const Color(0xFF64748B),
+                    ),
+                    searchViewConfig: emoji_picker.SearchViewConfig(
+                      backgroundColor: modeSombre ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                      buttonIconColor: modeSombre ? const Color(0xFFCBD5E1) : const Color(0xFF64748B),
+                      hintText: 'Rechercher un émoji...',
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -313,16 +427,19 @@ class _ChatPageState extends State<ChatPage> {
   PreferredSizeWidget _construireAppBar(
     BuildContext context,
     bool modeSombre,
+    Color fondPage,
   ) {
+    final iconeCouleur = modeSombre ? const Color(0xFFCBD5E1) : const Color(0xFF0F172A);
+
     return AppBar(
       elevation: 0,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: fondPage,
       surfaceTintColor: Colors.transparent,
       leading: IconButton(
         icon: Icon(
           Icons.arrow_back_ios_new_rounded,
           size: 20,
-          color: modeSombre ? Colors.white : const Color(0xFF0F172A),
+          color: iconeCouleur,
         ),
         onPressed: () => Navigator.pop(context),
       ),
@@ -412,6 +529,7 @@ class _SeparateurDate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
     final difference = DateTime.now().difference(date);
     String texte;
     if (difference.inDays == 0) {
@@ -426,7 +544,9 @@ class _SeparateurDate extends StatelessWidget {
       margin: const EdgeInsets.symmetric(vertical: 12),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
-        color: const Color(0xFFE2E8F0).withValues(alpha: 0.6),
+        color: modeSombre
+            ? const Color(0xFF1E293B)
+            : const Color(0xFFE2E8F0).withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
@@ -434,7 +554,7 @@ class _SeparateurDate extends StatelessWidget {
         style: GoogleFonts.inter(
           fontSize: 11,
           fontWeight: FontWeight.w600,
-          color: const Color(0xFF475569),
+          color: modeSombre ? const Color(0xFF94A3B8) : const Color(0xFF475569),
         ),
       ),
     );

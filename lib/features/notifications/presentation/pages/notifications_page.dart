@@ -5,8 +5,8 @@ import '../../../../core/widgets/contenu_adaptatif.dart';
 import '../../../../core/services/sse_notifications_service.dart';
 import '../../../messagerie/domain/entities/discussion.dart';
 import '../../../messagerie/presentation/pages/chat_page.dart';
+import '../../../../core/services/suivi_stage_service.dart';
 import '../../../stage/presentation/pages/mes_stages_page.dart';
-import '../../../stage/presentation/pages/mon_stage_page.dart';
 import '../../../stage/presentation/pages/apercu_facture_page.dart';
 import '../../../../core/network/client_api_http.dart';
 import '../../../../core/network/source_etudiant_distante.dart';
@@ -125,13 +125,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
     // Navigation vers la page cible demandée
     switch (notification.cible.type) {
       case TypeCibleNotification.affectationStage:
-        Navigator.of(context).push<void>(
-          MaterialPageRoute<void>(
-            builder: (_) => MonStagePage(
-              assignmentReference: notification.cible.identifiant,
-            ),
-          ),
-        );
+        SuiviStageService.ouvrirOngletStages(0);
+        SuiviStageService.naviguerVersIndex(1);
+        Navigator.of(context).maybePop();
       case TypeCibleNotification.detailCampagne:
         Navigator.of(context).push<void>(
           MaterialPageRoute<void>(builder: (_) => const MesStagesPage()),
@@ -181,21 +177,25 @@ class _NotificationsPageState extends State<NotificationsPage> {
   @override
   Widget build(BuildContext context) {
     final modeSombre = Theme.of(context).brightness == Brightness.dark;
+    final fondPage = modeSombre ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final texteCouleur = modeSombre ? Colors.white : const Color(0xFF0F172A);
+    final iconeCouleur = modeSombre ? const Color(0xFFCBD5E1) : const Color(0xFF475569);
     final nonLues = _compteNonLues;
     final listeFiltree = _notificationsFiltrees;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: fondPage,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        backgroundColor: fondPage,
         surfaceTintColor: Colors.transparent,
         leading: Navigator.canPop(context)
             ? IconButton(
+                tooltip: 'Retour',
                 icon: Icon(
                   Icons.arrow_back_ios_new_rounded,
                   size: 20,
-                  color: modeSombre ? Colors.white : const Color(0xFF0F172A),
+                  color: iconeCouleur,
                 ),
                 onPressed: () => Navigator.pop(context),
               )
@@ -207,7 +207,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
               style: GoogleFonts.inter(
                 fontSize: 20,
                 fontWeight: FontWeight.w900,
-                color: modeSombre ? Colors.white : const Color(0xFF0F172A),
+                color: texteCouleur,
                 letterSpacing: -0.4,
               ),
             ),
@@ -216,7 +216,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFF7417),
+                  color: const Color(0xFFFF751F),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -236,7 +236,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
             TextButton(
               onPressed: _toutMarquerCommeLu,
               style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFFFF7417),
+                foregroundColor: const Color(0xFFFF751F),
               ),
               child: Text(
                 'Tout lire',
@@ -267,11 +267,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
               child: _chargement
                   ? const Center(
                       child: CircularProgressIndicator(
-                        color: Color(0xFFFF7417),
+                        color: Color(0xFFFF751F),
                       ),
                     )
                   : RefreshIndicator(
-                      color: const Color(0xFFFF7417),
+                      color: const Color(0xFFFF751F),
                       onRefresh: _chargerNotifications,
                       child: listeFiltree.isEmpty
                           ? ListView(
@@ -285,14 +285,14 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                         width: 68,
                                         height: 68,
                                         decoration: BoxDecoration(
-                                          color: const Color(
-                                            0xFFFF7417,
-                                          ).withValues(alpha: 0.1),
+                                          color: modeSombre
+                                              ? const Color(0xFF1E293B)
+                                              : const Color(0xFFFF751F).withValues(alpha: 0.1),
                                           shape: BoxShape.circle,
                                         ),
-                                        child: const Icon(
+                                        child: Icon(
                                           Icons.notifications_none_rounded,
-                                          color: Color(0xFFFF7417),
+                                          color: iconeCouleur,
                                           size: 34,
                                         ),
                                       ),

@@ -19,12 +19,16 @@ class FeuillePiecesJointes extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final modeSombre = Theme.of(context).brightness == Brightness.dark;
+    final fond = modeSombre ? const Color(0xFF1E293B) : Colors.white;
+    final bordure = modeSombre ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final texteCouleur = modeSombre ? Colors.white : const Color(0xFF0F172A);
 
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
       decoration: BoxDecoration(
-        color: modeSombre ? const Color(0xFF1E1E1E) : Colors.white,
+        color: fond,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        border: Border(top: BorderSide(color: bordure, width: 1)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -36,7 +40,7 @@ class FeuillePiecesJointes extends StatelessWidget {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: const Color(0xFFCBD5E1),
+                color: modeSombre ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -48,7 +52,7 @@ class FeuillePiecesJointes extends StatelessWidget {
             style: GoogleFonts.inter(
               fontSize: 16,
               fontWeight: FontWeight.w800,
-              color: modeSombre ? Colors.white : const Color(0xFF0F172A),
+              color: texteCouleur,
               letterSpacing: -0.3,
             ),
           ),
@@ -87,7 +91,7 @@ class FeuillePiecesJointes extends StatelessWidget {
               _ElementOption(
                 icone: Icons.assignment_turned_in_rounded,
                 label: 'Fiche Stage',
-                couleur: const Color(0xFFFF7417),
+                couleur: const Color(0xFFFF751F),
                 onTap: () {
                   Navigator.pop(context);
                   onOptionChoisie(OptionPieceJointe.ficheStage);

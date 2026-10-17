@@ -185,6 +185,19 @@ class _ReservationPageState extends State<ReservationPage> {
     final statut = donnees['reservation_status']?.toString() ?? '';
     final workflowStatut = donnees['workflow_status']?.toString() ?? '';
 
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
+    final fondModal = modeSombre ? const Color(0xFF1E293B) : Colors.white;
+    final textePrincipal = modeSombre ? Colors.white : const Color(0xFF0F172A);
+    final texteSecondaire = modeSombre
+        ? const Color(0xFF94A3B8)
+        : const Color(0xFF64748B);
+    final bordure = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFE2E8F0);
+    final poignee = modeSombre
+        ? const Color(0xFF475569)
+        : const Color(0xFFCBD5E1);
+
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -192,9 +205,10 @@ class _ReservationPageState extends State<ReservationPage> {
       builder: (ctx) {
         return Container(
           padding: const EdgeInsets.fromLTRB(22, 16, 22, 32),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          decoration: BoxDecoration(
+            color: fondModal,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            border: Border.all(color: bordure),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -203,7 +217,7 @@ class _ReservationPageState extends State<ReservationPage> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE2E8F0),
+                  color: poignee,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -211,13 +225,17 @@ class _ReservationPageState extends State<ReservationPage> {
               Container(
                 width: 68,
                 height: 68,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFDCFCE7),
+                decoration: BoxDecoration(
+                  color: modeSombre
+                      ? const Color(0xFF14532D).withValues(alpha: 0.6)
+                      : const Color(0xFFDCFCE7),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.check_circle_rounded,
-                  color: Color(0xFF16A34A),
+                  color: modeSombre
+                      ? const Color(0xFF4ADE80)
+                      : const Color(0xFF16A34A),
                   size: 44,
                 ),
               ),
@@ -226,10 +244,11 @@ class _ReservationPageState extends State<ReservationPage> {
                 reservationCreee
                     ? 'Candidature & Réservation soumises !'
                     : 'Réservation déjà active',
+                textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
-                  color: const Color(0xFF0F172A),
+                  color: textePrincipal,
                 ),
               ),
               const SizedBox(height: 8),
@@ -241,7 +260,7 @@ class _ReservationPageState extends State<ReservationPage> {
                 style: GoogleFonts.inter(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: const Color(0xFF64748B),
+                  color: texteSecondaire,
                 ),
               ),
               if (reference.isNotEmpty ||
@@ -254,9 +273,11 @@ class _ReservationPageState extends State<ReservationPage> {
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
+                    color: modeSombre
+                        ? const Color(0xFF0F172A).withValues(alpha: 0.6)
+                        : const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    border: Border.all(color: bordure),
                   ),
                   child: Text(
                     [
@@ -281,7 +302,7 @@ class _ReservationPageState extends State<ReservationPage> {
                   style: GoogleFonts.inter(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w500,
-                    color: const Color(0xFF64748B),
+                    color: texteSecondaire,
                   ),
                 ),
               ],
@@ -291,7 +312,7 @@ class _ReservationPageState extends State<ReservationPage> {
                 height: 50,
                 child: FilledButton(
                   onPressed: () {
-                    Navigator.of(ctx).pop(); // Ferme le modal
+                    Navigator.of(ctx).pop();
                     Navigator.of(context).popUntil((route) => route.isFirst);
                   },
                   style: FilledButton.styleFrom(
@@ -319,16 +340,33 @@ class _ReservationPageState extends State<ReservationPage> {
 
   @override
   Widget build(BuildContext context) {
+    final modeSombre = Theme.of(context).brightness == Brightness.dark;
+    final fondPage = modeSombre
+        ? const Color(0xFF0F172A)
+        : const Color(0xFFF8FAFC);
+    final fondCarte = modeSombre ? const Color(0xFF1E293B) : Colors.white;
+    final bordure = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFE2E8F0);
+    final textePrincipal = modeSombre ? Colors.white : const Color(0xFF0F172A);
+    final texteSecondaire = modeSombre
+        ? const Color(0xFF94A3B8)
+        : const Color(0xFF64748B);
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: _buildAppBar(context),
+      backgroundColor: fondPage,
+      appBar: _buildAppBar(context, modeSombre),
       body: SafeArea(
         child: ListView(
           physics: const BouncingScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
           children: [
             // 1. CARTE VOTRE SÉLECTION
-            _CarteVotreSelection(campagne: _campagne, hopital: _hopital),
+            _CarteVotreSelection(
+              campagne: _campagne,
+              hopital: _hopital,
+              modeSombre: modeSombre,
+            ),
 
             const SizedBox(height: 22),
 
@@ -340,7 +378,7 @@ class _ReservationPageState extends State<ReservationPage> {
                   style: GoogleFonts.inter(
                     fontSize: 14.5,
                     fontWeight: FontWeight.w800,
-                    color: const Color(0xFF0F172A),
+                    color: textePrincipal,
                   ),
                 ),
                 Text(
@@ -348,7 +386,7 @@ class _ReservationPageState extends State<ReservationPage> {
                   style: GoogleFonts.inter(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
-                    color: const Color(0xFF64748B),
+                    color: texteSecondaire,
                   ),
                 ),
               ],
@@ -356,27 +394,32 @@ class _ReservationPageState extends State<ReservationPage> {
             const SizedBox(height: 8),
             Container(
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
+                color: fondCarte,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: bordure),
               ),
               child: TextField(
                 controller: _motivationController,
                 minLines: 3,
                 maxLines: 4,
+                cursorColor: const Color(0xFF1D61F2),
                 style: GoogleFonts.inter(
                   fontSize: 14,
-                  color: const Color(0xFF0F172A),
+                  color: textePrincipal,
                 ),
                 decoration: InputDecoration(
+                  filled: true,
+                  fillColor: fondCarte,
                   hintText:
                       'Expliquez brièvement votre choix de cet établissement...',
                   hintStyle: GoogleFonts.inter(
                     fontSize: 13.5,
-                    color: const Color(0xFF94A3B8),
+                    color: texteSecondaire,
                   ),
                   contentPadding: const EdgeInsets.all(14),
                   border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
                 ),
               ),
             ),
@@ -384,46 +427,66 @@ class _ReservationPageState extends State<ReservationPage> {
             const SizedBox(height: 20),
 
             // 3. CARTE RÉSUMÉ FINANCIER
-            _CarteResumeFinancier(hopital: _hopital),
+            _CarteResumeFinancier(
+              hopital: _hopital,
+              modeSombre: modeSombre,
+            ),
 
             const SizedBox(height: 18),
 
             // 4. CONDITIONS FOURNIES PAR L'API
             if (_hopital.conditions != null)
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: Checkbox(
-                      value: _conditionsAcceptees,
-                      activeColor: const Color(0xFF1D61F2),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(5),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: modeSombre
+                      ? const Color(0xFF1E293B).withValues(alpha: 0.6)
+                      : const Color(0xFFF1F5F9).withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: bordure),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: Checkbox(
+                        value: _conditionsAcceptees,
+                        activeColor: const Color(0xFF1D61F2),
+                        checkColor: Colors.white,
+                        side: BorderSide(
+                          color: modeSombre
+                              ? const Color(0xFF64748B)
+                              : const Color(0xFF94A3B8),
+                          width: 1.5,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        onChanged: (val) =>
+                            setState(() => _conditionsAcceptees = val ?? false),
                       ),
-                      onChanged: (val) =>
-                          setState(() => _conditionsAcceptees = val ?? false),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(
-                        () => _conditionsAcceptees = !_conditionsAcceptees,
-                      ),
-                      child: Text(
-                        'J\'accepte les conditions suivantes : ${_hopital.conditions}',
-                        style: GoogleFonts.inter(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w500,
-                          color: const Color(0xFF475569),
-                          height: 1.35,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(
+                          () => _conditionsAcceptees = !_conditionsAcceptees,
+                        ),
+                        child: Text(
+                          'J\'accepte les conditions suivantes : ${_hopital.conditions}',
+                          style: GoogleFonts.inter(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                            color: textePrincipal,
+                            height: 1.35,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
 
             const SizedBox(height: 22),
@@ -442,8 +505,11 @@ class _ReservationPageState extends State<ReservationPage> {
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF1D61F2),
                   foregroundColor: Colors.white,
+                  disabledBackgroundColor: modeSombre
+                      ? const Color(0xFF334155)
+                      : const Color(0xFFCBD5E1),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   elevation: 0,
                 ),
@@ -461,21 +527,23 @@ class _ReservationPageState extends State<ReservationPage> {
                         style: GoogleFonts.inter(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
+                          color: Colors.white,
                         ),
                       ),
               ),
             ),
 
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
 
             // Étape suivante du workflow API
             Center(
               child: Text(
                 'Votre réservation sera transmise à votre université pour décision.',
+                textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
-                  color: const Color(0xFF64748B),
+                  color: texteSecondaire,
                 ),
               ),
             ),
@@ -485,30 +553,34 @@ class _ReservationPageState extends State<ReservationPage> {
     );
   }
 
-  PreferredSizeWidget _buildAppBar(BuildContext context) {
+  PreferredSizeWidget _buildAppBar(BuildContext context, bool modeSombre) {
     final unreadNotifs =
         int.tryParse(_counts?['notifications']?.toString() ?? '0') ?? 0;
+    final textePrincipal = modeSombre ? Colors.white : const Color(0xFF0F172A);
+    final fondAppBar = modeSombre
+        ? const Color(0xFF0F172A)
+        : const Color(0xFFF8FAFC);
 
     return AppBar(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: fondAppBar,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       centerTitle: true,
       leading: IconButton(
         tooltip: 'Retour',
-        icon: const Icon(
+        icon: Icon(
           Icons.arrow_back_ios_new_rounded,
           size: 20,
-          color: Color(0xFF0F172A),
+          color: textePrincipal,
         ),
         onPressed: () => Navigator.of(context).maybePop(),
       ),
       title: Text(
         'Réservation',
         style: GoogleFonts.inter(
-          fontSize: 17,
+          fontSize: 18,
           fontWeight: FontWeight.w800,
-          color: const Color(0xFF0F172A),
+          color: textePrincipal,
         ),
       ),
       actions: [
@@ -525,9 +597,9 @@ class _ReservationPageState extends State<ReservationPage> {
                 );
                 _chargerCounts();
               },
-              icon: const Icon(
+              icon: Icon(
                 Icons.notifications_none_rounded,
-                color: Color(0xFF0F172A),
+                color: textePrincipal,
                 size: 26,
               ),
               visualDensity: VisualDensity.compact,
@@ -567,25 +639,44 @@ class _ReservationPageState extends State<ReservationPage> {
 // 1. CARTE VOTRE SÉLECTION
 // -------------------------------------------------------------
 class _CarteVotreSelection extends StatelessWidget {
-  const _CarteVotreSelection({required this.campagne, required this.hopital});
+  const _CarteVotreSelection({
+    required this.campagne,
+    required this.hopital,
+    required this.modeSombre,
+  });
 
   final CampagneStage campagne;
   final HopitalCampagne hopital;
+  final bool modeSombre;
 
   @override
   Widget build(BuildContext context) {
+    final fondCarte = modeSombre ? const Color(0xFF1E293B) : Colors.white;
+    final bordure = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFE2E8F0);
+    final textePrincipal = modeSombre ? Colors.white : const Color(0xFF0F172A);
+    final texteSecondaire = modeSombre
+        ? const Color(0xFF94A3B8)
+        : const Color(0xFF64748B);
+    final separateur = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFF1F5F9);
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: const [
+        color: fondCarte,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: bordure),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x06000000),
+            color: modeSombre
+                ? const Color(0x30000000)
+                : const Color(0x06000000),
             blurRadius: 10,
-            offset: Offset(0, 2),
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -593,16 +684,29 @@ class _CarteVotreSelection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Tag VOTRE SÉLECTION
-          Text(
-            'VOTRE SÉLECTION',
-            style: GoogleFonts.inter(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.5,
-              color: const Color(0xFF1D61F2),
-            ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: modeSombre
+                      ? const Color(0xFF1E3A8A).withValues(alpha: 0.5)
+                      : const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  'VOTRE SÉLECTION',
+                  style: GoogleFonts.inter(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                    color: const Color(0xFF1D61F2),
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 10),
 
           // Titre de la campagne
           Text(
@@ -610,22 +714,24 @@ class _CarteVotreSelection extends StatelessWidget {
             style: GoogleFonts.inter(
               fontSize: 16.5,
               fontWeight: FontWeight.w800,
-              color: const Color(0xFF0F172A),
+              color: textePrincipal,
             ),
           ),
 
           const SizedBox(height: 12),
-          Container(height: 1, color: const Color(0xFFF1F5F9)),
+          Divider(height: 1, color: separateur),
           const SizedBox(height: 12),
 
           // Hôpital avec icône
           Row(
             children: [
               Container(
-                width: 40,
-                height: 40,
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
+                  color: modeSombre
+                      ? const Color(0xFF1E3A8A).withValues(alpha: 0.4)
+                      : const Color(0xFFEFF6FF),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Center(
@@ -646,10 +752,10 @@ class _CarteVotreSelection extends StatelessWidget {
                       style: GoogleFonts.inter(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
-                        color: const Color(0xFF0F172A),
+                        color: textePrincipal,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 3),
                     if (hopital.localisationCourte.isNotEmpty ||
                         hopital.distanceKm > 0)
                       Text(
@@ -662,7 +768,7 @@ class _CarteVotreSelection extends StatelessWidget {
                         style: GoogleFonts.inter(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w500,
-                          color: const Color(0xFF64748B),
+                          color: texteSecondaire,
                         ),
                       ),
                   ],
@@ -671,23 +777,25 @@ class _CarteVotreSelection extends StatelessWidget {
             ],
           ),
 
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
 
           // Période
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.calendar_today_outlined,
                 size: 16,
-                color: Color(0xFF64748B),
+                color: texteSecondaire,
               ),
               const SizedBox(width: 8),
-              Text(
-                'Période: ${campagne.periodeTexte}',
-                style: GoogleFonts.inter(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w500,
-                  color: const Color(0xFF64748B),
+              Expanded(
+                child: Text(
+                  'Période : ${campagne.periodeTexte}',
+                  style: GoogleFonts.inter(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w500,
+                    color: texteSecondaire,
+                  ),
                 ),
               ),
             ],
@@ -702,9 +810,13 @@ class _CarteVotreSelection extends StatelessWidget {
 // CARTE RÉSUMÉ FINANCIER
 // -------------------------------------------------------------
 class _CarteResumeFinancier extends StatelessWidget {
-  const _CarteResumeFinancier({required this.hopital});
+  const _CarteResumeFinancier({
+    required this.hopital,
+    required this.modeSombre,
+  });
 
   final HopitalCampagne hopital;
+  final bool modeSombre;
 
   String get _montant {
     if (!hopital.fraisRequis) return 'Aucun frais requis';
@@ -717,13 +829,34 @@ class _CarteResumeFinancier extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fondCarte = modeSombre ? const Color(0xFF1E293B) : Colors.white;
+    final bordure = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFE2E8F0);
+    final textePrincipal = modeSombre ? Colors.white : const Color(0xFF0F172A);
+    final texteSecondaire = modeSombre
+        ? const Color(0xFF94A3B8)
+        : const Color(0xFF64748B);
+    final separateur = modeSombre
+        ? const Color(0xFF334155)
+        : const Color(0xFFF1F5F9);
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        color: fondCarte,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: bordure),
+        boxShadow: [
+          BoxShadow(
+            color: modeSombre
+                ? const Color(0x30000000)
+                : const Color(0x06000000),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -737,7 +870,7 @@ class _CarteResumeFinancier extends StatelessWidget {
                 style: GoogleFonts.inter(
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
-                  color: const Color(0xFF0F172A),
+                  color: textePrincipal,
                 ),
               ),
               Flexible(
@@ -755,14 +888,14 @@ class _CarteResumeFinancier extends StatelessWidget {
           ),
           if (hopital.conditions != null) ...[
             const SizedBox(height: 12),
-            Container(height: 1, color: const Color(0xFFF1F5F9)),
+            Divider(height: 1, color: separateur),
             const SizedBox(height: 12),
             Text(
               hopital.conditions!,
               style: GoogleFonts.inter(
                 fontSize: 12.5,
                 fontWeight: FontWeight.w500,
-                color: const Color(0xFF64748B),
+                color: texteSecondaire,
                 height: 1.4,
               ),
             ),

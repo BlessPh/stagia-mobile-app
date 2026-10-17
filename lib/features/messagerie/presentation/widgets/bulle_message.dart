@@ -25,8 +25,8 @@ class BulleMessage extends StatelessWidget {
     final largeurMax = estTablette ? 460.0 : largeurEcran * 0.78;
 
     final fond = message.estMien
-        ? const Color(0xFF1D61F2)
-        : (modeSombre ? const Color(0xFF262626) : const Color(0xFFF1F5F9));
+        ? const Color(0xFFFF751F)
+        : (modeSombre ? const Color(0xFF1E293B) : Colors.white);
 
     final bordureRayon = message.estMien
         ? const BorderRadius.only(
@@ -47,8 +47,12 @@ class BulleMessage extends StatelessWidget {
         : (modeSombre ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A));
 
     final couleurHeure = message.estMien
-        ? Colors.white.withValues(alpha: 0.75)
-        : const Color(0xFF94A3B8);
+        ? Colors.white.withValues(alpha: 0.8)
+        : (modeSombre ? const Color(0xFF94A3B8) : const Color(0xFF64748B));
+
+    final bordureBulle = message.estMien
+        ? Colors.transparent
+        : (modeSombre ? const Color(0xFF334155) : const Color(0xFFE2E8F0));
 
     return Align(
       alignment: message.estMien ? Alignment.centerRight : Alignment.centerLeft,
@@ -62,12 +66,13 @@ class BulleMessage extends StatelessWidget {
             decoration: BoxDecoration(
               color: fond,
               borderRadius: bordureRayon,
+              border: Border.all(color: bordureBulle, width: 1),
               boxShadow: [
                 BoxShadow(
                   color: message.estMien
-                      ? const Color(0xFF1D61F2).withValues(alpha: 0.18)
-                      : Colors.black.withValues(alpha: 0.03),
-                  blurRadius: 6,
+                      ? const Color(0xFFFF751F).withValues(alpha: 0.22)
+                      : (modeSombre ? const Color(0x33000000) : const Color(0x06000000)),
+                  blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
               ],
@@ -85,7 +90,7 @@ class BulleMessage extends StatelessWidget {
                     style: GoogleFonts.inter(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
-                      color: const Color(0xFF1D61F2),
+                      color: modeSombre ? const Color(0xFFCBD5E1) : const Color(0xFF1D61F2),
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -112,6 +117,7 @@ class BulleMessage extends StatelessWidget {
                     nomFichier: message.nomFichier ?? 'Document.pdf',
                     tailleFichier: message.tailleFichier ?? '1.0 Mo',
                     estMien: message.estMien,
+                    modeSombre: modeSombre,
                   )
                 else
                   Text(
@@ -162,23 +168,31 @@ class _CarteDocumentMessage extends StatelessWidget {
     required this.nomFichier,
     required this.tailleFichier,
     required this.estMien,
+    required this.modeSombre,
   });
 
   final String nomFichier;
   final String tailleFichier;
   final bool estMien;
+  final bool modeSombre;
 
   @override
   Widget build(BuildContext context) {
     final fondDoc = estMien
         ? Colors.white.withValues(alpha: 0.15)
-        : const Color(0xFFE2E8F0);
+        : (modeSombre ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9));
+    final iconeCouleur = modeSombre ? const Color(0xFFCBD5E1) : const Color(0xFF1D61F2);
 
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: fondDoc,
         borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: estMien
+              ? Colors.white.withValues(alpha: 0.2)
+              : (modeSombre ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -187,12 +201,12 @@ class _CarteDocumentMessage extends StatelessWidget {
             width: 38,
             height: 38,
             decoration: BoxDecoration(
-              color: estMien ? Colors.white : const Color(0xFF1D61F2),
+              color: estMien ? Colors.white : (modeSombre ? const Color(0xFF334155) : const Color(0xFFEFF6FF)),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
               Icons.picture_as_pdf_rounded,
-              color: estMien ? const Color(0xFF1D61F2) : Colors.white,
+              color: estMien ? const Color(0xFFFF751F) : iconeCouleur,
               size: 22,
             ),
           ),
@@ -209,7 +223,7 @@ class _CarteDocumentMessage extends StatelessWidget {
                   style: GoogleFonts.inter(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: estMien ? Colors.white : const Color(0xFF0F172A),
+                    color: estMien ? Colors.white : (modeSombre ? Colors.white : const Color(0xFF0F172A)),
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -218,8 +232,8 @@ class _CarteDocumentMessage extends StatelessWidget {
                   style: GoogleFonts.inter(
                     fontSize: 11,
                     color: estMien
-                        ? Colors.white.withValues(alpha: 0.75)
-                        : const Color(0xFF64748B),
+                        ? Colors.white.withValues(alpha: 0.8)
+                        : (modeSombre ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                   ),
                 ),
               ],
@@ -228,7 +242,7 @@ class _CarteDocumentMessage extends StatelessWidget {
           const SizedBox(width: 6),
           Icon(
             Icons.download_rounded,
-            color: estMien ? Colors.white : const Color(0xFF1D61F2),
+            color: estMien ? Colors.white : iconeCouleur,
             size: 20,
           ),
         ],

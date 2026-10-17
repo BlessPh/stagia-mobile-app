@@ -6,6 +6,7 @@ enum CategorieDiscussion {
 }
 
 enum StatutMessage {
+  enCours,
   envoye,
   distribue,
   lu,
